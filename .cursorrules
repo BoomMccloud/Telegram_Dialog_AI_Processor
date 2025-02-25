@@ -133,29 +133,381 @@ If needed, you can further use the `web_scraper.py` file to scrape the web page 
 
 ## Background and Motivation
 
-(Planner writes: User/business requirements, macro objectives, why this problem needs to be solved)
-The executor has access to three tools: invoking 3rd party LLM, invoking web browser, invoking search engine.
+This is a Telegram dialog processing system consisting of two main components:
+
+1. `tg_data_downloader.py`: A Telegram data collection service that:
+   - Downloads messages from both group and private chats
+   - Focuses on unread messages and messages from the last 24 hours
+   - Stores the last 20 messages for each relevant dialog
+   - Outputs data to telegram_data.json
+
+2. `reply_only_llama3.2.py`: A dialog processing system that:
+   - Uses the Llama model for generating responses
+   - Implements a sophisticated message processing pipeline
+   - Has built-in safety and validation mechanisms
+   - Generates context-aware responses
+
+The system appears to be designed for automated processing and responding to Telegram messages using LLM technology.
 
 ## Key Challenges and Analysis
 
-(Planner: Records of technical barriers, resource constraints, potential risks)
+1. Technical Architecture Challenges:
+   - Integration of FastAPI backend with existing Python scripts
+   - Implementation of secure QR code-based Telegram authentication
+   - Management of concurrent user sessions and message processing
+   - Handling of periodic background tasks for message downloading
+   - Database design for storing user sessions and message history
+
+2. Security Considerations:
+   - Secure storage of Telegram API credentials:
+     - Use environment variables for sensitive data
+     - Implement credential rotation mechanism
+     - Monitor for unauthorized access attempts
+   - Implement comprehensive access control policies:
+     - Rate limiting on API endpoints
+     - IP-based blocking for suspicious activity
+     - Session timeout and renewal policies
+   - Regular security audits and vulnerability assessments
+   - Implement HTTPS everywhere with certificate automation
+
+3. Performance Risks:
+   - Scalability of message processing with multiple users
+   - Resource management for LLM model instances
+   - Network latency in message processing pipeline
+   - Database performance with large message volumes
 
 ## Verifiable Success Criteria
 
-(Planner: List measurable or verifiable goals to be achieved)
+1. Authentication & Security:
+   - Successful QR code-based Telegram login
+   - Secure session management
+   - Protected API endpoints
+   - Encrypted data storage
+
+2. Functionality:
+   - Real-time message synchronization
+   - Accurate message processing with LLama model
+   - Two-way communication working in both web UI and Telegram
+   - Background task execution for periodic updates
+
+3. Performance:
+   - Message processing latency under 5 seconds
+   - UI responsiveness under 200ms
+   - Successful handling of concurrent users
+   - Efficient database queries
 
 ## High-level Task Breakdown
 
-(Planner: List subtasks by phase, or break down into modules)
+1. Backend Development (FastAPI):
+   a. Project Setup:
+      - Create a modular FastAPI project structure supporting scalability
+      - Set up dependency management with a focus on security for API keys
+      - Configure environment variables for both local and production environments
+      - Implement database models with a focus on user sessions and message history
+
+   b. Authentication System:
+      - Develop a secure QR code-based authentication mechanism:
+        - Generate unique QR codes with expiration timestamps
+        - Implement Telegram bot for QR code validation
+        - Handle concurrent login attempts securely
+      - Define the QR code generation and scanning flow:
+        1. User requests login -> Generate unique QR code
+        2. User scans QR with Telegram -> Bot validates user
+        3. WebSocket notification of successful auth
+        4. Session creation and redirect to dashboard
+      - Implement session management with JWT tokens
+      - Add robust authentication middleware for API protection
+
+   c. Core API Endpoints:
+      - Message download endpoint
+      - Message processing endpoint
+      - User preferences endpoint
+      - Status and health check endpoints
+
+   d. Background Tasks:
+      - Periodic message fetching service
+      - Message processing queue
+      - Notification system
+      - Cleanup tasks
+
+2. Frontend Development (Next.js on Vercel):
+   a. UI Components:
+      - Login page with QR code display (implemented using Next.js components)
+      - Message dashboard with real-time updates (using Next.js App Router)
+      - Chat interface with WebSocket integration
+      - Settings panel with dynamic updates
+
+   b. State Management:
+      - User session handling through Next.js context or Redux
+      - Real-time updates using WebSockets or Server-Sent Events (SSE) integrated with Next.js App Router
+      - Error handling with Next.js error boundaries
+      - Loading states using Next.js suspense features
+
+   c. API Integration:
+      - Next.js API routes for backend communication
+      - Environment configuration for different deployments
+      - WebSocket connection management
+      - Error handling and retry logic
+
+3. Integration Layer:
+   a. Next.js and FastAPI Integration:
+      - Use Next.js API routes to proxy requests to the FastAPI backend
+      - Ensure CORS policies are configured to allow requests from Vercel
+      - Adapt reply_only_llama3.2.py for web service compatibility
+      - Maintain shared data models across frontend and backend for consistency
+      - Implement robust error handling in both frontend and backend
+
+   b. Database Integration:
+      - Design schema for users and messages:
+        ```sql
+        -- Message History Table
+        CREATE TABLE message_history (
+            message_id UUID PRIMARY KEY,
+            dialog_name VARCHAR(255),
+            message_date TIMESTAMP,
+            sender_name VARCHAR(255),
+            message_text TEXT,
+            INDEX(message_date)
+        );
+
+        -- Processing Results Table
+        CREATE TABLE processing_results (
+            result_id UUID PRIMARY KEY,
+            message_id UUID NOT NULL,
+            processed_text TEXT,
+            response_text TEXT,
+            processing_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (message_id) REFERENCES message_history(message_id)
+        );
+
+        -- Authentication Data Table
+        CREATE TABLE authentication_data (
+            auth_id UUID PRIMARY KEY,
+            telegram_id BIGINT UNIQUE NOT NULL,
+            encrypted_data BYTEA,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        ```
+      - Implement direct database interactions using asyncpg
+      - Create database migration scripts
+      - Set up per-user database isolation
+
+      Storage Strategy:
+      1. Security:
+         - One container per user for complete data isolation
+         - Encrypt sensitive data (auth tokens, passwords)
+         - Regular security audits and logging
+      2. Performance:
+         - Index critical fields (message_date)
+         - Utilize PostgreSQL's built-in query cache
+         - Implement efficient async database operations
+      3. Deployment:
+         - Docker Compose setup for easy deployment
+         - Automated container creation per user
+         - Simple backup and restore procedures
+
+4. Testing & Deployment:
+   a. Testing:
+      - Unit tests for API endpoints
+      - Integration tests for message processing
+      - Frontend component tests using Jest and React Testing Library
+      - End-to-end testing with Cypress
+      - Load testing for concurrent user scenarios
+
+   b. Deployment:
+      Frontend (Vercel):
+      ```yaml
+      # vercel.json
+      {
+        "env": {
+          "NEXT_PUBLIC_API_URL": "https://api.yourdomain.com",
+          "NEXT_PUBLIC_WS_URL": "wss://api.yourdomain.com"
+        },
+        "build": {
+          "env": {
+            "NEXT_PUBLIC_API_URL": "https://api.yourdomain.com",
+            "NEXT_PUBLIC_WS_URL": "wss://api.yourdomain.com"
+          }
+        }
+      }
+      ```
+
+      Backend (Docker Compose):
+      ```yaml
+      version: '3.8'
+      services:
+        app:
+          build: .
+          environment:
+            - POSTGRES_DB=${DB_NAME}
+            - POSTGRES_USER=${DB_USER}
+            - POSTGRES_PASSWORD=${DB_PASSWORD}
+            - TELEGRAM_API_ID=${TELEGRAM_API_ID}
+            - TELEGRAM_API_HASH=${TELEGRAM_API_HASH}
+            - CORS_ORIGINS=${CORS_ORIGINS}
+            - JWT_SECRET=${JWT_SECRET}
+            - REDIS_URL=${REDIS_URL}
+          volumes:
+            - ./app:/app
+          depends_on:
+            - db
+          ports:
+            - "8000:8000"
+          healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+
+        db:
+          image: postgres:15
+          environment:
+            - POSTGRES_DB=${DB_NAME}
+            - POSTGRES_USER=${DB_USER}
+            - POSTGRES_PASSWORD=${DB_PASSWORD}
+          volumes:
+            - postgres_data:/var/lib/postgresql/data
+          healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+
+      volumes:
+        postgres_data:
+      ```
+
+   c. Monitoring and Observability:
+      - System health monitoring:
+        - CPU, memory, and disk usage
+        - API endpoint response times
+        - Database query performance
+        - WebSocket connection status
+      - Error tracking and alerting:
+        - Centralized error logging
+        - Alert thresholds for critical metrics
+        - Automated incident response
+      - Performance monitoring:
+        - Real-time user metrics
+        - Message processing latency
+        - Database query analysis
+
+   d. Backup and Recovery:
+      - Automated daily database backups
+      - Point-in-time recovery capability
+      - Backup verification and testing
+      - Disaster recovery procedures
+
+## Development Workflow
+
+1. Local Development:
+   - Prerequisites:
+     - Docker and Docker Compose
+     - Node.js 18+ and npm/yarn
+     - Python 3.9+
+   - Setup steps:
+     ```bash
+     # Clone repository
+     git clone <repository-url>
+     cd <repository>
+
+     # Frontend setup
+     cd frontend
+     npm install
+     npm run dev
+
+     # Backend setup
+     cd ../backend
+     python -m venv .venv
+     source .venv/bin/activate
+     pip install -r requirements.txt
+     
+     # Start services
+     docker-compose up -d
+     ```
+
+2. Git Workflow:
+   - Branch naming convention:
+     - feature/* for new features
+     - fix/* for bug fixes
+     - chore/* for maintenance
+   - Pull request requirements:
+     - Code review by at least one team member
+     - All tests passing
+     - No security vulnerabilities
+     - Documentation updated
+
+3. CI/CD Pipeline:
+   - On pull request:
+     - Run linting and tests
+     - Build Docker images
+     - Deploy to staging environment
+   - On merge to main:
+     - Deploy to production
+     - Run smoke tests
+     - Monitor for errors
 
 ## Current Status / Progress Tracking
 
-(Executor: Update completion status after each subtask. If needed, use bullet points or tables to show Done/In progress/Blocked status)
+Status: Ready for Implementation
+- Architecture updated for Next.js on Vercel frontend
+- Backend configuration prepared for CORS and WebSocket support
+- Deployment configurations defined for both frontend and backend
 
-## Next Steps and Action Items
+## MVP Development Focus
 
-(Planner: Specific arrangements for the Executor)
+1. Core Features for MVP:
+   - Implement QR code-based Telegram login in FastAPI
+   - Set up message retrieval from Telegram using the bot
+   - Process messages using the Llama model
+   - Display messages and responses on a basic Next.js frontend
+
+2. Next Steps and Action Items for MVP:
+   - Set up FastAPI backend:
+     - Initialize FastAPI application
+     - Implement Telegram authentication via QR code
+     - Create an endpoint for message processing
+     - Ensure CORS is configured for Next.js frontend
+
+   - Set up Next.js frontend:
+     - Create a simple page to display QR code for login
+     - Show incoming messages and generated responses
+     - Configure environment variables for API communication
+
+   - Deployment and Testing:
+     - Deploy backend and frontend using Docker and Vercel
+     - Test the end-to-end user journey from login to message display
+     - Verify the integration between components
+
+## Incremental Development Plan
+
+### Sprint 1: Enhance Authentication and User Management
+- Implement comprehensive access control policies
+- Add user registration and profile management
+- Improve session management with enhanced JWT token handling
+- Conduct security audits and vulnerability assessments
+
+### Sprint 2: Expand Message Processing Capabilities
+- Integrate advanced message processing features within the Llama model
+- Implement language support for additional languages
+- Optimize message processing latency and resource management
+- Introduce user-specific message processing preferences
+
+### Sprint 3: Improve UI and User Experience
+- Develop a rich message dashboard with advanced filtering and searching capabilities
+- Enhance chat interface with multimedia support (images, videos, etc.)
+- Implement real-time collaboration features for group chats
+- Conduct user experience testing and feedback integration
+
+### Sprint 4: Scale System Performance and Robustness
+- Scale message processing for concurrent users
+- Enhance database performance with optimized queries and indexing
+- Conduct load testing and performance monitoring
+- Implement backup and recovery strategies for data integrity
 
 ## Executor's Feedback or Assistance Requests
 
-(Executor: Write here when encountering blockers, questions, or need for more information during execution)
+Ready to begin implementation with Next.js and FastAPI. Need to:
+1. Set up Next.js project with App Router
+2. Configure FastAPI for CORS and WebSocket support
+3. Test local development environment

@@ -6,8 +6,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 import sys
 import time
-from tools.token_tracker import TokenUsage, APIResponse, get_token_tracker
-from tools.llm_api import query_llm, create_llm_client
+from token_tracker import TokenUsage, APIResponse, get_token_tracker
+from llm_api import query_llm, create_llm_client
 
 STATUS_FILE = '.cursorrules'
 
