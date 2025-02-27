@@ -4,6 +4,29 @@ import os
 from datetime import datetime, timedelta
 from .auth import client_sessions
 
+async def get_dialogs(session_id: str) -> List[Dict]:
+    """Get list of dialogs (chats)"""
+    session = client_sessions.get(session_id)
+    if not session or not session.get("client"):
+        raise ValueError("Invalid or expired session")
+    
+    client = session["client"]
+    if not await client.is_user_authorized():
+        raise ValueError("Client is not authorized")
+
+    dialogs = []
+    async for dialog in client.iter_dialogs():
+        dialogs.append({
+            "id": dialog.id,
+            "name": dialog.name or "Unknown",
+            "unread_count": dialog.unread_count,
+            "is_group": dialog.is_group,
+            "is_channel": dialog.is_channel,
+            "is_user": dialog.is_user
+        })
+    
+    return dialogs
+
 async def get_recent_messages(session_id: str, limit: int = 20) -> List[Dict]:
     """Get recent messages from all dialogs"""
     session = client_sessions.get(session_id)

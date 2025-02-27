@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
 
@@ -8,6 +9,7 @@ export default function Home() {
   const [qrCode, setQrCode] = useState<string>('');
   const [sessionId, setSessionId] = useState<string>('');
   const [status, setStatus] = useState<string>('pending');
+  const router = useRouter();
 
   const createQrSession = async () => {
     try {
@@ -26,13 +28,16 @@ export default function Home() {
     if (!sessionId) return;
 
     try {
+      console.log('Checking session status for:', sessionId);
       const response = await fetch(`${API_URL}/auth/session/${sessionId}`);
       const data = await response.json();
+      console.log('Session status response:', data);
       setStatus(data.status);
 
       if (data.status === 'authenticated') {
-        // Redirect to dashboard or store auth token
-        console.log('Authentication successful!');
+        console.log('Authentication successful, storing session and redirecting...');
+        localStorage.setItem('sessionId', sessionId);
+        router.push('/messages');
       }
     } catch (error) {
       console.error('Error checking session status:', error);
@@ -40,8 +45,15 @@ export default function Home() {
   };
 
   useEffect(() => {
+    // Check if already authenticated
+    const storedSessionId = localStorage.getItem('sessionId');
+    if (storedSessionId) {
+      router.push('/messages');
+      return;
+    }
+
     createQrSession();
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     if (sessionId && status === 'pending') {

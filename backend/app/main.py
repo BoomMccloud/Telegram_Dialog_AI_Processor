@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 import os
 
 from .api.auth import router as auth_router
+from .api.messages import router as messages_router
 
 # Load environment variables
 load_dotenv()
@@ -21,6 +22,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(auth_router, prefix="/api", tags=["auth"])
+app.include_router(messages_router, prefix="/api", tags=["messages"])
 
 @app.get("/health")
 async def health_check():
