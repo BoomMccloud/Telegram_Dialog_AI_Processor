@@ -263,6 +263,10 @@ The system appears to be designed for automated processing and responding to Tel
             FOREIGN KEY (message_id) REFERENCES message_history(message_id)
         );
 
+        -- Priority Processing Index (NEW)
+        CREATE INDEX idx_processing_priority ON processing_queue 
+            USING BTREE (status, priority DESC, created_at);
+
         -- Auto-reply Rules Table
         CREATE TABLE auto_reply_rules (
             rule_id UUID PRIMARY KEY,
@@ -272,6 +276,24 @@ The system appears to be designed for automated processing and responding to Tel
             is_active BOOLEAN DEFAULT true,
             created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
             last_triggered_at TIMESTAMP WITH TIME ZONE
+        );
+
+        -- User Selected Dialogs Table
+        CREATE TABLE user_selected_dialogs (
+            selection_id UUID PRIMARY KEY,
+            user_id BIGINT NOT NULL,
+            dialog_id BIGINT NOT NULL,
+            dialog_name VARCHAR(255),
+            is_active BOOLEAN DEFAULT true,
+            processing_enabled BOOLEAN DEFAULT true,
+            auto_reply_enabled BOOLEAN DEFAULT false,
+            response_approval_required BOOLEAN DEFAULT true,
+            priority INTEGER DEFAULT 0,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            last_processed_at TIMESTAMP WITH TIME ZONE,
+            processing_settings JSONB,
+            UNIQUE(user_id, dialog_id)
         );
         ```
 
@@ -406,6 +428,7 @@ The system appears to be designed for automated processing and responding to Tel
            CREATE INDEX idx_message_history_dialog ON message_history (dialog_id, message_date DESC);
            CREATE INDEX idx_processing_queue_status ON processing_queue (status, priority DESC);
            CREATE INDEX idx_auth_data_active ON authentication_data (is_active, last_active_at DESC);
+           CREATE INDEX idx_user_selected_dialogs_user ON user_selected_dialogs (user_id, is_active, priority DESC);
            ```
          - Implement efficient async database operations using connection pooling
       3. Deployment:
@@ -769,3 +792,34 @@ Next steps:
 2. Verify database initialization and schema creation
 3. Ensure proper communication between frontend and backend containers
 4. Implement CI/CD pipeline for automated Docker builds and deployments
+
+### Current Status - User Dialog Selection Feature Added
+
+I've added a new database table called `user_selected_dialogs` to give users control over which Telegram conversations the service will process. This enhancement:
+
+1. **Provides User Control**: Users can explicitly select which dialogs (chats) they want the system to process
+2. **Supports Prioritization**: Allows setting different priority levels for different conversations
+3. **Enables Granular Settings**: Users can enable/disable processing and auto-replies on a per-dialog basis
+4. **Stores Processing Preferences**: The JSONB `processing_settings` field can store dialog-specific processing parameters
+
+The table structure includes:
+- `selection_id`: Primary key for the selection
+- `user_id`: The Telegram user ID who owns this selection
+- `dialog_id`: The Telegram dialog/chat ID being selected
+- `dialog_name`: Name of the dialog for display purposes
+- `is_active`: Whether this selection is currently active
+- `processing_enabled`: Whether message processing is enabled for this dialog
+- `auto_reply_enabled`: Whether auto-replies are enabled for this dialog
+- `response_approval_required`: Whether response approval is required for this dialog
+- `priority`: Processing priority (higher numbers = higher priority)
+- `created_at` and `updated_at`: Timestamps for creation and updates
+- `last_processed_at`: When the dialog was last processed
+- `processing_settings`: JSON field for dialog-specific processing parameters
+
+An index has been added to optimize queries by user, active status, and priority.
+
+Next steps for this feature:
+1. Create API endpoints for managing selected dialogs
+2. Update the message processing logic to filter by selected dialogs
+3. Add UI components for dialog selection and configuration
+4. Implement dialog-specific processing settings

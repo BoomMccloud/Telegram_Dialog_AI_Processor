@@ -1,9 +1,9 @@
 version: '3.8'
 
 services:
-  # PostgreSQL Database
+  # PostgreSQL Database with vector extension
   postgres:
-    image: postgres:15
+    image: ankane/pgvector:v0.5.1
     container_name: telegram-dialog-processor-db
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
@@ -55,6 +55,11 @@ services:
         python -m app.db.init_db &&
         uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
       "
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     networks:
       - app-network
 
