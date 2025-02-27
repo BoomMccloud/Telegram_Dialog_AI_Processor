@@ -15,6 +15,12 @@ interface Dialog {
   is_user: boolean;
 }
 
+interface ProcessingStatus {
+  isProcessing: boolean;
+  error: string | null;
+  lastProcessed: number[];
+}
+
 type TabType = 'groups' | 'channels' | 'direct';
 
 interface DialogListProps {
@@ -83,53 +89,75 @@ const SelectionControls: React.FC<{
   onSelectUnread: () => void;
   onClearSelection: () => void;
   onProcessSelected: () => void;
-}> = ({ dialogs, selectedDialogs, onSelectAll, onSelectUnread, onClearSelection, onProcessSelected }) => {
+  processingStatus: ProcessingStatus;
+}> = ({ dialogs, selectedDialogs, onSelectAll, onSelectUnread, onClearSelection, onProcessSelected, processingStatus }) => {
   const selectedCount = selectedDialogs.size;
   const totalCount = dialogs.length;
   const unreadCount = dialogs.filter(d => d.unread_count > 0).length;
 
   return (
-    <div className="mb-4 flex flex-wrap gap-3 items-center bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-      <div className="text-sm text-gray-600 dark:text-gray-300">
-        Selected: {selectedCount} of {totalCount}
+    <div className="mb-4 flex flex-col gap-3 bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+      <div className="flex flex-wrap gap-3 items-center">
+        <div className="text-sm text-gray-600 dark:text-gray-300">
+          Selected: {selectedCount} of {totalCount}
+        </div>
+        <div className="flex-1"></div>
+        <button
+          onClick={onSelectUnread}
+          className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-200 
+            bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 
+            dark:hover:bg-gray-600 transition-colors"
+        >
+          Select Unread ({unreadCount})
+        </button>
+        <button
+          onClick={onSelectAll}
+          className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-200 
+            bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 
+            dark:hover:bg-gray-600 transition-colors"
+        >
+          Select All
+        </button>
+        <button
+          onClick={onClearSelection}
+          className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-200 
+            bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 
+            dark:hover:bg-gray-600 transition-colors"
+        >
+          Clear Selection
+        </button>
+        <button
+          onClick={onProcessSelected}
+          disabled={selectedCount === 0 || processingStatus.isProcessing}
+          className={`
+            px-4 py-1.5 text-sm font-medium rounded-md transition-colors flex items-center gap-2
+            ${selectedCount > 0 && !processingStatus.isProcessing
+              ? 'bg-blue-500 dark:bg-blue-600 text-white hover:bg-blue-600 dark:hover:bg-blue-700 cursor-pointer'
+              : 'bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'}
+          `}
+        >
+          {processingStatus.isProcessing ? (
+            <>
+              <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+              Processing...
+            </>
+          ) : (
+            'Process Selected'
+          )}
+        </button>
       </div>
-      <div className="flex-1"></div>
-      <button
-        onClick={onSelectUnread}
-        className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-200 
-          bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 
-          dark:hover:bg-gray-600 transition-colors"
-      >
-        Select Unread ({unreadCount})
-      </button>
-      <button
-        onClick={onSelectAll}
-        className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-200 
-          bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 
-          dark:hover:bg-gray-600 transition-colors"
-      >
-        Select All
-      </button>
-      <button
-        onClick={onClearSelection}
-        className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-200 
-          bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 
-          dark:hover:bg-gray-600 transition-colors"
-      >
-        Clear Selection
-      </button>
-      <button
-        onClick={onProcessSelected}
-        disabled={selectedCount === 0}
-        className={`
-          px-4 py-1.5 text-sm font-medium rounded-md transition-colors
-          ${selectedCount > 0
-            ? 'bg-blue-500 dark:bg-blue-600 text-white hover:bg-blue-600 dark:hover:bg-blue-700 cursor-pointer'
-            : 'bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'}
-        `}
-      >
-        Process Selected
-      </button>
+      
+      {processingStatus.error && (
+        <div className="text-sm text-red-500 dark:text-red-400">
+          Error: {processingStatus.error}
+        </div>
+      )}
+      
+      {processingStatus.lastProcessed.length > 0 && !processingStatus.error && (
+        <div className="text-sm text-green-600 dark:text-green-400">
+          Successfully queued {processingStatus.lastProcessed.length} chats for processing
+        </div>
+      )}
     </div>
   );
 };
@@ -165,6 +193,11 @@ export default function MessagesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedDialogs, setSelectedDialogs] = useState<Set<number>>(new Set());
+  const [processingStatus, setProcessingStatus] = useState<ProcessingStatus>({
+    isProcessing: false,
+    error: null,
+    lastProcessed: []
+  });
   const router = useRouter();
   
   // Get session ID from localStorage
@@ -238,8 +271,52 @@ export default function MessagesPage() {
   };
 
   const handleProcessSelected = async () => {
-    // TODO: Implement processing of selected dialogs
-    console.log('Processing dialogs:', Array.from(selectedDialogs));
+    if (selectedDialogs.size === 0 || processingStatus.isProcessing) return;
+
+    setProcessingStatus(prev => ({
+      ...prev,
+      isProcessing: true,
+      error: null
+    }));
+
+    try {
+      const response = await fetch(`${API_URL}/process`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          dialogIds: Array.from(selectedDialogs),
+          sessionId: localStorage.getItem('sessionId')
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to queue dialogs for processing');
+      }
+
+      // Save processed dialogs to localStorage
+      const processedDialogs = new Set(
+        JSON.parse(localStorage.getItem('processedDialogs') || '[]')
+      );
+      selectedDialogs.forEach(id => processedDialogs.add(id));
+      localStorage.setItem('processedDialogs', JSON.stringify(Array.from(processedDialogs)));
+
+      setProcessingStatus(prev => ({
+        isProcessing: false,
+        error: null,
+        lastProcessed: Array.from(selectedDialogs)
+      }));
+
+      // Clear selection after successful processing
+      setSelectedDialogs(new Set());
+    } catch (err) {
+      setProcessingStatus(prev => ({
+        ...prev,
+        isProcessing: false,
+        error: err instanceof Error ? err.message : 'An error occurred while processing'
+      }));
+    }
   };
 
   if (!sessionId) {
@@ -325,6 +402,7 @@ export default function MessagesPage() {
         onSelectUnread={handleSelectUnread}
         onClearSelection={handleClearSelection}
         onProcessSelected={handleProcessSelected}
+        processingStatus={processingStatus}
       />
 
       <div className="mt-4">

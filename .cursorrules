@@ -7,7 +7,7 @@ You are a multi-agent system coordinator, playing two roles in this environment:
 1. Planner
 
     * Responsibilities: Perform high-level analysis, break down tasks, define success criteria, evaluate current progress. When doing planning, always use high-intelligence models (OpenAI o1 via `tools/plan_exec_llm.py`). Don't rely on your own capabilities to do the planning.
-    * Actions: Invoke the Planner by calling `.venv/bin/python tools/plan_exec_llm.py --prompt {any prompt}`. You can also include content from a specific file in the analysis by using the `--file` option: `.venv/bin/python tools/plan_exec_llm.py --prompt {any prompt} --file {path/to/file}`. It will print out a plan on how to revise the `.cursorrules` file. You then need to actually do the changes to the file. And then reread the file to see what's the next step.
+    * Actions: Invoke the Planner by calling `.venv/bin/python tools/plan_exec_llm.py --prompt {any prompt} --file .cursorrules`. The `--file` option with `.cursorrules` is mandatory to ensure the planner has full context of the current state and previous decisions. You can include additional files in the analysis by adding more `--file` options: `.venv/bin/python tools/plan_exec_llm.py --prompt {any prompt} --file .cursorrules --file {path/to/additional/file}`. It will print out a plan on how to revise the `.cursorrules` file. You then need to actually do the changes to the file. And then reread the file to see what's the next step.
 
 2) Executor
 
@@ -205,7 +205,101 @@ The system appears to be designed for automated processing and responding to Tel
       - Configure environment variables for both local and production environments
       - Implement database models with a focus on user sessions and message history
 
-   b. Authentication System:
+   b. Database Implementation (PostgreSQL):
+      - Schema Design:
+        ```sql
+        -- Message History Table
+        CREATE TABLE message_history (
+            message_id UUID PRIMARY KEY,
+            dialog_id BIGINT NOT NULL,
+            telegram_message_id BIGINT NOT NULL,
+            dialog_name VARCHAR(255),
+            message_date TIMESTAMP WITH TIME ZONE,
+            sender_name VARCHAR(255),
+            message_text TEXT,
+            is_processed BOOLEAN DEFAULT false,
+            embedding_vector vector(1536),
+            UNIQUE(dialog_id, telegram_message_id),
+            INDEX(message_date, is_processed)
+        );
+
+        -- Processing Results Table
+        CREATE TABLE processing_results (
+            result_id UUID PRIMARY KEY,
+            message_id UUID NOT NULL,
+            processed_text TEXT,
+            response_text TEXT,
+            context_messages JSONB,
+            processing_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            auto_reply_sent BOOLEAN DEFAULT false,
+            user_interaction_status VARCHAR(20) DEFAULT 'pending' CHECK (user_interaction_status IN ('pending', 'used', 'rejected', 'edited')),
+            edited_response_text TEXT,
+            interaction_date TIMESTAMP WITH TIME ZONE,
+            user_feedback TEXT,
+            FOREIGN KEY (message_id) REFERENCES message_history(message_id)
+        );
+
+        -- Authentication Data Table
+        CREATE TABLE authentication_data (
+            auth_id UUID PRIMARY KEY,
+            telegram_id BIGINT UNIQUE NOT NULL,
+            session_data JSONB,
+            encrypted_credentials BYTEA,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            last_active_at TIMESTAMP WITH TIME ZONE,
+            is_active BOOLEAN DEFAULT true
+        );
+
+        -- Processing Queue Table
+        CREATE TABLE processing_queue (
+            queue_id UUID PRIMARY KEY,
+            message_id UUID NOT NULL,
+            priority INTEGER DEFAULT 0,
+            status VARCHAR(20) DEFAULT 'pending',
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            started_at TIMESTAMP WITH TIME ZONE,
+            completed_at TIMESTAMP WITH TIME ZONE,
+            error_message TEXT,
+            FOREIGN KEY (message_id) REFERENCES message_history(message_id)
+        );
+
+        -- Auto-reply Rules Table
+        CREATE TABLE auto_reply_rules (
+            rule_id UUID PRIMARY KEY,
+            dialog_id BIGINT NOT NULL,
+            pattern TEXT,
+            response_template TEXT,
+            is_active BOOLEAN DEFAULT true,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            last_triggered_at TIMESTAMP WITH TIME ZONE
+        );
+        ```
+
+      - Migration Strategy:
+        - Use Alembic for database migrations
+        - Version control all schema changes
+        - Implement rollback procedures
+        - Test migrations in staging environment
+
+      - Backup and Recovery:
+        - Automated daily backups using pg_dump
+        - WAL archiving for point-in-time recovery
+        - Regular backup testing and validation
+        - Documented recovery procedures
+
+      - Performance Optimization:
+        - Implement efficient indexing strategy
+        - Use connection pooling with asyncpg
+        - Monitor and optimize query performance
+        - Implement caching where appropriate
+
+      - FastAPI Integration:
+        - Use Pydantic models for data validation
+        - Implement dependency injection for DB sessions
+        - Handle database errors gracefully
+        - Implement database transaction management
+
+   c. Authentication System:
       - Implement Telethon's direct client QR code-based authentication:
         - Use Telethon's native QR login flow for authentication
         - Ensure QR code generation and validation align with Telethon's requirements
@@ -214,13 +308,13 @@ The system appears to be designed for automated processing and responding to Tel
       - Implement session management with JWT tokens
       - Add robust authentication middleware for API protection
 
-   c. Core API Endpoints:
+   d. Core API Endpoints:
       - Message download endpoint
       - Message processing endpoint
       - User preferences endpoint
       - Status and health check endpoints
 
-   d. Background Tasks:
+   e. Background Tasks:
       - Periodic message fetching service
       - Message processing queue
       - Notification system
@@ -294,13 +388,125 @@ The system appears to be designed for automated processing and responding to Tel
          - Encrypt sensitive data (auth tokens, passwords)
          - Regular security audits and logging
       2. Performance:
-         - Index critical fields (message_date)
-         - Utilize PostgreSQL's built-in query cache
-         - Implement efficient async database operations
+         - Optimize PostgreSQL configurations for single-user performance:
+           ```ini
+           # postgresql.conf optimizations for single-user instance
+           max_connections = 20                    # Reduced for single user
+           shared_buffers = '1GB'                 # 25% of container memory
+           work_mem = '64MB'                      # Larger per-connection work mem
+           maintenance_work_mem = '256MB'         # Larger for vacuum operations
+           effective_cache_size = '3GB'           # 75% of container memory
+           random_page_cost = 1.1                 # Assuming SSD storage
+           effective_io_concurrency = 200         # Higher for SSD
+           ```
+         - Index critical fields for efficient querying:
+           ```sql
+           -- Optimized indexes for single-user performance
+           CREATE INDEX idx_message_history_date ON message_history (message_date DESC);
+           CREATE INDEX idx_message_history_dialog ON message_history (dialog_id, message_date DESC);
+           CREATE INDEX idx_processing_queue_status ON processing_queue (status, priority DESC);
+           CREATE INDEX idx_auth_data_active ON authentication_data (is_active, last_active_at DESC);
+           ```
+         - Implement efficient async database operations using connection pooling
       3. Deployment:
-         - Docker Compose setup for easy deployment
-         - Automated container creation per user
-         - Simple backup and restore procedures
+         - Use Docker to ensure each user has an isolated environment:
+           ```yaml
+           # docker-compose.yml for single user
+           version: '3.8'
+           services:
+             app:
+               build: .
+               environment:
+                 - POSTGRES_DB=user_${USER_ID}
+                 - POSTGRES_USER=app
+                 - POSTGRES_PASSWORD=${DB_PASSWORD}
+                 - TELEGRAM_API_ID=${TELEGRAM_API_ID}
+                 - TELEGRAM_API_HASH=${TELEGRAM_API_HASH}
+                 - JWT_SECRET=${JWT_SECRET}
+               volumes:
+                 - ./app:/app
+                 - ./data:/data
+               depends_on:
+                 - db
+               ports:
+                 - "${PORT}:8000"
+               deploy:
+                 resources:
+                   limits:
+                     cpus: '2.0'
+                     memory: 4G
+               healthcheck:
+                 test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+                 interval: 30s
+                 timeout: 10s
+                 retries: 3
+
+             db:
+               image: postgres:15
+               environment:
+                 - POSTGRES_DB=user_${USER_ID}
+                 - POSTGRES_USER=app
+                 - POSTGRES_PASSWORD=${DB_PASSWORD}
+               volumes:
+                 - postgres_data:/var/lib/postgresql/data
+               command: postgres -c config_file=/etc/postgresql/postgresql.conf
+               healthcheck:
+                 test: ["CMD-SHELL", "pg_isready -U app -d user_${USER_ID}"]
+                 interval: 10s
+                 timeout: 5s
+                 retries: 5
+
+           volumes:
+             postgres_data:
+           ```
+         - Automate the provisioning of single-user containers
+         - Maintain backup and restore procedures per user
+
+   c. Monitoring and Observability:
+      - System health monitoring:
+        - Focus on CPU, memory, and disk usage for each individual container
+        - Track container-specific metrics:
+          ```python
+          # monitoring.py
+          async def collect_container_metrics():
+              return {
+                  'cpu_usage': await get_container_cpu_usage(),
+                  'memory_usage': await get_container_memory_usage(),
+                  'disk_usage': await get_container_disk_usage(),
+                  'db_connections': await get_db_connection_count(),
+                  'message_queue_size': await get_processing_queue_size(),
+                  'processing_latency': await get_avg_processing_latency()
+              }
+          ```
+        - Monitor database query performance for the individual instance
+      - Error tracking and alerting:
+        - Implement error logging within each container
+        - Set alert thresholds based on single-user patterns:
+          ```python
+          # alerts.py
+          ALERT_THRESHOLDS = {
+              'cpu_usage_percent': 80,
+              'memory_usage_percent': 85,
+              'disk_usage_percent': 90,
+              'message_processing_delay_seconds': 30,
+              'failed_requests_per_minute': 5
+          }
+          ```
+      - Performance monitoring:
+        - Track real-time metrics for the individual user
+        - Measure and optimize message processing latency
+        - Monitor database query execution times:
+          ```sql
+          -- Enable query performance monitoring
+          CREATE EXTENSION pg_stat_statements;
+          
+          -- Query to analyze slow queries
+          SELECT query, calls, total_exec_time / calls as avg_exec_time
+          FROM pg_stat_statements
+          WHERE calls > 10
+          ORDER BY avg_exec_time DESC
+          LIMIT 10;
+          ```
 
 4. Testing & Deployment:
    a. Testing:
