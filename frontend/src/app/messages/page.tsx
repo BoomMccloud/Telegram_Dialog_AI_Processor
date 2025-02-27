@@ -19,9 +19,11 @@ type TabType = 'groups' | 'channels' | 'direct';
 
 interface DialogListProps {
   dialogs: Dialog[];
+  selectedDialogs: Set<number>;
+  onToggleSelect: (dialogId: number) => void;
 }
 
-const DialogList: React.FC<DialogListProps> = ({ dialogs }) => {
+const DialogList: React.FC<DialogListProps> = ({ dialogs, selectedDialogs, onToggleSelect }) => {
   if (dialogs.length === 0) {
     return (
       <div className="text-center text-gray-500 dark:text-gray-400 py-4">
@@ -35,14 +37,29 @@ const DialogList: React.FC<DialogListProps> = ({ dialogs }) => {
       {dialogs.map((dialog) => (
         <div
           key={dialog.id}
-          className="p-4 rounded-lg shadow bg-white dark:bg-gray-800 
+          className={`
+            p-4 rounded-lg shadow bg-white dark:bg-gray-800 
             hover:bg-gray-50 dark:hover:bg-gray-700 
             cursor-pointer transition-colors border border-gray-200 dark:border-gray-700
-            flex justify-between items-center"
+            flex justify-between items-center
+            ${selectedDialogs.has(dialog.id) ? 'ring-2 ring-blue-500 dark:ring-blue-400' : ''}
+          `}
+          onClick={() => onToggleSelect(dialog.id)}
         >
-          <h2 className="font-semibold text-lg dark:text-white truncate pr-4">
-            {dialog.name}
-          </h2>
+          <div className="flex items-center flex-1">
+            <input
+              type="checkbox"
+              checked={selectedDialogs.has(dialog.id)}
+              onChange={() => onToggleSelect(dialog.id)}
+              className="h-4 w-4 text-blue-600 rounded border-gray-300 
+                focus:ring-blue-500 dark:border-gray-600 dark:focus:ring-blue-400
+                mr-4"
+              onClick={(e) => e.stopPropagation()}
+            />
+            <h2 className="font-semibold text-lg dark:text-white truncate pr-4">
+              {dialog.name}
+            </h2>
+          </div>
           <div className={`
             flex items-center whitespace-nowrap px-3 py-1 rounded-full text-sm
             ${dialog.unread_count > 0
@@ -55,6 +72,64 @@ const DialogList: React.FC<DialogListProps> = ({ dialogs }) => {
           </div>
         </div>
       ))}
+    </div>
+  );
+};
+
+const SelectionControls: React.FC<{
+  dialogs: Dialog[];
+  selectedDialogs: Set<number>;
+  onSelectAll: () => void;
+  onSelectUnread: () => void;
+  onClearSelection: () => void;
+  onProcessSelected: () => void;
+}> = ({ dialogs, selectedDialogs, onSelectAll, onSelectUnread, onClearSelection, onProcessSelected }) => {
+  const selectedCount = selectedDialogs.size;
+  const totalCount = dialogs.length;
+  const unreadCount = dialogs.filter(d => d.unread_count > 0).length;
+
+  return (
+    <div className="mb-4 flex flex-wrap gap-3 items-center bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+      <div className="text-sm text-gray-600 dark:text-gray-300">
+        Selected: {selectedCount} of {totalCount}
+      </div>
+      <div className="flex-1"></div>
+      <button
+        onClick={onSelectUnread}
+        className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-200 
+          bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 
+          dark:hover:bg-gray-600 transition-colors"
+      >
+        Select Unread ({unreadCount})
+      </button>
+      <button
+        onClick={onSelectAll}
+        className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-200 
+          bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 
+          dark:hover:bg-gray-600 transition-colors"
+      >
+        Select All
+      </button>
+      <button
+        onClick={onClearSelection}
+        className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-200 
+          bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 
+          dark:hover:bg-gray-600 transition-colors"
+      >
+        Clear Selection
+      </button>
+      <button
+        onClick={onProcessSelected}
+        disabled={selectedCount === 0}
+        className={`
+          px-4 py-1.5 text-sm font-medium rounded-md transition-colors
+          ${selectedCount > 0
+            ? 'bg-blue-500 dark:bg-blue-600 text-white hover:bg-blue-600 dark:hover:bg-blue-700 cursor-pointer'
+            : 'bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'}
+        `}
+      >
+        Process Selected
+      </button>
     </div>
   );
 };
@@ -89,10 +164,24 @@ export default function MessagesPage() {
   const [activeTab, setActiveTab] = useState<TabType>('direct');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedDialogs, setSelectedDialogs] = useState<Set<number>>(new Set());
   const router = useRouter();
   
   // Get session ID from localStorage
   const sessionId = typeof window !== 'undefined' ? localStorage.getItem('sessionId') : null;
+
+  // Load selected dialogs from localStorage
+  useEffect(() => {
+    const savedSelection = localStorage.getItem('selectedDialogs');
+    if (savedSelection) {
+      setSelectedDialogs(new Set(JSON.parse(savedSelection)));
+    }
+  }, []);
+
+  // Save selected dialogs to localStorage
+  useEffect(() => {
+    localStorage.setItem('selectedDialogs', JSON.stringify(Array.from(selectedDialogs)));
+  }, [selectedDialogs]);
 
   useEffect(() => {
     // Redirect to login if no session ID
@@ -121,6 +210,37 @@ export default function MessagesPage() {
     const interval = setInterval(fetchDialogs, 30000);
     return () => clearInterval(interval);
   }, [sessionId, router]);
+
+  const handleToggleSelect = (dialogId: number) => {
+    setSelectedDialogs(prev => {
+      const newSelection = new Set(prev);
+      if (newSelection.has(dialogId)) {
+        newSelection.delete(dialogId);
+      } else {
+        newSelection.add(dialogId);
+      }
+      return newSelection;
+    });
+  };
+
+  const handleSelectAll = () => {
+    const currentDialogs = filteredDialogs[activeTab];
+    setSelectedDialogs(new Set(currentDialogs.map(d => d.id)));
+  };
+
+  const handleSelectUnread = () => {
+    const currentDialogs = filteredDialogs[activeTab];
+    setSelectedDialogs(new Set(currentDialogs.filter(d => d.unread_count > 0).map(d => d.id)));
+  };
+
+  const handleClearSelection = () => {
+    setSelectedDialogs(new Set());
+  };
+
+  const handleProcessSelected = async () => {
+    // TODO: Implement processing of selected dialogs
+    console.log('Processing dialogs:', Array.from(selectedDialogs));
+  };
 
   if (!sessionId) {
     return null; // Will redirect
@@ -198,8 +318,21 @@ export default function MessagesPage() {
         </div>
       </div>
 
+      <SelectionControls
+        dialogs={filteredDialogs[activeTab]}
+        selectedDialogs={selectedDialogs}
+        onSelectAll={handleSelectAll}
+        onSelectUnread={handleSelectUnread}
+        onClearSelection={handleClearSelection}
+        onProcessSelected={handleProcessSelected}
+      />
+
       <div className="mt-4">
-        <DialogList dialogs={filteredDialogs[activeTab]} />
+        <DialogList 
+          dialogs={filteredDialogs[activeTab]}
+          selectedDialogs={selectedDialogs}
+          onToggleSelect={handleToggleSelect}
+        />
       </div>
     </main>
   );
