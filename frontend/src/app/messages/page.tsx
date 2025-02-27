@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTheme } from '../ThemeContext';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
 
@@ -23,7 +24,7 @@ interface DialogListProps {
 const DialogList: React.FC<DialogListProps> = ({ dialogs }) => {
   if (dialogs.length === 0) {
     return (
-      <div className="text-center text-gray-500 py-4">
+      <div className="text-center text-gray-500 dark:text-gray-400 py-4">
         No chats found
       </div>
     );
@@ -34,17 +35,19 @@ const DialogList: React.FC<DialogListProps> = ({ dialogs }) => {
       {dialogs.map((dialog) => (
         <div
           key={dialog.id}
-          className="p-4 rounded-lg shadow bg-white hover:bg-gray-50 cursor-pointer transition-colors"
+          className="p-4 rounded-lg shadow bg-white dark:bg-gray-800 
+            hover:bg-gray-50 dark:hover:bg-gray-700 
+            cursor-pointer transition-colors border border-gray-200 dark:border-gray-700"
         >
           <div className="flex justify-between items-center">
             <div>
-              <h2 className="font-semibold text-lg">{dialog.name}</h2>
-              <p className="text-sm text-gray-500">
+              <h2 className="font-semibold text-lg dark:text-white">{dialog.name}</h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
                 {dialog.is_group ? 'Group' : dialog.is_channel ? 'Channel' : 'Direct Message'}
               </p>
             </div>
             {dialog.unread_count > 0 && (
-              <span className="bg-blue-500 text-white px-2 py-1 rounded-full text-sm">
+              <span className="bg-blue-500 dark:bg-blue-600 text-white px-2 py-1 rounded-full text-sm">
                 {dialog.unread_count}
               </span>
             )}
@@ -52,6 +55,31 @@ const DialogList: React.FC<DialogListProps> = ({ dialogs }) => {
         </div>
       ))}
     </div>
+  );
+};
+
+const ThemeToggle: React.FC = () => {
+  const { theme, toggleTheme } = useTheme();
+  
+  return (
+    <button
+      onClick={toggleTheme}
+      className="fixed top-4 right-4 p-2 rounded-lg bg-gray-200 dark:bg-gray-700 
+        hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+      aria-label="Toggle theme"
+    >
+      {theme === 'light' ? (
+        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+            d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+        </svg>
+      ) : (
+        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+            d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707" />
+        </svg>
+      )}
+    </button>
   );
 };
 
@@ -99,16 +127,16 @@ export default function MessagesPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
+      <div className="flex min-h-screen items-center justify-center dark:bg-gray-900">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 dark:border-white"></div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="text-red-500">Error: {error}</div>
+      <div className="flex min-h-screen items-center justify-center dark:bg-gray-900">
+        <div className="text-red-500 dark:text-red-400">Error: {error}</div>
       </div>
     );
   }
@@ -126,11 +154,15 @@ export default function MessagesPage() {
   };
 
   return (
-    <main className="flex min-h-screen flex-col p-8">
-      <h1 className="text-3xl font-bold mb-6">Your Chats</h1>
+    <main className="flex min-h-screen flex-col p-8 bg-gray-50 dark:bg-gray-900">
+      <ThemeToggle />
+      
+      <h1 className="text-3xl font-bold mb-6 text-gray-900 dark:text-white">
+        Your Chats
+      </h1>
       
       <div className="mb-6">
-        <div className="border-b border-gray-200">
+        <div className="border-b border-gray-200 dark:border-gray-700">
           <nav className="-mb-px flex space-x-8" aria-label="Tabs">
             {[
               { id: 'direct', name: 'Direct Messages', count: totalUnread.direct },
@@ -143,8 +175,8 @@ export default function MessagesPage() {
                 className={`
                   whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm
                   ${activeTab === tab.id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'border-blue-500 text-blue-600 dark:border-blue-400 dark:text-blue-400'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:border-gray-600'
                   }
                 `}
               >
@@ -152,7 +184,9 @@ export default function MessagesPage() {
                 {tab.count > 0 && (
                   <span className={`
                     ml-2 py-0.5 px-2 rounded-full text-xs
-                    ${activeTab === tab.id ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-900'}
+                    ${activeTab === tab.id 
+                      ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400' 
+                      : 'bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-300'}
                   `}>
                     {tab.count}
                   </span>
