@@ -31,26 +31,27 @@ const DialogList: React.FC<DialogListProps> = ({ dialogs }) => {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {dialogs.map((dialog) => (
         <div
           key={dialog.id}
           className="p-4 rounded-lg shadow bg-white dark:bg-gray-800 
             hover:bg-gray-50 dark:hover:bg-gray-700 
-            cursor-pointer transition-colors border border-gray-200 dark:border-gray-700"
+            cursor-pointer transition-colors border border-gray-200 dark:border-gray-700
+            flex justify-between items-center"
         >
-          <div className="flex justify-between items-center">
-            <div>
-              <h2 className="font-semibold text-lg dark:text-white">{dialog.name}</h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                {dialog.is_group ? 'Group' : dialog.is_channel ? 'Channel' : 'Direct Message'}
-              </p>
-            </div>
-            {dialog.unread_count > 0 && (
-              <span className="bg-blue-500 dark:bg-blue-600 text-white px-2 py-1 rounded-full text-sm">
-                {dialog.unread_count}
-              </span>
-            )}
+          <h2 className="font-semibold text-lg dark:text-white truncate pr-4">
+            {dialog.name}
+          </h2>
+          <div className={`
+            flex items-center whitespace-nowrap px-3 py-1 rounded-full text-sm
+            ${dialog.unread_count > 0
+              ? 'bg-blue-500 dark:bg-blue-600 text-white'
+              : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
+            }`}
+          >
+            <span className="font-medium">{dialog.unread_count || '0'}</span>
+            <span className="ml-1 font-normal">messages unread</span>
           </div>
         </div>
       ))}
