@@ -63,3 +63,7 @@ credentials.json
 # Token tracking logs
 token_logs/
 test_token_logs/
+
+.venv/
+
+backend/sessions/
