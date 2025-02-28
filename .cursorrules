@@ -130,6 +130,8 @@ If needed, you can further use the `web_scraper.py` file to scrape the web page 
 - When running Python scripts that import from other local modules, use `PYTHONPATH=.` to ensure Python can find the modules. For example: `PYTHONPATH=. python tools/plan_exec_llm.py` instead of just `python tools/plan_exec_llm.py`. This is especially important when using relative imports.
 - When using Docker Compose in a project with virtual environments, make sure to activate the virtual environment before running Docker Compose commands to ensure that environment variables from `.env` files are properly loaded and passed to the containers. For example, use `source .venv/bin/activate && docker-compose up -d` instead of just `docker-compose up -d`.
 - When mocking an API that uses in-memory session storage (like `client_sessions` dictionary), ensure all dictionaries that store session information are properly synchronized. When creating mock sessions, always populate all required dictionaries with consistent data. For authentication-dependent endpoints, add double-checks to ensure sessions exist in all necessary dictionaries before attempting operations.
+- For hybrid development environments, run just the database in Docker while keeping the backend and frontend running locally. This approach gives you the benefits of containerized persistence while maintaining fast development cycles. Use `docker-compose up -d postgres` to start only the database service, then run the backend with environment variables set to connect to the containerized database.
+- When switching between development and production modes in a web application, ensure data formats remain consistent. Mock data APIs often have slightly different response formats than real APIs. Always check the response structure in both environments and adjust the backend to maintain format consistency.
 
 # Multi-Agent Scratchpad
 
@@ -420,3 +422,45 @@ The database schema already includes the `user_selected_dialogs` table, but we n
 2. Implement frontend components for capturing user preferences
 3. Ensure proper data synchronization between frontend and backend
 4. Add validation and error handling for user input
+
+### Current Status - Development Environment Improvements
+
+I've implemented several improvements to the development environment:
+
+1. **Hybrid Development Setup**:
+   - Created a streamlined workflow where only the PostgreSQL database runs in Docker
+   - Configured the backend and frontend to run locally for faster development cycles
+   - Set up proper environment variables to connect to the containerized database
+
+2. **Environment Modes**:
+   - Added proper production/development mode switching (APP_ENV=production/development)
+   - Disabled mock data routes when running in production mode
+   - Ensured proper functioning with real Telegram data
+
+3. **User Experience Enhancements**:
+   - Added logout functionality to the navigation bar
+   - Implemented session management with proper clearing of authentication data
+   - Ensured persistence of user selections across login sessions
+
+4. **Data Format Compatibility**:
+   - Fixed format inconsistencies between the development and production APIs
+   - Added proper API response format matching in the backend
+   - Ensured the Dialog interface is consistently formatted between environments
+   - Improved error handling and detailed logging for debugging
+
+5. **Authentication Improvements**:
+   - Fixed session management issues when switching between environments
+   - Ensured proper client connection status checking
+   - Added error handling for expired or invalid sessions
+
+The system now provides a smooth development experience with:
+- Fast local development for frontend and backend
+- Persistence and reliability through containerized database
+- Seamless switching between dev/prod environments
+- Consistent data formats across all components
+- Proper session management with logout capability
+
+Next steps:
+1. Complete the integration with the Llama processing model
+2. Implement background tasks for automatic message processing
+3. Enhance the user interface for message history and context viewing
