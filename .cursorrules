@@ -129,6 +129,7 @@ If needed, you can further use the `web_scraper.py` file to scrape the web page 
 - Use `claude-3-5-sonnet-20241022` as the model name for Claude. It is the latest Claude model and has vision capabilities as well.
 - When running Python scripts that import from other local modules, use `PYTHONPATH=.` to ensure Python can find the modules. For example: `PYTHONPATH=. python tools/plan_exec_llm.py` instead of just `python tools/plan_exec_llm.py`. This is especially important when using relative imports.
 - When using Docker Compose in a project with virtual environments, make sure to activate the virtual environment before running Docker Compose commands to ensure that environment variables from `.env` files are properly loaded and passed to the containers. For example, use `source .venv/bin/activate && docker-compose up -d` instead of just `docker-compose up -d`.
+- When mocking an API that uses in-memory session storage (like `client_sessions` dictionary), ensure all dictionaries that store session information are properly synchronized. When creating mock sessions, always populate all required dictionaries with consistent data. For authentication-dependent endpoints, add double-checks to ensure sessions exist in all necessary dictionaries before attempting operations.
 
 # Multi-Agent Scratchpad
 

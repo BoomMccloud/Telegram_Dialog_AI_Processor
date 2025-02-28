@@ -1,0 +1,58 @@
+[
+  {
+    "id": -10000000,
+    "name": "Ivan",
+    "unread_count": 3,
+    "is_group": false,
+    "is_channel": false,
+    "is_user": true
+  },
+  {
+    "id": -20000000,
+    "name": "Michael",
+    "unread_count": 5,
+    "is_group": false,
+    "is_channel": false,
+    "is_user": true
+  },
+  {
+    "id": -30000000,
+    "name": "Ivan",
+    "unread_count": 0,
+    "is_group": false,
+    "is_channel": false,
+    "is_user": true
+  },
+  {
+    "id": 10000000,
+    "name": "Work Announcements",
+    "unread_count": 8,
+    "is_group": false,
+    "is_channel": true,
+    "is_user": false
+  },
+  {
+    "id": 20000000,
+    "name": "Work Announcements",
+    "unread_count": 9,
+    "is_group": true,
+    "is_channel": false,
+    "is_user": false
+  },
+  {
+    "id": 30000000,
+    "name": "Crypto Discussions",
+    "unread_count": 9,
+    "is_group": false,
+    "is_channel": true,
+    "is_user": false
+  },
+  {
+    "id": 40000000,
+    "name": "Project Alpha",
+    "unread_count": 8,
+    "is_group": false,
+    "is_channel": true,
+    "is_user": false
+  }
+]
