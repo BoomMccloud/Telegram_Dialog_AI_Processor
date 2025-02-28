@@ -19,6 +19,7 @@ export default function MainNavigation() {
     { name: 'Home', href: '/home' },
     { name: 'Chats', href: '/chats' },
     { name: 'Data Source', href: '/messages' },
+    { name: 'Model', href: '/model' },
   ];
 
   // Function to determine if a nav item is active
