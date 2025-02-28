@@ -97,7 +97,7 @@ const DialogList: React.FC<DialogListProps> = ({ dialogs, selectedDialogs, onTog
                 </h2>
                 {isProcessed && (
                   <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100 rounded-full whitespace-nowrap">
-                    Already processing
+                    Processing
                   </span>
                 )}
               </div>
