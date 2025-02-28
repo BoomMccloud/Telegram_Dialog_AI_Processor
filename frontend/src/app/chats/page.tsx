@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import AppLayout from '../AppLayout';
+import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 
 // Define types for the chat interface
 interface Message {
@@ -31,6 +32,7 @@ interface ChatDialog {
   lastMessage?: string;
   unreadCount: number;
   isActive: boolean;
+  isPriority?: boolean;
 }
 
 export default function ChatsPage() {
@@ -51,12 +53,21 @@ export default function ChatsPage() {
         
         // Mock data for demo
         const mockChats: ChatDialog[] = [
+          { id: 0, name: 'Priority', lastMessage: 'Critical message requiring immediate attention', unreadCount: 1, isActive: true, isPriority: true },
           { id: 1, name: 'John Doe', lastMessage: 'Hello, how are you?', unreadCount: 2, isActive: true },
           { id: 2, name: 'Tech Support Group', lastMessage: 'Issue has been resolved', unreadCount: 0, isActive: true },
           { id: 3, name: 'Team Announcements', lastMessage: 'New project starting next week', unreadCount: 1, isActive: false }
         ];
         
         const mockMessages: Message[] = [
+          {
+            id: 'p1',
+            chatId: 0,
+            content: 'IMPORTANT: There is a critical update that requires your immediate attention.',
+            sender: { id: 'system', name: 'System' },
+            timestamp: '2023-10-15T14:28:00Z',
+            isFromUser: false
+          },
           {
             id: 'm1',
             chatId: 1,
@@ -76,6 +87,14 @@ export default function ChatsPage() {
         ];
         
         const mockResponses: GeneratedResponse[] = [
+          {
+            id: 'pr1',
+            messageId: 'p1',
+            content: 'We\'ve detected unusual activity in one of your connected chats. Please review and verify if this is expected behavior.',
+            status: 'pending',
+            timestamp: '2023-10-15T14:29:00Z',
+            confidence: 0.98
+          },
           {
             id: 'r1',
             messageId: 'm1',
@@ -98,8 +117,10 @@ export default function ChatsPage() {
         setMessages(mockMessages);
         setResponses(mockResponses);
         
-        // Default to selecting the first chat
-        if (mockChats.length > 0) {
+        const priorityChat = mockChats.find(chat => chat.isPriority);
+        if (priorityChat) {
+          setSelectedChat(priorityChat.id);
+        } else if (mockChats.length > 0) {
           setSelectedChat(mockChats[0].id);
         }
       } catch (error) {
@@ -153,11 +174,48 @@ export default function ChatsPage() {
             <div className="flex flex-col md:flex-row gap-6">
               {/* Sidebar with chat list */}
               <div className="w-full md:w-64 bg-white dark:bg-gray-800 rounded-lg shadow">
-                <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
                   <h2 className="text-lg font-medium text-gray-900 dark:text-white">Active Chats</h2>
+                  <button 
+                    className="p-1 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    aria-label="Search chats"
+                    title="Search chats"
+                  >
+                    <MagnifyingGlassIcon className="h-5 w-5" />
+                  </button>
                 </div>
                 <div className="overflow-y-auto max-h-[calc(100vh-250px)]">
-                  {chats.map(chat => (
+                  {chats.filter(chat => chat.isPriority).map(chat => (
+                    <div
+                      key={chat.id}
+                      className={`p-4 border-b-2 border-l-4 border-amber-500 dark:border-amber-600 cursor-pointer bg-amber-50 dark:bg-amber-900/20
+                        ${selectedChat === chat.id ? 'bg-amber-100 dark:bg-amber-900/30' : 'hover:bg-amber-100 dark:hover:bg-amber-900/30'}`}
+                      onClick={() => setSelectedChat(chat.id)}
+                    >
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center">
+                          <span className="inline-flex items-center justify-center mr-2 w-5 h-5 rounded-full bg-amber-500 dark:bg-amber-600">
+                            <svg className="w-3 h-3 text-white" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                            </svg>
+                          </span>
+                          <h3 className="font-bold text-amber-700 dark:text-amber-400">{chat.name}</h3>
+                        </div>
+                        {chat.unreadCount > 0 && (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-800 dark:text-amber-100">
+                            {chat.unreadCount}
+                          </span>
+                        )}
+                      </div>
+                      {chat.lastMessage && (
+                        <p className="mt-1 text-sm text-amber-600 dark:text-amber-300 truncate pl-7">
+                          {chat.lastMessage}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                  
+                  {chats.filter(chat => !chat.isPriority).map(chat => (
                     <div
                       key={chat.id}
                       className={`p-4 border-b border-gray-200 dark:border-gray-700 cursor-pointer
