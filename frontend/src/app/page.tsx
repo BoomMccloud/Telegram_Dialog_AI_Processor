@@ -37,7 +37,7 @@ export default function Home() {
       if (data.status === 'authenticated') {
         console.log('Authentication successful, storing session and redirecting...');
         localStorage.setItem('sessionId', sessionId);
-        router.push('/messages');
+        router.push('/home');
       }
     } catch (error) {
       console.error('Error checking session status:', error);
@@ -48,7 +48,7 @@ export default function Home() {
     // Check if already authenticated
     const storedSessionId = localStorage.getItem('sessionId');
     if (storedSessionId) {
-      router.push('/messages');
+      router.push('/home');
       return;
     }
 

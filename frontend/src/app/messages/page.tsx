@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useTheme } from '../ThemeContext';
+import AppLayout from '../AppLayout';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
 
@@ -240,31 +240,6 @@ const SelectionControls: React.FC<{
         )
       )}
     </div>
-  );
-};
-
-const ThemeToggle: React.FC = () => {
-  const { theme, toggleTheme } = useTheme();
-  
-  return (
-    <button
-      onClick={toggleTheme}
-      className="fixed top-4 right-4 p-2 rounded-lg bg-gray-200 dark:bg-gray-700 
-        hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-      aria-label="Toggle theme"
-    >
-      {theme === 'light' ? (
-        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-            d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-        </svg>
-      ) : (
-        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-            d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707" />
-        </svg>
-      )}
-    </button>
   );
 };
 
@@ -576,17 +551,21 @@ export default function MessagesPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center dark:bg-gray-900">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 dark:border-white"></div>
-      </div>
+      <AppLayout>
+        <div className="flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 dark:border-white"></div>
+        </div>
+      </AppLayout>
     );
   }
 
   if (error) {
     return (
-      <div className="flex min-h-screen items-center justify-center dark:bg-gray-900">
-        <div className="text-red-500 dark:text-red-400">Error: {error}</div>
-      </div>
+      <AppLayout>
+        <div className="flex items-center justify-center">
+          <div className="text-red-500 dark:text-red-400">Error: {error}</div>
+        </div>
+      </AppLayout>
     );
   }
 
@@ -606,85 +585,85 @@ export default function MessagesPage() {
   };
 
   return (
-    <main className="flex min-h-screen flex-col p-8 bg-gray-50 dark:bg-gray-900">
-      <ThemeToggle />
-      
-      <h1 className="text-3xl font-bold mb-6 text-gray-900 dark:text-white">
-        Your Chats
-      </h1>
-      
-      <div className="mb-6">
-        <div className="border-b border-gray-200 dark:border-gray-700">
-          <nav className="-mb-px flex space-x-8" aria-label="Tabs">
-            {[
-              { id: 'selected', name: 'Selected', count: totalDialogs.selected },
-              { id: 'direct', name: 'Direct Messages', count: totalDialogs.direct },
-              { id: 'groups', name: 'Groups', count: totalDialogs.groups },
-              { id: 'channels', name: 'Channels', count: totalDialogs.channels },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as TabType)}
-                className={`
-                  whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm
-                  ${activeTab === tab.id
-                    ? 'border-blue-500 text-blue-600 dark:border-blue-400 dark:text-blue-400'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:border-gray-600'
-                  }
-                `}
-              >
-                {tab.name}
-                <span className="ml-2 py-0.5 px-2 rounded-full text-xs font-normal
-                  bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
+    <AppLayout>
+      <div className="flex flex-col">
+        <h1 className="text-3xl font-bold mb-6 text-gray-900 dark:text-white">
+          Data Sources
+        </h1>
+        
+        <div className="mb-6">
+          <div className="border-b border-gray-200 dark:border-gray-700">
+            <nav className="-mb-px flex space-x-8" aria-label="Tabs">
+              {[
+                { id: 'selected', name: 'Selected', count: totalDialogs.selected },
+                { id: 'direct', name: 'Direct Messages', count: totalDialogs.direct },
+                { id: 'groups', name: 'Groups', count: totalDialogs.groups },
+                { id: 'channels', name: 'Channels', count: totalDialogs.channels },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as TabType)}
+                  className={`
+                    whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm
+                    ${activeTab === tab.id
+                      ? 'border-blue-500 text-blue-600 dark:border-blue-400 dark:text-blue-400'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:border-gray-600'
+                    }
+                  `}
                 >
-                  {tab.count}
-                </span>
-              </button>
-            ))}
-          </nav>
+                  {tab.name}
+                  <span className="ml-2 py-0.5 px-2 rounded-full text-xs font-normal
+                    bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
+                  >
+                    {tab.count}
+                  </span>
+                </button>
+              ))}
+            </nav>
+          </div>
         </div>
+
+        {/* Show loading indicator when switching to Selected tab */}
+        {activeTab === 'selected' && loadingSelected && (
+          <div className="flex justify-center my-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-white"></div>
+          </div>
+        )}
+
+        {/* Show existing selection controls */}
+        <SelectionControls
+          dialogs={filteredDialogs[activeTab]}
+          selectedDialogs={selectedDialogs}
+          onSelectAll={handleSelectAll}
+          onSelectUnread={handleSelectUnread}
+          onClearSelection={handleClearSelection}
+          onProcessSelected={handleProcessSelected}
+          processingStatus={processingStatus}
+          processedDialogs={[
+            ...processingStatus.lastProcessed,
+            ...apiSelectedDialogs.map(d => d.id)
+          ]}
+        />
+        
+        {/* Show the dialog list filtered by the active tab */}
+        <DialogList
+          dialogs={filteredDialogs[activeTab]}
+          selectedDialogs={selectedDialogs}
+          onToggleSelect={handleToggleSelect}
+          processedDialogs={[
+            ...processingStatus.lastProcessed,
+            ...apiSelectedDialogs.map(d => d.id)
+          ]}
+        />
+
+        {/* Show empty state for selected dialogs */}
+        {activeTab === 'selected' && apiSelectedDialogs.length === 0 && !loadingSelected && (
+          <div className="text-center text-gray-500 dark:text-gray-400 py-8 my-4 bg-white dark:bg-gray-800 rounded-lg shadow">
+            <p className="mb-2">No dialogs selected for processing.</p>
+            <p className="text-sm">Select dialogs from other tabs and click &quot;Process Selected&quot; to add them here.</p>
+          </div>
+        )}
       </div>
-
-      {/* Show loading indicator when switching to Selected tab */}
-      {activeTab === 'selected' && loadingSelected && (
-        <div className="flex justify-center my-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-white"></div>
-        </div>
-      )}
-
-      {/* Show existing selection controls */}
-      <SelectionControls
-        dialogs={filteredDialogs[activeTab]}
-        selectedDialogs={selectedDialogs}
-        onSelectAll={handleSelectAll}
-        onSelectUnread={handleSelectUnread}
-        onClearSelection={handleClearSelection}
-        onProcessSelected={handleProcessSelected}
-        processingStatus={processingStatus}
-        processedDialogs={[
-          ...processingStatus.lastProcessed,
-          ...apiSelectedDialogs.map(d => d.id)
-        ]}
-      />
-      
-      {/* Show the dialog list filtered by the active tab */}
-      <DialogList
-        dialogs={filteredDialogs[activeTab]}
-        selectedDialogs={selectedDialogs}
-        onToggleSelect={handleToggleSelect}
-        processedDialogs={[
-          ...processingStatus.lastProcessed,
-          ...apiSelectedDialogs.map(d => d.id)
-        ]}
-      />
-
-      {/* Show empty state for selected dialogs */}
-      {activeTab === 'selected' && apiSelectedDialogs.length === 0 && !loadingSelected && (
-        <div className="text-center text-gray-500 dark:text-gray-400 py-8 my-4 bg-white dark:bg-gray-800 rounded-lg shadow">
-          <p className="mb-2">No dialogs selected for processing.</p>
-          <p className="text-sm">Select dialogs from other tabs and click &quot;Process Selected&quot; to add them here.</p>
-        </div>
-      )}
-    </main>
+    </AppLayout>
   );
 } 
