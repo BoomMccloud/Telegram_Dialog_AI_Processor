@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "./ThemeContext";
 import "./globals.css";
+// Import DevToolsWrapper which handles the dynamic loading
+import DevToolsWrapper from "./components/DevToolsWrapper";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -30,7 +32,11 @@ export default function RootLayout({
           bg-gray-50 text-gray-900 transition-colors duration-200
           dark:bg-gray-900 dark:text-gray-100`}
       >
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          {children}
+          {/* Add DevToolsWrapper - it will only show in development mode */}
+          <DevToolsWrapper />
+        </ThemeProvider>
       </body>
     </html>
   );

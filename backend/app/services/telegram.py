@@ -2,11 +2,11 @@ from telethon import TelegramClient
 from typing import List, Dict
 import os
 from datetime import datetime, timedelta
-from .auth import client_sessions
+from .auth import get_or_load_session
 
 async def get_dialogs(session_id: str) -> List[Dict]:
     """Get list of dialogs (chats)"""
-    session = client_sessions.get(session_id)
+    session = get_or_load_session(session_id)
     if not session or not session.get("client"):
         raise ValueError("Invalid or expired session")
     
@@ -29,7 +29,7 @@ async def get_dialogs(session_id: str) -> List[Dict]:
 
 async def get_recent_messages(session_id: str, limit: int = 20) -> List[Dict]:
     """Get recent messages from all dialogs"""
-    session = client_sessions.get(session_id)
+    session = get_or_load_session(session_id)
     if not session or not session.get("client"):
         raise ValueError("Invalid or expired session")
     
@@ -62,7 +62,7 @@ async def get_recent_messages(session_id: str, limit: int = 20) -> List[Dict]:
 
 async def send_message(session_id: str, dialog_id: int, text: str) -> Dict:
     """Send a message to a specific dialog"""
-    session = client_sessions.get(session_id)
+    session = get_or_load_session(session_id)
     if not session or not session.get("client"):
         raise ValueError("Invalid or expired session")
     

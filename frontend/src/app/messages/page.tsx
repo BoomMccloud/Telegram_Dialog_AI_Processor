@@ -13,6 +13,15 @@ interface Dialog {
   is_group: boolean;
   is_channel: boolean;
   is_user: boolean;
+  last_message?: {
+    id: string;
+    text: string;
+    sender: {
+      id: string;
+      name: string;
+    };
+    date: string;
+  };
 }
 
 interface ProcessingStatus {
@@ -187,6 +196,23 @@ const ThemeToggle: React.FC = () => {
   );
 };
 
+// Interface for API response dialog format
+interface ApiDialog {
+  id: string;
+  name: string;
+  type: string;
+  unread_count: number;
+  last_message?: {
+    id: string;
+    text: string;
+    sender: {
+      id: string;
+      name: string;
+    };
+    date: string;
+  };
+}
+
 export default function MessagesPage() {
   const [dialogs, setDialogs] = useState<Dialog[]>([]);
   const [activeTab, setActiveTab] = useState<TabType>('direct');
@@ -225,13 +251,41 @@ export default function MessagesPage() {
 
     const fetchDialogs = async () => {
       try {
+        console.log(`Fetching dialogs from: ${API_URL}/dialogs/${sessionId}`);
         const response = await fetch(`${API_URL}/dialogs/${sessionId}`);
+        console.log('Response status:', response.status);
+        
+        // Log the response content type
+        console.log('Content-Type:', response.headers.get('content-type'));
+        
         if (!response.ok) {
-          throw new Error('Failed to fetch dialogs');
+          const responseText = await response.text();
+          console.error('Error response text:', responseText);
+          throw new Error(`Failed to fetch dialogs: ${response.status} ${response.statusText}`);
         }
+        
         const data = await response.json();
-        setDialogs(data);
+        console.log('Dialogs data:', data);
+        
+        // Transform the API data to match the Dialog interface
+        if (data && Array.isArray(data.dialogs)) {
+          const transformedDialogs = data.dialogs.map((dialog: ApiDialog) => ({
+            id: parseInt(dialog.id, 10), // Convert string ID to number
+            name: dialog.name,
+            unread_count: dialog.unread_count,
+            is_group: dialog.type === 'group',
+            is_channel: dialog.type === 'channel',
+            is_user: dialog.type === 'private',
+            last_message: dialog.last_message
+          }));
+          console.log('Transformed dialogs:', transformedDialogs);
+          setDialogs(transformedDialogs);
+        } else {
+          console.error('Unexpected response format:', data);
+          setError('Received invalid data format from server');
+        }
       } catch (err) {
+        console.error('Fetch error details:', err);
         setError(err instanceof Error ? err.message : 'An error occurred');
       } finally {
         setLoading(false);
@@ -280,19 +334,35 @@ export default function MessagesPage() {
     }));
 
     try {
-      const response = await fetch(`${API_URL}/process`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          dialogIds: Array.from(selectedDialogs),
-          sessionId: localStorage.getItem('sessionId')
-        }),
+      // Process each selected dialog individually
+      const selectPromises = Array.from(selectedDialogs).map(dialogId => {
+        // Find the dialog object to get the name
+        const dialog = dialogs.find(d => d.id === dialogId);
+        if (!dialog) {
+          throw new Error(`Dialog with ID ${dialogId} not found`);
+        }
+        
+        return fetch(`${API_URL}/dialogs/${sessionId}/select`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            dialog_id: dialogId,
+            dialog_name: dialog.name, // Include the dialog name
+            processing_enabled: true, // Match the backend field name
+            priority: 1, // Default priority
+          }),
+        });
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to queue dialogs for processing');
+      
+      // Wait for all selections to complete
+      const results = await Promise.all(selectPromises);
+      
+      // Check if any requests failed
+      const failedRequests = results.filter(response => !response.ok);
+      if (failedRequests.length > 0) {
+        throw new Error(`Failed to select ${failedRequests.length} dialogs`);
       }
 
       // Save processed dialogs to localStorage
@@ -303,6 +373,7 @@ export default function MessagesPage() {
       localStorage.setItem('processedDialogs', JSON.stringify(Array.from(processedDialogs)));
 
       setProcessingStatus(prev => ({
+        ...prev,
         isProcessing: false,
         error: null,
         lastProcessed: Array.from(selectedDialogs)

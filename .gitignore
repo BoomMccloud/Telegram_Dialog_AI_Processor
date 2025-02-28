@@ -68,3 +68,5 @@ test_token_logs/
 .venv/
 
 backend/sessions/
+backend/server.log
+sessions/

@@ -1,0 +1,1802 @@
+[
+  {
+    "id": 8087085,
+    "dialog_id": -10000000,
+    "date": "2025-02-28T08:46:06.081085",
+    "sender": "Laura",
+    "text": "I wanted to follow up on our update. And, i wanted to follow up on our recommendation.",
+    "is_read": false,
+    "is_outgoing": false
+  },
+  {
+    "id": 3075977,
+    "dialog_id": -10000000,
+    "date": "2025-02-28T08:36:06.081085",
+    "sender": "Laura",
+    "text": "I'm working on a new thought. Just so you know, let me know what you think of this idea.",
+    "is_read": false,
+    "is_outgoing": false
+  },
+  {
+    "id": 6016686,
+    "dialog_id": -10000000,
+    "date": "2025-02-28T08:26:06.081085",
+    "sender": "You",
+    "text": "I'd like your feedback on my plan. Plus, i'm working on a new update.",
+    "is_read": false,
+    "is_outgoing": true
+  },
+  {
+    "id": 8173685,
+    "dialog_id": -10000000,
+    "date": "2025-02-28T08:16:06.081085",
+    "sender": "Laura",
+    "text": "I had an update I wanted to share with you. And, can you help me with a question?",
+    "is_read": false,
+    "is_outgoing": false
+  },
+  {
+    "id": 7827372,
+    "dialog_id": -10000000,
+    "date": "2025-02-28T08:06:06.081085",
+    "sender": "Laura",
+    "text": "What do you think about this suggestion? FYI, i had an thought i wanted to share with you.",
+    "is_read": false,
+    "is_outgoing": false
+  },
+  {
+    "id": 1729528,
+    "dialog_id": -10000000,
+    "date": "2025-02-28T07:56:06.081085",
+    "sender": "You",
+    "text": "I had an thought I wanted to share with you.",
+    "is_read": false,
+    "is_outgoing": true
+  },
+  {
+    "id": 4212019,
+    "dialog_id": -10000000,
+    "date": "2025-02-28T07:46:06.081085",
+    "sender": "You",
+    "text": "I'd like your feedback on my suggestion.",
+    "is_read": true,
+    "is_outgoing": true
+  },
+  {
+    "id": 6637976,
+    "dialog_id": -10000000,
+    "date": "2025-02-28T07:36:06.081085",
+    "sender": "Laura",
+    "text": "I'd like your feedback on my update.",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 5933213,
+    "dialog_id": -10000000,
+    "date": "2025-02-28T07:26:06.081085",
+    "sender": "You",
+    "text": "Let me know what you think of this question.",
+    "is_read": true,
+    "is_outgoing": true
+  },
+  {
+    "id": 4099339,
+    "dialog_id": -10000000,
+    "date": "2025-02-28T07:16:06.081085",
+    "sender": "Laura",
+    "text": "I had an update I wanted to share with you. And, what do you think about this suggestion?",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 8047328,
+    "dialog_id": -10000000,
+    "date": "2025-02-28T07:06:06.081085",
+    "sender": "Laura",
+    "text": "Just checking in about the idea. And, i had an recommendation i wanted to share with you.",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 6320800,
+    "dialog_id": -10000000,
+    "date": "2025-02-28T06:56:06.081085",
+    "sender": "You",
+    "text": "I'm working on a new thought. Plus, i had an question i wanted to share with you.",
+    "is_read": true,
+    "is_outgoing": true
+  },
+  {
+    "id": 1806772,
+    "dialog_id": -10000000,
+    "date": "2025-02-28T06:46:06.081085",
+    "sender": "You",
+    "text": "I wanted to follow up on our request. Just so you know, what do you think about this proposal?",
+    "is_read": true,
+    "is_outgoing": true
+  },
+  {
+    "id": 6425226,
+    "dialog_id": -10000000,
+    "date": "2025-02-28T06:36:06.081085",
+    "sender": "Laura",
+    "text": "Let me know what you think of this plan. FYI, i had an recommendation i wanted to share with you.",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 1920607,
+    "dialog_id": -10000000,
+    "date": "2025-02-28T06:26:06.081085",
+    "sender": "Laura",
+    "text": "What do you think about this proposal?",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 2880049,
+    "dialog_id": -10000000,
+    "date": "2025-02-28T06:16:06.081085",
+    "sender": "You",
+    "text": "What do you think about this question? FYI, i'd like your feedback on my update.",
+    "is_read": true,
+    "is_outgoing": true
+  },
+  {
+    "id": 7377421,
+    "dialog_id": -10000000,
+    "date": "2025-02-28T06:06:06.081085",
+    "sender": "Laura",
+    "text": "Let me know what you think of this suggestion.",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 8516343,
+    "dialog_id": -10000000,
+    "date": "2025-02-28T05:56:06.081085",
+    "sender": "You",
+    "text": "I had an request I wanted to share with you.",
+    "is_read": true,
+    "is_outgoing": true
+  },
+  {
+    "id": 3633595,
+    "dialog_id": -10000000,
+    "date": "2025-02-28T05:46:06.081085",
+    "sender": "Laura",
+    "text": "Have you considered this idea? And, let me know what you think of this proposal.",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 7754925,
+    "dialog_id": -10000000,
+    "date": "2025-02-28T05:36:06.081085",
+    "sender": "You",
+    "text": "Just checking in about the idea. Remember, have you considered this plan?",
+    "is_read": true,
+    "is_outgoing": true
+  },
+  {
+    "id": 8638688,
+    "dialog_id": -10000001,
+    "date": "2025-02-28T08:46:06.081267",
+    "sender": "James Brown",
+    "text": "Who's responsible for the question?",
+    "is_read": false,
+    "is_outgoing": false
+  },
+  {
+    "id": 6278485,
+    "dialog_id": -10000001,
+    "date": "2025-02-28T08:36:06.081267",
+    "sender": "William Smith",
+    "text": "We should prioritize the plan this week. FYI, the feedback needs more attention before friday.",
+    "is_read": false,
+    "is_outgoing": false
+  },
+  {
+    "id": 7622623,
+    "dialog_id": -10000001,
+    "date": "2025-02-28T08:26:06.081267",
+    "sender": "David Johnson",
+    "text": "I've updated the question documentation.",
+    "is_read": false,
+    "is_outgoing": false
+  },
+  {
+    "id": 8274294,
+    "dialog_id": -10000001,
+    "date": "2025-02-28T08:16:06.081267",
+    "sender": "William Smith",
+    "text": "We should prioritize the question this week.",
+    "is_read": false,
+    "is_outgoing": false
+  },
+  {
+    "id": 3117114,
+    "dialog_id": -10000001,
+    "date": "2025-02-28T08:06:06.081267",
+    "sender": "William Smith",
+    "text": "We should prioritize the question this week. By the way, we should prioritize the question this week.",
+    "is_read": false,
+    "is_outgoing": false
+  },
+  {
+    "id": 4263035,
+    "dialog_id": -10000001,
+    "date": "2025-02-28T07:56:06.081267",
+    "sender": "David Johnson",
+    "text": "Has anyone looked at the issue yet?",
+    "is_read": false,
+    "is_outgoing": false
+  },
+  {
+    "id": 8351799,
+    "dialog_id": -10000001,
+    "date": "2025-02-28T07:46:06.081267",
+    "sender": "David Johnson",
+    "text": "I've updated the issue documentation.",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 4179574,
+    "dialog_id": -10000001,
+    "date": "2025-02-28T07:36:06.081267",
+    "sender": "You",
+    "text": "The plan needs more attention before Friday. And, the plan needs more attention before friday.",
+    "is_read": true,
+    "is_outgoing": true
+  },
+  {
+    "id": 2793616,
+    "dialog_id": -10000001,
+    "date": "2025-02-28T07:26:06.081267",
+    "sender": "Joseph Wilson",
+    "text": "Let's discuss the solution in our next meeting.",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 6597463,
+    "dialog_id": -10000001,
+    "date": "2025-02-28T07:16:06.081267",
+    "sender": "You",
+    "text": "Can we schedule a call about the project? Just so you know, i've updated the review documentation.",
+    "is_read": true,
+    "is_outgoing": true
+  },
+  {
+    "id": 3175821,
+    "dialog_id": -10000001,
+    "date": "2025-02-28T07:06:06.081267",
+    "sender": "William Smith",
+    "text": "I need help with the question, who can assist?",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 4119501,
+    "dialog_id": -10000001,
+    "date": "2025-02-28T06:56:06.081267",
+    "sender": "William Smith",
+    "text": "Who's responsible for the plan? Remember, let's discuss the question in our next meeting.",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 3779542,
+    "dialog_id": -10000001,
+    "date": "2025-02-28T06:46:06.081267",
+    "sender": "Harper Martin",
+    "text": "Has anyone looked at the meeting yet? FYI, let's discuss the issue in our next meeting.",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 8475159,
+    "dialog_id": -10000001,
+    "date": "2025-02-28T06:36:06.081267",
+    "sender": "Joseph Wilson",
+    "text": "We should prioritize the meeting this week.",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 8995223,
+    "dialog_id": -10000001,
+    "date": "2025-02-28T06:26:06.081267",
+    "sender": "James Brown",
+    "text": "The feedback needs more attention before Friday. Remember, let's discuss the issue in our next meeting.",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 2038586,
+    "dialog_id": -10000001,
+    "date": "2025-02-28T06:16:06.081267",
+    "sender": "You",
+    "text": "We should prioritize the project this week.",
+    "is_read": true,
+    "is_outgoing": true
+  },
+  {
+    "id": 1806980,
+    "dialog_id": -10000001,
+    "date": "2025-02-28T06:06:06.081267",
+    "sender": "William Smith",
+    "text": "Any updates on the project?",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 4020106,
+    "dialog_id": -10000001,
+    "date": "2025-02-28T05:56:06.081267",
+    "sender": "You",
+    "text": "Great progress on the review everyone! By the way, has anyone looked at the review yet?",
+    "is_read": true,
+    "is_outgoing": true
+  },
+  {
+    "id": 6771140,
+    "dialog_id": -10000001,
+    "date": "2025-02-28T05:46:06.081267",
+    "sender": "You",
+    "text": "Can we schedule a call about the plan? Oh, i need help with the solution, who can assist?",
+    "is_read": true,
+    "is_outgoing": true
+  },
+  {
+    "id": 5044624,
+    "dialog_id": -10000001,
+    "date": "2025-02-28T05:36:06.081267",
+    "sender": "Joseph Wilson",
+    "text": "I've updated the question documentation. Remember, we should prioritize the question this week.",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 1116442,
+    "dialog_id": -10000002,
+    "date": "2025-02-28T08:46:06.081346",
+    "sender": "You",
+    "text": "Have you considered this recommendation?",
+    "is_read": false,
+    "is_outgoing": true
+  },
+  {
+    "id": 8630297,
+    "dialog_id": -10000002,
+    "date": "2025-02-28T08:36:06.081346",
+    "sender": "Mike Brown",
+    "text": "Have you considered this thought?",
+    "is_read": false,
+    "is_outgoing": false
+  },
+  {
+    "id": 8173712,
+    "dialog_id": -10000002,
+    "date": "2025-02-28T08:26:06.081346",
+    "sender": "Mike Brown",
+    "text": "Do you have time to discuss a consideration? Also, have you considered this question?",
+    "is_read": false,
+    "is_outgoing": false
+  },
+  {
+    "id": 5547705,
+    "dialog_id": -10000002,
+    "date": "2025-02-28T08:16:06.081346",
+    "sender": "Mike Brown",
+    "text": "Have you considered this idea? Don't forget, let me know what you think of this idea.",
+    "is_read": false,
+    "is_outgoing": false
+  },
+  {
+    "id": 6091676,
+    "dialog_id": -10000002,
+    "date": "2025-02-28T08:06:06.081346",
+    "sender": "Mike Brown",
+    "text": "Can you help me with a recommendation?",
+    "is_read": false,
+    "is_outgoing": false
+  },
+  {
+    "id": 3053785,
+    "dialog_id": -10000002,
+    "date": "2025-02-28T07:56:06.081346",
+    "sender": "You",
+    "text": "I wanted to follow up on our thought.",
+    "is_read": false,
+    "is_outgoing": true
+  },
+  {
+    "id": 1416287,
+    "dialog_id": -10000002,
+    "date": "2025-02-28T07:46:06.081346",
+    "sender": "You",
+    "text": "Do you have time to discuss a proposal?",
+    "is_read": true,
+    "is_outgoing": true
+  },
+  {
+    "id": 9912644,
+    "dialog_id": -10000002,
+    "date": "2025-02-28T07:36:06.081346",
+    "sender": "Mike Brown",
+    "text": "Let me know what you think of this recommendation. By the way, what do you think about this proposal?",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 4748547,
+    "dialog_id": -10000002,
+    "date": "2025-02-28T07:26:06.081346",
+    "sender": "You",
+    "text": "I wanted to follow up on our question.",
+    "is_read": true,
+    "is_outgoing": true
+  },
+  {
+    "id": 1691399,
+    "dialog_id": -10000002,
+    "date": "2025-02-28T07:16:06.081346",
+    "sender": "Mike Brown",
+    "text": "Have you considered this suggestion? Don't forget, i'd like your feedback on my plan.",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 4589592,
+    "dialog_id": -10000002,
+    "date": "2025-02-28T07:06:06.081346",
+    "sender": "Mike Brown",
+    "text": "Let me know what you think of this proposal.",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 9149336,
+    "dialog_id": -10000002,
+    "date": "2025-02-28T06:56:06.081346",
+    "sender": "You",
+    "text": "I'd like your feedback on my consideration. Oh, do you have time to discuss a proposal?",
+    "is_read": true,
+    "is_outgoing": true
+  },
+  {
+    "id": 7468460,
+    "dialog_id": -10000002,
+    "date": "2025-02-28T06:46:06.081346",
+    "sender": "You",
+    "text": "I wanted to follow up on our idea. By the way, i had an update i wanted to share with you.",
+    "is_read": true,
+    "is_outgoing": true
+  },
+  {
+    "id": 1136963,
+    "dialog_id": -10000002,
+    "date": "2025-02-28T06:36:06.081346",
+    "sender": "You",
+    "text": "Just checking in about the request.",
+    "is_read": true,
+    "is_outgoing": true
+  },
+  {
+    "id": 3408556,
+    "dialog_id": -10000002,
+    "date": "2025-02-28T06:26:06.081346",
+    "sender": "Mike Brown",
+    "text": "What do you think about this recommendation?",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 5552003,
+    "dialog_id": -10000002,
+    "date": "2025-02-28T06:16:06.081346",
+    "sender": "You",
+    "text": "I'd like your feedback on my update. Just so you know, i had an proposal i wanted to share with you.",
+    "is_read": true,
+    "is_outgoing": true
+  },
+  {
+    "id": 2232426,
+    "dialog_id": -10000002,
+    "date": "2025-02-28T06:06:06.081346",
+    "sender": "Mike Brown",
+    "text": "What do you think about this idea?",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 2881832,
+    "dialog_id": -10000002,
+    "date": "2025-02-28T05:56:06.081346",
+    "sender": "You",
+    "text": "I'd like your feedback on my request. Remember, i'm working on a new plan.",
+    "is_read": true,
+    "is_outgoing": true
+  },
+  {
+    "id": 3013942,
+    "dialog_id": -10000002,
+    "date": "2025-02-28T05:46:06.081346",
+    "sender": "Mike Brown",
+    "text": "What do you think about this thought?",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 7822806,
+    "dialog_id": -10000002,
+    "date": "2025-02-28T05:36:06.081346",
+    "sender": "You",
+    "text": "Do you have time to discuss a proposal? By the way, i had an question i wanted to share with you.",
+    "is_read": true,
+    "is_outgoing": true
+  },
+  {
+    "id": 1191239,
+    "dialog_id": -10000003,
+    "date": "2025-02-28T08:46:06.081386",
+    "sender": "Amelia Miller",
+    "text": "Any updates on the update? Also, i need help with the solution, who can assist?",
+    "is_read": false,
+    "is_outgoing": false
+  },
+  {
+    "id": 6356099,
+    "dialog_id": -10000003,
+    "date": "2025-02-28T08:36:06.081386",
+    "sender": "William Wilson",
+    "text": "Let's discuss the meeting in our next meeting.",
+    "is_read": false,
+    "is_outgoing": false
+  },
+  {
+    "id": 1731762,
+    "dialog_id": -10000003,
+    "date": "2025-02-28T08:26:06.081386",
+    "sender": "You",
+    "text": "Any updates on the deadline? And, has anyone looked at the question yet?",
+    "is_read": false,
+    "is_outgoing": true
+  },
+  {
+    "id": 9203527,
+    "dialog_id": -10000003,
+    "date": "2025-02-28T08:16:06.081386",
+    "sender": "David Martinez",
+    "text": "Has anyone looked at the question yet? Don't forget, has anyone looked at the question yet?",
+    "is_read": false,
+    "is_outgoing": false
+  },
+  {
+    "id": 5719059,
+    "dialog_id": -10000003,
+    "date": "2025-02-28T08:06:06.081386",
+    "sender": "You",
+    "text": "Let's discuss the plan in our next meeting. Remember, any updates on the plan?",
+    "is_read": false,
+    "is_outgoing": true
+  },
+  {
+    "id": 5775585,
+    "dialog_id": -10000003,
+    "date": "2025-02-28T07:56:06.081386",
+    "sender": "Sophia Thompson",
+    "text": "Let's discuss the meeting in our next meeting.",
+    "is_read": false,
+    "is_outgoing": false
+  },
+  {
+    "id": 2462162,
+    "dialog_id": -10000003,
+    "date": "2025-02-28T07:46:06.081386",
+    "sender": "Sophia Thompson",
+    "text": "Great progress on the plan everyone!",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 7357193,
+    "dialog_id": -10000003,
+    "date": "2025-02-28T07:36:06.081386",
+    "sender": "Sophia Thompson",
+    "text": "Can we schedule a call about the solution? Also, i've updated the project documentation.",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 4376688,
+    "dialog_id": -10000003,
+    "date": "2025-02-28T07:26:06.081386",
+    "sender": "Amelia Miller",
+    "text": "Has anyone looked at the review yet? Plus, we should prioritize the solution this week.",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 6995831,
+    "dialog_id": -10000003,
+    "date": "2025-02-28T07:16:06.081386",
+    "sender": "David Martinez",
+    "text": "I need help with the project, who can assist?",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 4182802,
+    "dialog_id": -10000003,
+    "date": "2025-02-28T07:06:06.081386",
+    "sender": "Isabella Davis",
+    "text": "Who's responsible for the plan?",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 7679149,
+    "dialog_id": -10000003,
+    "date": "2025-02-28T06:56:06.081386",
+    "sender": "Isabella Davis",
+    "text": "Has anyone looked at the solution yet?",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 8972228,
+    "dialog_id": -10000003,
+    "date": "2025-02-28T06:46:06.081386",
+    "sender": "Sophia Thompson",
+    "text": "Any updates on the review? By the way, has anyone looked at the plan yet?",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 6180710,
+    "dialog_id": -10000003,
+    "date": "2025-02-28T06:36:06.081386",
+    "sender": "Isabella Davis",
+    "text": "I've updated the plan documentation. By the way, can we schedule a call about the project?",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 4358869,
+    "dialog_id": -10000003,
+    "date": "2025-02-28T06:26:06.081386",
+    "sender": "You",
+    "text": "Let's discuss the solution in our next meeting. Just so you know, who's responsible for the project?",
+    "is_read": true,
+    "is_outgoing": true
+  },
+  {
+    "id": 5550032,
+    "dialog_id": -10000003,
+    "date": "2025-02-28T06:16:06.081386",
+    "sender": "Isabella Davis",
+    "text": "Has anyone looked at the project yet?",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 7808673,
+    "dialog_id": -10000003,
+    "date": "2025-02-28T06:06:06.081386",
+    "sender": "Isabella Davis",
+    "text": "Who's responsible for the update?",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 5799042,
+    "dialog_id": -10000003,
+    "date": "2025-02-28T05:56:06.081386",
+    "sender": "David Martinez",
+    "text": "Has anyone looked at the solution yet?",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 7953924,
+    "dialog_id": -10000003,
+    "date": "2025-02-28T05:46:06.081386",
+    "sender": "David Martinez",
+    "text": "Can we schedule a call about the update?",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 8482176,
+    "dialog_id": -10000003,
+    "date": "2025-02-28T05:36:06.081386",
+    "sender": "Sophia Thompson",
+    "text": "We should prioritize the project this week.",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 8494352,
+    "dialog_id": -10000004,
+    "date": "2025-02-28T08:46:06.081429",
+    "sender": "Jason",
+    "text": "Do you have time to discuss a thought? Also, i'd like your feedback on my update.",
+    "is_read": false,
+    "is_outgoing": false
+  },
+  {
+    "id": 8982286,
+    "dialog_id": -10000004,
+    "date": "2025-02-28T08:36:06.081429",
+    "sender": "Jason",
+    "text": "I'm working on a new proposal.",
+    "is_read": false,
+    "is_outgoing": false
+  },
+  {
+    "id": 2961117,
+    "dialog_id": -10000004,
+    "date": "2025-02-28T08:26:06.081429",
+    "sender": "Jason",
+    "text": "Let me know what you think of this consideration. Oh, i had an proposal i wanted to share with you.",
+    "is_read": false,
+    "is_outgoing": false
+  },
+  {
+    "id": 4486378,
+    "dialog_id": -10000004,
+    "date": "2025-02-28T08:16:06.081429",
+    "sender": "Jason",
+    "text": "Let me know what you think of this request. FYI, do you have time to discuss a suggestion?",
+    "is_read": false,
+    "is_outgoing": false
+  },
+  {
+    "id": 3945005,
+    "dialog_id": -10000004,
+    "date": "2025-02-28T08:06:06.081429",
+    "sender": "You",
+    "text": "What do you think about this request?",
+    "is_read": false,
+    "is_outgoing": true
+  },
+  {
+    "id": 7083901,
+    "dialog_id": -10000004,
+    "date": "2025-02-28T07:56:06.081429",
+    "sender": "You",
+    "text": "What do you think about this question? And, can you help me with a recommendation?",
+    "is_read": false,
+    "is_outgoing": true
+  },
+  {
+    "id": 4304010,
+    "dialog_id": -10000004,
+    "date": "2025-02-28T07:46:06.081429",
+    "sender": "You",
+    "text": "Can you help me with a idea?",
+    "is_read": true,
+    "is_outgoing": true
+  },
+  {
+    "id": 8260442,
+    "dialog_id": -10000004,
+    "date": "2025-02-28T07:36:06.081429",
+    "sender": "You",
+    "text": "Do you have time to discuss a question?",
+    "is_read": true,
+    "is_outgoing": true
+  },
+  {
+    "id": 7148607,
+    "dialog_id": -10000004,
+    "date": "2025-02-28T07:26:06.081429",
+    "sender": "You",
+    "text": "Have you considered this question? And, can you help me with a plan?",
+    "is_read": true,
+    "is_outgoing": true
+  },
+  {
+    "id": 5806976,
+    "dialog_id": -10000004,
+    "date": "2025-02-28T07:16:06.081429",
+    "sender": "You",
+    "text": "I'm working on a new consideration. And, just checking in about the idea.",
+    "is_read": true,
+    "is_outgoing": true
+  },
+  {
+    "id": 8405506,
+    "dialog_id": -10000004,
+    "date": "2025-02-28T07:06:06.081429",
+    "sender": "You",
+    "text": "Have you considered this idea?",
+    "is_read": true,
+    "is_outgoing": true
+  },
+  {
+    "id": 8224964,
+    "dialog_id": -10000004,
+    "date": "2025-02-28T06:56:06.081429",
+    "sender": "Jason",
+    "text": "I'm working on a new thought. Just so you know, what do you think about this consideration?",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 7886013,
+    "dialog_id": -10000004,
+    "date": "2025-02-28T06:46:06.081429",
+    "sender": "You",
+    "text": "I'd like your feedback on my suggestion.",
+    "is_read": true,
+    "is_outgoing": true
+  },
+  {
+    "id": 7938078,
+    "dialog_id": -10000004,
+    "date": "2025-02-28T06:36:06.081429",
+    "sender": "Jason",
+    "text": "Just checking in about the suggestion. FYI, can you help me with a question?",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 4179173,
+    "dialog_id": -10000004,
+    "date": "2025-02-28T06:26:06.081429",
+    "sender": "Jason",
+    "text": "Have you considered this consideration?",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 5962928,
+    "dialog_id": -10000004,
+    "date": "2025-02-28T06:16:06.081429",
+    "sender": "Jason",
+    "text": "Can you help me with a update? And, i had an update i wanted to share with you.",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 2001000,
+    "dialog_id": -10000004,
+    "date": "2025-02-28T06:06:06.081429",
+    "sender": "You",
+    "text": "Just checking in about the consideration. Plus, i had an recommendation i wanted to share with you.",
+    "is_read": true,
+    "is_outgoing": true
+  },
+  {
+    "id": 2828588,
+    "dialog_id": -10000004,
+    "date": "2025-02-28T05:56:06.081429",
+    "sender": "Jason",
+    "text": "I'd like your feedback on my recommendation.",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 2387567,
+    "dialog_id": -10000004,
+    "date": "2025-02-28T05:46:06.081429",
+    "sender": "You",
+    "text": "Do you have time to discuss a consideration?",
+    "is_read": true,
+    "is_outgoing": true
+  },
+  {
+    "id": 8673244,
+    "dialog_id": -10000004,
+    "date": "2025-02-28T05:36:06.081429",
+    "sender": "Jason",
+    "text": "I'd like your feedback on my plan. Remember, do you have time to discuss a consideration?",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 1223035,
+    "dialog_id": -10000005,
+    "date": "2025-02-28T08:46:06.081471",
+    "sender": "William Thompson",
+    "text": "I've updated the project documentation. By the way, has anyone looked at the update yet?",
+    "is_read": false,
+    "is_outgoing": false
+  },
+  {
+    "id": 3643487,
+    "dialog_id": -10000005,
+    "date": "2025-02-28T08:36:06.081471",
+    "sender": "You",
+    "text": "The question needs more attention before Friday. Also, i need help with the project, who can assist?",
+    "is_read": false,
+    "is_outgoing": true
+  },
+  {
+    "id": 6035115,
+    "dialog_id": -10000005,
+    "date": "2025-02-28T08:26:06.081471",
+    "sender": "David Thomas",
+    "text": "Has anyone looked at the project yet?",
+    "is_read": false,
+    "is_outgoing": false
+  },
+  {
+    "id": 7344830,
+    "dialog_id": -10000005,
+    "date": "2025-02-28T08:16:06.081471",
+    "sender": "James Miller",
+    "text": "Can we schedule a call about the project? Don't forget, great progress on the meeting everyone!",
+    "is_read": false,
+    "is_outgoing": false
+  },
+  {
+    "id": 2572449,
+    "dialog_id": -10000005,
+    "date": "2025-02-28T08:06:06.081471",
+    "sender": "David Thomas",
+    "text": "The meeting needs more attention before Friday.",
+    "is_read": false,
+    "is_outgoing": false
+  },
+  {
+    "id": 6633752,
+    "dialog_id": -10000005,
+    "date": "2025-02-28T07:56:06.081471",
+    "sender": "Emma Jackson",
+    "text": "I need help with the deadline, who can assist?",
+    "is_read": false,
+    "is_outgoing": false
+  },
+  {
+    "id": 1017434,
+    "dialog_id": -10000005,
+    "date": "2025-02-28T07:46:06.081471",
+    "sender": "David Thomas",
+    "text": "I've updated the deadline documentation. Additionally, i've updated the meeting documentation.",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 6977242,
+    "dialog_id": -10000005,
+    "date": "2025-02-28T07:36:06.081471",
+    "sender": "David Thomas",
+    "text": "I need help with the meeting, who can assist? And, i've updated the update documentation.",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 7922649,
+    "dialog_id": -10000005,
+    "date": "2025-02-28T07:26:06.081471",
+    "sender": "David Thomas",
+    "text": "Who's responsible for the issue? And, let's discuss the issue in our next meeting.",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 2306683,
+    "dialog_id": -10000005,
+    "date": "2025-02-28T07:16:06.081471",
+    "sender": "William Thompson",
+    "text": "Let's discuss the feedback in our next meeting. FYI, can we schedule a call about the meeting?",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 4141692,
+    "dialog_id": -10000005,
+    "date": "2025-02-28T07:06:06.081471",
+    "sender": "James Miller",
+    "text": "Any updates on the project? By the way, we should prioritize the issue this week.",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 4897773,
+    "dialog_id": -10000005,
+    "date": "2025-02-28T06:56:06.081471",
+    "sender": "William Thompson",
+    "text": "Has anyone looked at the issue yet?",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 9921251,
+    "dialog_id": -10000005,
+    "date": "2025-02-28T06:46:06.081471",
+    "sender": "Emma Jackson",
+    "text": "Can we schedule a call about the plan?",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 8429900,
+    "dialog_id": -10000005,
+    "date": "2025-02-28T06:36:06.081471",
+    "sender": "You",
+    "text": "Who's responsible for the plan?",
+    "is_read": true,
+    "is_outgoing": true
+  },
+  {
+    "id": 9844425,
+    "dialog_id": -10000005,
+    "date": "2025-02-28T06:26:06.081471",
+    "sender": "William Thompson",
+    "text": "I need help with the solution, who can assist? Just so you know, i need help with the update, who can assist?",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 3747661,
+    "dialog_id": -10000005,
+    "date": "2025-02-28T06:16:06.081471",
+    "sender": "Andrew Smith",
+    "text": "Has anyone looked at the review yet?",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 5565488,
+    "dialog_id": -10000005,
+    "date": "2025-02-28T06:06:06.081471",
+    "sender": "David Thomas",
+    "text": "Can we schedule a call about the question? Remember, the review needs more attention before friday.",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 3378578,
+    "dialog_id": -10000005,
+    "date": "2025-02-28T05:56:06.081471",
+    "sender": "Andrew Smith",
+    "text": "Can we schedule a call about the review?",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 9515455,
+    "dialog_id": -10000005,
+    "date": "2025-02-28T05:46:06.081471",
+    "sender": "You",
+    "text": "We should prioritize the deadline this week. And, who's responsible for the feedback?",
+    "is_read": true,
+    "is_outgoing": true
+  },
+  {
+    "id": 5273639,
+    "dialog_id": -10000005,
+    "date": "2025-02-28T05:36:06.081471",
+    "sender": "You",
+    "text": "Can we schedule a call about the solution?",
+    "is_read": true,
+    "is_outgoing": true
+  },
+  {
+    "id": 5790585,
+    "dialog_id": -10000006,
+    "date": "2025-02-28T08:46:06.081697",
+    "sender": "You",
+    "text": "Let me know what you think of this plan. Plus, do you have time to discuss a proposal?",
+    "is_read": false,
+    "is_outgoing": true
+  },
+  {
+    "id": 4181751,
+    "dialog_id": -10000006,
+    "date": "2025-02-28T08:36:06.081697",
+    "sender": "You",
+    "text": "Can you help me with a consideration?",
+    "is_read": false,
+    "is_outgoing": true
+  },
+  {
+    "id": 4781633,
+    "dialog_id": -10000006,
+    "date": "2025-02-28T08:26:06.081697",
+    "sender": "Sarah Johnson",
+    "text": "Can you help me with a plan?",
+    "is_read": false,
+    "is_outgoing": false
+  },
+  {
+    "id": 3813216,
+    "dialog_id": -10000006,
+    "date": "2025-02-28T08:16:06.081697",
+    "sender": "Sarah Johnson",
+    "text": "Just checking in about the request.",
+    "is_read": false,
+    "is_outgoing": false
+  },
+  {
+    "id": 8223928,
+    "dialog_id": -10000006,
+    "date": "2025-02-28T08:06:06.081697",
+    "sender": "Sarah Johnson",
+    "text": "I'd like your feedback on my question.",
+    "is_read": false,
+    "is_outgoing": false
+  },
+  {
+    "id": 5442400,
+    "dialog_id": -10000006,
+    "date": "2025-02-28T07:56:06.081697",
+    "sender": "You",
+    "text": "I'd like your feedback on my suggestion.",
+    "is_read": false,
+    "is_outgoing": true
+  },
+  {
+    "id": 7020643,
+    "dialog_id": -10000006,
+    "date": "2025-02-28T07:46:06.081697",
+    "sender": "You",
+    "text": "Can you help me with a question? Just so you know, i'd like your feedback on my recommendation.",
+    "is_read": true,
+    "is_outgoing": true
+  },
+  {
+    "id": 8105609,
+    "dialog_id": -10000006,
+    "date": "2025-02-28T07:36:06.081697",
+    "sender": "Sarah Johnson",
+    "text": "I'd like your feedback on my question.",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 4539592,
+    "dialog_id": -10000006,
+    "date": "2025-02-28T07:26:06.081697",
+    "sender": "Sarah Johnson",
+    "text": "Have you considered this thought?",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 9666135,
+    "dialog_id": -10000006,
+    "date": "2025-02-28T07:16:06.081697",
+    "sender": "You",
+    "text": "I wanted to follow up on our consideration.",
+    "is_read": true,
+    "is_outgoing": true
+  },
+  {
+    "id": 1910418,
+    "dialog_id": -10000006,
+    "date": "2025-02-28T07:06:06.081697",
+    "sender": "You",
+    "text": "Let me know what you think of this update.",
+    "is_read": true,
+    "is_outgoing": true
+  },
+  {
+    "id": 9171440,
+    "dialog_id": -10000006,
+    "date": "2025-02-28T06:56:06.081697",
+    "sender": "You",
+    "text": "Have you considered this recommendation? Just so you know, i'm working on a new recommendation.",
+    "is_read": true,
+    "is_outgoing": true
+  },
+  {
+    "id": 8556737,
+    "dialog_id": -10000006,
+    "date": "2025-02-28T06:46:06.081697",
+    "sender": "Sarah Johnson",
+    "text": "Do you have time to discuss a idea? And, do you have time to discuss a question?",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 7366985,
+    "dialog_id": -10000006,
+    "date": "2025-02-28T06:36:06.081697",
+    "sender": "You",
+    "text": "I had an request I wanted to share with you. Just so you know, do you have time to discuss a suggestion?",
+    "is_read": true,
+    "is_outgoing": true
+  },
+  {
+    "id": 4852615,
+    "dialog_id": -10000006,
+    "date": "2025-02-28T06:26:06.081697",
+    "sender": "Sarah Johnson",
+    "text": "Just checking in about the recommendation.",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 3191830,
+    "dialog_id": -10000006,
+    "date": "2025-02-28T06:16:06.081697",
+    "sender": "Sarah Johnson",
+    "text": "I had an question I wanted to share with you. Also, i wanted to follow up on our proposal.",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 2444626,
+    "dialog_id": -10000006,
+    "date": "2025-02-28T06:06:06.081697",
+    "sender": "You",
+    "text": "Do you have time to discuss a plan?",
+    "is_read": true,
+    "is_outgoing": true
+  },
+  {
+    "id": 5147270,
+    "dialog_id": -10000006,
+    "date": "2025-02-28T05:56:06.081697",
+    "sender": "Sarah Johnson",
+    "text": "Do you have time to discuss a thought? And, i wanted to follow up on our idea.",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 1697967,
+    "dialog_id": -10000006,
+    "date": "2025-02-28T05:46:06.081697",
+    "sender": "Sarah Johnson",
+    "text": "Have you considered this consideration?",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 1451003,
+    "dialog_id": -10000006,
+    "date": "2025-02-28T05:36:06.081697",
+    "sender": "You",
+    "text": "I'm working on a new idea.",
+    "is_read": true,
+    "is_outgoing": true
+  },
+  {
+    "id": 1237412,
+    "dialog_id": -10000007,
+    "date": "2025-02-28T08:46:06.081736",
+    "sender": "You",
+    "text": "Can we schedule a call about the question? Additionally, can we schedule a call about the question?",
+    "is_read": false,
+    "is_outgoing": true
+  },
+  {
+    "id": 6528979,
+    "dialog_id": -10000007,
+    "date": "2025-02-28T08:36:06.081736",
+    "sender": "Michael Anderson",
+    "text": "Can we schedule a call about the question? Additionally, has anyone looked at the issue yet?",
+    "is_read": false,
+    "is_outgoing": false
+  },
+  {
+    "id": 5486028,
+    "dialog_id": -10000007,
+    "date": "2025-02-28T08:26:06.081736",
+    "sender": "Alexander Jones",
+    "text": "Has anyone looked at the update yet?",
+    "is_read": false,
+    "is_outgoing": false
+  },
+  {
+    "id": 2236729,
+    "dialog_id": -10000007,
+    "date": "2025-02-28T08:16:06.081736",
+    "sender": "Michael Anderson",
+    "text": "Great progress on the question everyone! And, i've updated the question documentation.",
+    "is_read": false,
+    "is_outgoing": false
+  },
+  {
+    "id": 4578672,
+    "dialog_id": -10000007,
+    "date": "2025-02-28T08:06:06.081736",
+    "sender": "You",
+    "text": "I need help with the meeting, who can assist?",
+    "is_read": false,
+    "is_outgoing": true
+  },
+  {
+    "id": 6382407,
+    "dialog_id": -10000007,
+    "date": "2025-02-28T07:56:06.081736",
+    "sender": "Alexander Jones",
+    "text": "Has anyone looked at the review yet? Additionally, can we schedule a call about the plan?",
+    "is_read": false,
+    "is_outgoing": false
+  },
+  {
+    "id": 8688913,
+    "dialog_id": -10000007,
+    "date": "2025-02-28T07:46:06.081736",
+    "sender": "Charlotte White",
+    "text": "I need help with the question, who can assist?",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 1842838,
+    "dialog_id": -10000007,
+    "date": "2025-02-28T07:36:06.081736",
+    "sender": "Andrew Williams",
+    "text": "The deadline needs more attention before Friday.",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 7973683,
+    "dialog_id": -10000007,
+    "date": "2025-02-28T07:26:06.081736",
+    "sender": "You",
+    "text": "Great progress on the issue everyone!",
+    "is_read": true,
+    "is_outgoing": true
+  },
+  {
+    "id": 8478248,
+    "dialog_id": -10000007,
+    "date": "2025-02-28T07:16:06.081736",
+    "sender": "You",
+    "text": "I've updated the solution documentation.",
+    "is_read": true,
+    "is_outgoing": true
+  },
+  {
+    "id": 7053763,
+    "dialog_id": -10000007,
+    "date": "2025-02-28T07:06:06.081736",
+    "sender": "Charlotte White",
+    "text": "Let's discuss the project in our next meeting. Additionally, has anyone looked at the question yet?",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 3964982,
+    "dialog_id": -10000007,
+    "date": "2025-02-28T06:56:06.081736",
+    "sender": "Michael Anderson",
+    "text": "We should prioritize the meeting this week.",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 3821022,
+    "dialog_id": -10000007,
+    "date": "2025-02-28T06:46:06.081736",
+    "sender": "Andrew Williams",
+    "text": "The meeting needs more attention before Friday.",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 8325041,
+    "dialog_id": -10000007,
+    "date": "2025-02-28T06:36:06.081736",
+    "sender": "Charlotte White",
+    "text": "Let's discuss the project in our next meeting.",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 1944729,
+    "dialog_id": -10000007,
+    "date": "2025-02-28T06:26:06.081736",
+    "sender": "Andrew Williams",
+    "text": "I've updated the update documentation. Plus, can we schedule a call about the feedback?",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 2177470,
+    "dialog_id": -10000007,
+    "date": "2025-02-28T06:16:06.081736",
+    "sender": "Andrew Williams",
+    "text": "Who's responsible for the review? Just so you know, we should prioritize the issue this week.",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 6525883,
+    "dialog_id": -10000007,
+    "date": "2025-02-28T06:06:06.081736",
+    "sender": "You",
+    "text": "I need help with the solution, who can assist? And, i need help with the meeting, who can assist?",
+    "is_read": true,
+    "is_outgoing": true
+  },
+  {
+    "id": 2180159,
+    "dialog_id": -10000007,
+    "date": "2025-02-28T05:56:06.081736",
+    "sender": "Charlotte White",
+    "text": "We should prioritize the review this week. Also, can we schedule a call about the question?",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 9242960,
+    "dialog_id": -10000007,
+    "date": "2025-02-28T05:46:06.081736",
+    "sender": "Michael Anderson",
+    "text": "Let's discuss the feedback in our next meeting.",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 9099941,
+    "dialog_id": -10000007,
+    "date": "2025-02-28T05:36:06.081736",
+    "sender": "Andrew Williams",
+    "text": "Can we schedule a call about the meeting?",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 3771627,
+    "dialog_id": -10000008,
+    "date": "2025-02-28T08:46:06.081782",
+    "sender": "You",
+    "text": "Can you help me with a consideration?",
+    "is_read": false,
+    "is_outgoing": true
+  },
+  {
+    "id": 7803305,
+    "dialog_id": -10000008,
+    "date": "2025-02-28T08:36:06.081782",
+    "sender": "You",
+    "text": "Do you have time to discuss a thought?",
+    "is_read": false,
+    "is_outgoing": true
+  },
+  {
+    "id": 5603258,
+    "dialog_id": -10000008,
+    "date": "2025-02-28T08:26:06.081782",
+    "sender": "David Wilson",
+    "text": "Have you considered this recommendation?",
+    "is_read": false,
+    "is_outgoing": false
+  },
+  {
+    "id": 8922601,
+    "dialog_id": -10000008,
+    "date": "2025-02-28T08:16:06.081782",
+    "sender": "David Wilson",
+    "text": "Have you considered this proposal? And, can you help me with a request?",
+    "is_read": false,
+    "is_outgoing": false
+  },
+  {
+    "id": 3104104,
+    "dialog_id": -10000008,
+    "date": "2025-02-28T08:06:06.081782",
+    "sender": "You",
+    "text": "Can you help me with a proposal?",
+    "is_read": false,
+    "is_outgoing": true
+  },
+  {
+    "id": 9892294,
+    "dialog_id": -10000008,
+    "date": "2025-02-28T07:56:06.081782",
+    "sender": "You",
+    "text": "I had an idea I wanted to share with you. Don't forget, have you considered this thought?",
+    "is_read": false,
+    "is_outgoing": true
+  },
+  {
+    "id": 7472118,
+    "dialog_id": -10000008,
+    "date": "2025-02-28T07:46:06.081782",
+    "sender": "David Wilson",
+    "text": "Can you help me with a recommendation? Just so you know, i wanted to follow up on our update.",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 7030134,
+    "dialog_id": -10000008,
+    "date": "2025-02-28T07:36:06.081782",
+    "sender": "David Wilson",
+    "text": "Just checking in about the plan. By the way, have you considered this thought?",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 9689133,
+    "dialog_id": -10000008,
+    "date": "2025-02-28T07:26:06.081782",
+    "sender": "David Wilson",
+    "text": "Have you considered this question? Don't forget, i had an request i wanted to share with you.",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 3987020,
+    "dialog_id": -10000008,
+    "date": "2025-02-28T07:16:06.081782",
+    "sender": "You",
+    "text": "Can you help me with a question? And, let me know what you think of this thought.",
+    "is_read": true,
+    "is_outgoing": true
+  },
+  {
+    "id": 2536396,
+    "dialog_id": -10000008,
+    "date": "2025-02-28T07:06:06.081782",
+    "sender": "David Wilson",
+    "text": "Let me know what you think of this update. And, have you considered this idea?",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 6567917,
+    "dialog_id": -10000008,
+    "date": "2025-02-28T06:56:06.081782",
+    "sender": "David Wilson",
+    "text": "Just checking in about the consideration.",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 3403759,
+    "dialog_id": -10000008,
+    "date": "2025-02-28T06:46:06.081782",
+    "sender": "David Wilson",
+    "text": "I'd like your feedback on my update.",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 4301498,
+    "dialog_id": -10000008,
+    "date": "2025-02-28T06:36:06.081782",
+    "sender": "David Wilson",
+    "text": "What do you think about this recommendation?",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 8459515,
+    "dialog_id": -10000008,
+    "date": "2025-02-28T06:26:06.081782",
+    "sender": "David Wilson",
+    "text": "Have you considered this consideration? By the way, i'm working on a new proposal.",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 3789962,
+    "dialog_id": -10000008,
+    "date": "2025-02-28T06:16:06.081782",
+    "sender": "David Wilson",
+    "text": "Have you considered this recommendation? Additionally, can you help me with a question?",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 7565818,
+    "dialog_id": -10000008,
+    "date": "2025-02-28T06:06:06.081782",
+    "sender": "David Wilson",
+    "text": "What do you think about this question?",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 5870916,
+    "dialog_id": -10000008,
+    "date": "2025-02-28T05:56:06.081782",
+    "sender": "David Wilson",
+    "text": "Have you considered this question? Just so you know, let me know what you think of this question.",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 8271726,
+    "dialog_id": -10000008,
+    "date": "2025-02-28T05:46:06.081782",
+    "sender": "You",
+    "text": "Do you have time to discuss a suggestion?",
+    "is_read": true,
+    "is_outgoing": true
+  },
+  {
+    "id": 8143831,
+    "dialog_id": -10000008,
+    "date": "2025-02-28T05:36:06.081782",
+    "sender": "You",
+    "text": "Just checking in about the plan.",
+    "is_read": true,
+    "is_outgoing": true
+  },
+  {
+    "id": 7253014,
+    "dialog_id": -10000009,
+    "date": "2025-02-28T08:46:06.081822",
+    "sender": "Sophia Moore",
+    "text": "We should prioritize the meeting this week.",
+    "is_read": false,
+    "is_outgoing": false
+  },
+  {
+    "id": 6526031,
+    "dialog_id": -10000009,
+    "date": "2025-02-28T08:36:06.081822",
+    "sender": "Sophia Moore",
+    "text": "Great progress on the review everyone! Just so you know, i need help with the issue, who can assist?",
+    "is_read": false,
+    "is_outgoing": false
+  },
+  {
+    "id": 5288518,
+    "dialog_id": -10000009,
+    "date": "2025-02-28T08:26:06.081822",
+    "sender": "Michael Miller",
+    "text": "We should prioritize the review this week.",
+    "is_read": false,
+    "is_outgoing": false
+  },
+  {
+    "id": 5490610,
+    "dialog_id": -10000009,
+    "date": "2025-02-28T08:16:06.081822",
+    "sender": "Sophia Moore",
+    "text": "Can we schedule a call about the project? Plus, i've updated the project documentation.",
+    "is_read": false,
+    "is_outgoing": false
+  },
+  {
+    "id": 3751674,
+    "dialog_id": -10000009,
+    "date": "2025-02-28T08:06:06.081822",
+    "sender": "Alexander Taylor",
+    "text": "Any updates on the deadline?",
+    "is_read": false,
+    "is_outgoing": false
+  },
+  {
+    "id": 3561948,
+    "dialog_id": -10000009,
+    "date": "2025-02-28T07:56:06.081822",
+    "sender": "Alexander Taylor",
+    "text": "I've updated the solution documentation.",
+    "is_read": false,
+    "is_outgoing": false
+  },
+  {
+    "id": 9050615,
+    "dialog_id": -10000009,
+    "date": "2025-02-28T07:46:06.081822",
+    "sender": "Michael Miller",
+    "text": "Can we schedule a call about the meeting? Remember, any updates on the review?",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 9663338,
+    "dialog_id": -10000009,
+    "date": "2025-02-28T07:36:06.081822",
+    "sender": "Michael Miller",
+    "text": "Let's discuss the meeting in our next meeting. Remember, we should prioritize the deadline this week.",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 1860451,
+    "dialog_id": -10000009,
+    "date": "2025-02-28T07:26:06.081822",
+    "sender": "Sophia Moore",
+    "text": "We should prioritize the solution this week. Just so you know, who's responsible for the project?",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 3959469,
+    "dialog_id": -10000009,
+    "date": "2025-02-28T07:16:06.081822",
+    "sender": "Ava Harris",
+    "text": "Any updates on the deadline? Just so you know, i need help with the plan, who can assist?",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 7084282,
+    "dialog_id": -10000009,
+    "date": "2025-02-28T07:06:06.081822",
+    "sender": "You",
+    "text": "I need help with the review, who can assist?",
+    "is_read": true,
+    "is_outgoing": true
+  },
+  {
+    "id": 1863726,
+    "dialog_id": -10000009,
+    "date": "2025-02-28T06:56:06.081822",
+    "sender": "Matthew Brown",
+    "text": "The issue needs more attention before Friday. Remember, the deadline needs more attention before friday.",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 6003623,
+    "dialog_id": -10000009,
+    "date": "2025-02-28T06:46:06.081822",
+    "sender": "Michael Miller",
+    "text": "Any updates on the question?",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 2258570,
+    "dialog_id": -10000009,
+    "date": "2025-02-28T06:36:06.081822",
+    "sender": "Ava Harris",
+    "text": "Who's responsible for the issue?",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 9613169,
+    "dialog_id": -10000009,
+    "date": "2025-02-28T06:26:06.081822",
+    "sender": "Alexander Taylor",
+    "text": "Can we schedule a call about the issue?",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 4185911,
+    "dialog_id": -10000009,
+    "date": "2025-02-28T06:16:06.081822",
+    "sender": "You",
+    "text": "Has anyone looked at the plan yet? Oh, can we schedule a call about the solution?",
+    "is_read": true,
+    "is_outgoing": true
+  },
+  {
+    "id": 9847636,
+    "dialog_id": -10000009,
+    "date": "2025-02-28T06:06:06.081822",
+    "sender": "Ava Harris",
+    "text": "Great progress on the issue everyone! By the way, any updates on the feedback?",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 6781706,
+    "dialog_id": -10000009,
+    "date": "2025-02-28T05:56:06.081822",
+    "sender": "Matthew Brown",
+    "text": "The meeting needs more attention before Friday. Additionally, any updates on the issue?",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 6747679,
+    "dialog_id": -10000009,
+    "date": "2025-02-28T05:46:06.081822",
+    "sender": "Sophia Moore",
+    "text": "I need help with the plan, who can assist? FYI, who's responsible for the solution?",
+    "is_read": true,
+    "is_outgoing": false
+  },
+  {
+    "id": 5628741,
+    "dialog_id": -10000009,
+    "date": "2025-02-28T05:36:06.081822",
+    "sender": "Alexander Taylor",
+    "text": "The question needs more attention before Friday.",
+    "is_read": true,
+    "is_outgoing": false
+  }
+]
