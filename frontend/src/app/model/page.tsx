@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import AppLayout from '../AppLayout';
+import { useSession } from '../SessionContext';
 
 interface ModelOption {
   id: string;
@@ -14,6 +15,7 @@ export default function ModelPage() {
   const [selectedModel, setSelectedModel] = useState<string>('ollama');
   const [saving, setSaving] = useState<boolean>(false);
   const [saved, setSaved] = useState<boolean>(false);
+  const { managedFetch } = useSession();
 
   // List of available models
   const models: ModelOption[] = [
@@ -45,11 +47,21 @@ export default function ModelPage() {
 
   // Load saved model preference on page load
   useEffect(() => {
-    const savedModel = localStorage.getItem('selectedModel');
-    if (savedModel) {
-      setSelectedModel(savedModel);
-    }
-  }, []);
+    const fetchSavedModel = async () => {
+      try {
+        // For now, fallback to localStorage
+        // This would be replaced with an API call to get user preferences
+        const savedModel = localStorage.getItem('selectedModel');
+        if (savedModel) {
+          setSelectedModel(savedModel);
+        }
+      } catch (error) {
+        console.error('Error loading model preference:', error);
+      }
+    };
+
+    fetchSavedModel();
+  }, [managedFetch]);
 
   // Handle model selection
   const handleModelSelect = (modelId: string) => {

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import AppLayout from '../AppLayout';
+import { useSession } from '../SessionContext';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
 
@@ -263,7 +264,7 @@ interface ApiDialog {
 export default function MessagesPage() {
   const [dialogs, setDialogs] = useState<Dialog[]>([]);
   const [activeTab, setActiveTab] = useState<TabType>('selected');
-  const [loading, setLoading] = useState(true);
+  const [dialogsLoading, setDialogsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedDialogs, setSelectedDialogs] = useState<Set<number>>(new Set());
   const [apiSelectedDialogs, setApiSelectedDialogs] = useState<Dialog[]>([]);
@@ -275,9 +276,7 @@ export default function MessagesPage() {
     lastUnprocessed: false
   });
   const router = useRouter();
-  
-  // Get session ID from localStorage
-  const sessionId = typeof window !== 'undefined' ? localStorage.getItem('sessionId') : null;
+  const { sessionId, managedFetch, setManagedInterval } = useSession();
 
   // Load selected dialogs from localStorage
   useEffect(() => {
@@ -302,7 +301,15 @@ export default function MessagesPage() {
     const fetchDialogs = async () => {
       try {
         console.log(`Fetching dialogs from: ${API_URL}/dialogs/${sessionId}`);
-        const response = await fetch(`${API_URL}/dialogs/${sessionId}`);
+        const response = await managedFetch(`${API_URL}/dialogs/${sessionId}`);
+        
+        // If response is null (could happen if 401 was received and user was logged out)
+        if (!response) {
+          console.log('Null response received (possibly due to auth error)');
+          setDialogsLoading(false);
+          return;
+        }
+        
         console.log('Response status:', response.status);
         
         // Log the response content type
@@ -338,15 +345,14 @@ export default function MessagesPage() {
         console.error('Fetch error details:', err);
         setError(err instanceof Error ? err.message : 'An error occurred');
       } finally {
-        setLoading(false);
+        setDialogsLoading(false);
       }
     };
 
     fetchDialogs();
-    // Refresh dialogs every 30 seconds
-    const interval = setInterval(fetchDialogs, 30000);
-    return () => clearInterval(interval);
-  }, [sessionId, router]);
+    // Refresh dialogs every 30 seconds using the managed interval
+    setManagedInterval(fetchDialogs, 30000);
+  }, [sessionId, router, setManagedInterval]);
 
   // Function to fetch selected dialogs from the API
   const fetchSelectedDialogs = async () => {
@@ -355,12 +361,16 @@ export default function MessagesPage() {
     setLoadingSelected(true);
     try {
       console.log(`Fetching selected dialogs from: ${API_URL}/dialogs/${sessionId}/selected`);
-      const response = await fetch(`${API_URL}/dialogs/${sessionId}/selected`);
+      const response = await managedFetch(`${API_URL}/dialogs/${sessionId}/selected`);
       
-      if (!response.ok) {
-        const responseText = await response.text();
-        console.error('Error response text:', responseText);
-        throw new Error(`Failed to fetch selected dialogs: ${response.status} ${response.statusText}`);
+      if (!response || !response.ok) {
+        if (response) {
+          const responseText = await response.text();
+          console.error('Error response text:', responseText);
+          throw new Error(`Failed to fetch selected dialogs: ${response.status} ${response.statusText}`);
+        } else {
+          throw new Error('Failed to fetch selected dialogs: No response received');
+        }
       }
       
       const data = await response.json();
@@ -464,7 +474,7 @@ export default function MessagesPage() {
           }
           
           // Call the API to remove from processing using DELETE method
-          return fetch(`${API_URL}/dialogs/${sessionId}/selected/${dialogId}`, {
+          return managedFetch(`${API_URL}/dialogs/${sessionId}/selected/${dialogId}`, {
             method: 'DELETE',
             headers: {
               'Content-Type': 'application/json',
@@ -476,7 +486,7 @@ export default function MessagesPage() {
         const results = await Promise.all(unprocessPromises);
         
         // Check if any requests failed
-        const failedRequests = results.filter(response => !response.ok);
+        const failedRequests = results.filter(response => !response || !response.ok);
         if (failedRequests.length > 0) {
           throw new Error(`Failed to unselect ${failedRequests.length} dialogs`);
         }
@@ -501,7 +511,7 @@ export default function MessagesPage() {
             throw new Error(`Dialog with ID ${dialogId} not found`);
           }
           
-          return fetch(`${API_URL}/dialogs/${sessionId}/select`, {
+          return managedFetch(`${API_URL}/dialogs/${sessionId}/select`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -519,7 +529,7 @@ export default function MessagesPage() {
         const results = await Promise.all(selectPromises);
         
         // Check if any requests failed
-        const failedRequests = results.filter(response => !response.ok);
+        const failedRequests = results.filter(response => !response || !response.ok);
         if (failedRequests.length > 0) {
           throw new Error(`Failed to select ${failedRequests.length} dialogs`);
         }
@@ -549,7 +559,7 @@ export default function MessagesPage() {
     return null; // Will redirect
   }
 
-  if (loading) {
+  if (dialogsLoading) {
     return (
       <AppLayout>
         <div className="flex items-center justify-center">
@@ -666,4 +676,5 @@ export default function MessagesPage() {
       </div>
     </AppLayout>
   );
-} 
+}
+

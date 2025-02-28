@@ -3,6 +3,7 @@
 import { useEffect, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import MainNavigation from './components/MainNavigation';
+import { useSession } from './SessionContext';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -10,14 +11,14 @@ interface AppLayoutProps {
 
 export default function AppLayout({ children }: AppLayoutProps) {
   const router = useRouter();
+  const { isAuthenticated } = useSession();
   
   // Check authentication on mount and redirect if not authenticated
   useEffect(() => {
-    const sessionId = localStorage.getItem('sessionId');
-    if (!sessionId) {
+    if (!isAuthenticated) {
       router.push('/');
     }
-  }, [router]);
+  }, [router, isAuthenticated]);
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900">

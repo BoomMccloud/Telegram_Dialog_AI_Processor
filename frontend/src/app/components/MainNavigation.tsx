@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useTheme } from '../ThemeContext';
+import { useSession } from '../SessionContext';
 import { MoonIcon, SunIcon, ArrowRightOnRectangleIcon } from '@heroicons/react/24/outline';
 
 interface NavigationItem {
@@ -12,8 +13,8 @@ interface NavigationItem {
 
 export default function MainNavigation() {
   const pathname = usePathname();
-  const router = useRouter();
   const { theme, toggleTheme } = useTheme();
+  const { logout } = useSession();
   
   const navigation: NavigationItem[] = [
     { name: 'Home', href: '/home' },
@@ -35,8 +36,7 @@ export default function MainNavigation() {
 
   // Handle logout
   const handleLogout = () => {
-    localStorage.removeItem('sessionId');
-    router.push('/');
+    logout();
   };
 
   return (

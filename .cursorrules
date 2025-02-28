@@ -336,3 +336,26 @@ I'm currently working on implementing the Claude integration for the MVP. The im
    - Implementing background task status indicators
 
 These components will complete the end-to-end MVP implementation, allowing users to process Telegram messages with Claude and review the generated responses through the web interface.
+
+### Critical Backend Error - Missing Middleware Module
+
+I've identified a critical error in the backend application:
+
+```
+ModuleNotFoundError: No module named 'app.middleware'
+```
+
+The error occurs because the backend is trying to import `verify_session` from `.middleware.session_middleware`, but the middleware module doesn't exist. This needs to be fixed before we can proceed with the implementation.
+
+**Resolution Steps:**
+1. Create the middleware directory structure in the backend:
+   ```
+   backend/app/middleware/
+   ```
+2. Create a session middleware file:
+   ```
+   backend/app/middleware/session_middleware.py
+   ```
+3. Implement the `verify_session` function to handle session validation
+
+This is a blocking issue that must be addressed before we can continue with the Claude integration implementation.

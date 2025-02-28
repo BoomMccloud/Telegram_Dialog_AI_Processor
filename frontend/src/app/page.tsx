@@ -2,14 +2,16 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSession } from './SessionContext';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
 
 export default function Home() {
   const [qrCode, setQrCode] = useState<string>('');
-  const [sessionId, setSessionId] = useState<string>('');
-  const [status, setStatus] = useState<string>('pending');
+  const [tempSessionId, setTempSessionId] = useState<string>('');
+  const [authStatus, setAuthStatus] = useState<string>('pending');
   const router = useRouter();
+  const { login, isAuthenticated } = useSession();
 
   const createQrSession = async () => {
     try {
@@ -18,25 +20,25 @@ export default function Home() {
       });
       const data = await response.json();
       setQrCode(data.qr_code);
-      setSessionId(data.session_id);
+      setTempSessionId(data.session_id);
     } catch (error) {
       console.error('Error creating QR session:', error);
     }
   };
 
   const checkSessionStatus = async () => {
-    if (!sessionId) return;
+    if (!tempSessionId) return;
 
     try {
-      console.log('Checking session status for:', sessionId);
-      const response = await fetch(`${API_URL}/auth/session/${sessionId}`);
+      console.log('Checking session status for:', tempSessionId);
+      const response = await fetch(`${API_URL}/auth/session/${tempSessionId}`);
       const data = await response.json();
       console.log('Session status response:', data);
-      setStatus(data.status);
+      setAuthStatus(data.status);
 
       if (data.status === 'authenticated') {
         console.log('Authentication successful, storing session and redirecting...');
-        localStorage.setItem('sessionId', sessionId);
+        login(tempSessionId);
         router.push('/home');
       }
     } catch (error) {
@@ -46,21 +48,20 @@ export default function Home() {
 
   useEffect(() => {
     // Check if already authenticated
-    const storedSessionId = localStorage.getItem('sessionId');
-    if (storedSessionId) {
+    if (isAuthenticated) {
       router.push('/home');
       return;
     }
 
     createQrSession();
-  }, [router]);
+  }, [isAuthenticated, router]);
 
   useEffect(() => {
-    if (sessionId && status === 'pending') {
+    if (tempSessionId && authStatus === 'pending') {
       const interval = setInterval(checkSessionStatus, 2000);
       return () => clearInterval(interval);
     }
-  }, [sessionId, status]);
+  }, [tempSessionId, authStatus]);
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-24">
@@ -69,7 +70,7 @@ export default function Home() {
           Telegram Dialog Processor
         </h1>
         
-        <div className="bg-white rounded-lg p-8 shadow-lg max-w-md mx-auto">
+        <div className="bg-white rounded-lg p-8 shadow-lg max-w-md mx-auto dark:bg-gray-800">
           <h2 className="text-2xl font-semibold mb-4 text-center">
             Scan QR Code to Login
           </h2>
@@ -81,15 +82,15 @@ export default function Home() {
                 alt="QR Code"
                 className="w-64 h-64 mb-4"
               />
-              <p className="text-gray-600">
+              <p className="text-gray-600 dark:text-gray-300">
                 Open Telegram and scan this QR code to log in
               </p>
-              {status === 'pending' && (
+              {authStatus === 'pending' && (
                 <p className="text-blue-600 mt-2">
                   Waiting for authentication...
                 </p>
               )}
-              {status === 'authenticated' && (
+              {authStatus === 'authenticated' && (
                 <p className="text-green-600 mt-2">
                   Authentication successful!
                 </p>
@@ -97,7 +98,7 @@ export default function Home() {
             </div>
           ) : (
             <div className="flex justify-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 dark:border-gray-100"></div>
             </div>
           )}
         </div>
