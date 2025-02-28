@@ -265,21 +265,29 @@ Completed:
    - Chat retrieval working
 
 Next Steps:
-1. Implement message processing using the Llama model
-2. Add auto-reply functionality
-3. Implement user dialog selection persistence
-4. Add message history and context view
-5. Enhance the UI with more responsive design
+1. Implement database storage for user frontend input
+2. Implement message processing using the Llama model
+3. Add auto-reply functionality
+4. Implement user dialog selection persistence
+5. Add message history and context view
+6. Enhance the UI with more responsive design
 
 ## MVP Development Focus
 
 1. Core Features for MVP:
    - Implement Telethon's direct client QR code-based Telegram login in FastAPI
    - Set up message retrieval from Telegram using Telethon
+   - Store user input and preferences in the database
    - Process messages using the Llama model
    - Display messages and responses on a basic Next.js frontend
 
 2. Next Steps and Action Items for MVP:
+   - Implement database storage for user frontend input:
+     - Create database models for storing user preferences and selections 
+     - Implement API endpoints for saving user input to the database
+     - Add database access services for retrieving and updating user data
+     - Ensure proper validation and error handling for user input
+
    - Implement message processing service using the Llama model:
      - Adapt the existing `reply_only_llama3.2.py` script for API use
      - Create endpoints for message processing and response generation
@@ -357,3 +365,17 @@ I've successfully implemented and tested:
 3. Set up a working development environment with:
    - Database running in Docker
    - Frontend and backend running locally
+
+### Current Status - Next Priority: Database Storage for User Input
+
+Based on our current progress, the next priority is to ensure all user input from the frontend can be properly stored in the database. This includes:
+
+1. **User Dialog Selections**: Store which Telegram conversations the user has selected for processing
+2. **User Preferences**: Save user-specific settings for message processing
+3. **Processing Settings**: Store dialog-specific processing parameters
+
+The database schema already includes the `user_selected_dialogs` table, but we need to:
+1. Create API endpoints for storing user selections
+2. Implement frontend components for capturing user preferences
+3. Ensure proper data synchronization between frontend and backend
+4. Add validation and error handling for user input
