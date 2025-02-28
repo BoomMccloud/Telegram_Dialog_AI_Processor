@@ -88,4 +88,8 @@ When the application runs with `APP_ENV=development`, special development routes
 1. **GET /api/dialogs/{session_id}**: Returns mock dialogs instead of real Telegram data
 2. **GET /api/messages/{session_id}**: Returns mock messages instead of real Telegram data
 
-These routes use the same authentication mechanism as the regular routes but return mock data. 
+These routes use the same authentication mechanism as the regular routes but return mock data.
+
+## Additional Documentation
+
+For more detailed information about the mock session system, including troubleshooting and API testing examples, please refer to the [Mock Session Development Guide](./MOCK_SESSION_GUIDE.md). 
