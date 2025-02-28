@@ -199,12 +199,22 @@ The system appears to be designed for automated processing and responding to Tel
 1. Backend Development (FastAPI):
    - Project Setup: Create modular structure, configure environment variables
    - Database Implementation: Use PostgreSQL with proper models/schema
+   - Model Management: Implement storage and retrieval of available models and configurations
    - Authentication System: Implement Telethon QR login
    - Core API Endpoints: Messages, processing, preferences
+   - Implement a `POST /api/models/select` endpoint for model selection
+   - Implement a `POST /api/messages/process` endpoint for triggering message processing
+   - Implement a `GET /api/responses/{user_id}` endpoint for response retrieval
+   - Extend database schema to include `user_selected_models` and `processed_responses` tables
+   - Add fields `model_id` and `system_prompt` to `user_selected_dialogs` table
    - Background Tasks: Message fetching, processing queue
 
 2. Frontend Development (Next.js):
    - UI Components: Login, dashboard, chat interface, settings
+   - Model and Dialog Selection Interfaces
+   - Implement Model Selection Interface to allow users to choose processing models
+   - Develop Response Review Interface for users to review processed responses
+   - Create Background Task Status Indicator to show processing status
    - State Management: Session handling, real-time updates
    - API Integration: Communication with backend
 
@@ -278,6 +288,10 @@ Next Steps:
 3. Add message history and context view
 4. Enhance the UI with more responsive design
 5. Implement user preference settings for dialog processing
+6. Develop new components for model selection and system prompt management
+7. Update database schema to store model selections and prompts
+8. Implement API endpoints for new workflow components
+9. Create UI components for user workflow steps
 
 ## MVP Development Focus
 
@@ -308,6 +322,35 @@ Next Steps:
      - Add settings for processing preferences
 
 ## Executor's Feedback or Assistance Requests
+
+### Current Status - Simplified Model and System Prompt Management
+
+I've implemented a significant design improvement to simplify model and system prompt management:
+
+1. **User-Level Model and Prompt Configuration**:
+   - Moved `system_prompt` from the `user_selected_dialogs` table to the `user_selected_models` table
+   - Removed the `model_id` field from `user_selected_dialogs`
+   - Created a data migration script (`migrate_model_data.py`) to transfer existing settings
+   - Configured the application to run the migration on startup
+
+2. **API Improvements**:
+   - Updated the `/api/models/{session_id}/select` endpoint to handle system prompts
+   - Modified the model processor service to get model and system prompt from the user level
+   - Streamlined the dialog processing workflow to use user-level model settings
+
+3. **Consistency Benefits**:
+   - All dialogs for a user now use the same model and system prompt
+   - Simplified the user experience by centralizing model configuration
+   - Reduced database complexity and potential for inconsistent states
+   - Made the code more maintainable by removing duplicate settings
+
+These changes ensure that model selection and system prompt configuration are handled consistently across the application. The user can now select one model and system prompt that applies to all their dialogs, removing potential confusion from dialog-specific model settings.
+
+Next steps:
+1. Complete the implementation of the message processing API endpoints
+2. Add frontend components for model selection and system prompt configuration
+3. Develop the response review interface for user decision making
+4. Test the complete workflow with the Llama model integration
 
 ### Current Status - Docker Setup Completed
 I've implemented a complete Docker setup for the project that includes:
@@ -408,6 +451,8 @@ Next steps:
 2. Add auto-reply functionality based on processed messages
 3. Implement more detailed processing settings for individual dialogs
 4. Add message history and context viewing capabilities
+5. Develop and test new components for model selection and workflow management
+6. Verify new API endpoints for model selection and response review
 
 ### Current Status - Next Priority: Database Storage for User Input
 
@@ -464,3 +509,69 @@ Next steps:
 1. Complete the integration with the Llama processing model
 2. Implement background tasks for automatic message processing
 3. Enhance the user interface for message history and context viewing
+4. Implement model selection components and configuration options
+5. Add system prompt management functionality
+6. Create response review interface for user decision making
+
+## Next Steps and Action Items for MVP:
+
+1. Database Schema Extensions:
+   - Create a new `user_selected_models` table with fields:
+     - `user_id`: BIGINT NOT NULL (foreign key to user)
+     - `model_id`: UUID PRIMARY KEY
+     - `model_name`: VARCHAR(255) NOT NULL
+     - `is_default`: BOOLEAN DEFAULT false
+     - `system_prompt`: TEXT
+     - `created_at`: TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+     - `updated_at`: TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+   
+   - Remove fields from `user_selected_dialogs` table:
+     - ~~`model_id`: UUID (foreign key to user_selected_models)~~
+     - ~~`system_prompt`: TEXT~~
+   
+   - Create a new `processed_responses` table with fields:
+     - `response_id`: UUID PRIMARY KEY
+     - `message_id`: UUID NOT NULL (foreign key to message_history)
+     - `dialog_id`: BIGINT NOT NULL
+     - `user_id`: BIGINT NOT NULL
+     - `response_text`: TEXT NOT NULL
+     - `created_at`: TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+     - `status`: VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'modified'))
+     - `modified_text`: TEXT
+     - `reviewed_at`: TIMESTAMP WITH TIME ZONE
+
+2. Backend API Implementation:
+   - Create model selection endpoint:
+     - `POST /api/models/select`: Allow users to select which model to use for processing
+     - Parameters: `user_id`, `model_id`
+   
+   - Create message processing endpoint:
+     - `POST /api/messages/process`: Trigger message processing using the selected model
+     - Parameters: `session_id`, `dialog_ids[]` (array of dialog IDs to process)
+   
+   - Create response retrieval endpoint:
+     - `GET /api/responses/{session_id}`: Fetch processed responses for user review
+     - Query parameters: `status`, `dialog_id` (optional filters)
+
+3. Background Processing Implementation:
+   - Adapt the `reply_only_llama3.2.py` script for API use:
+     - Modify the `DialogProcessor` class to work with the database
+     - Create a background task system for processing messages
+   
+   - Implement a message processing queue:
+     - Use the existing `processing_queue` table
+     - Add a worker process to handle the queue items
+
+4. Frontend Components:
+   - Create Model Selection UI:
+     - Dropdown or radio buttons for model selection
+     - Save button to persist selection
+   
+   - Develop Response Review UI:
+     - List of processed responses grouped by dialog
+     - Approve/Reject/Modify actions for each response
+     - Filtering by status and dialog
+   
+   - Implement Background Task Status Indicator:
+     - Visual indication of processing status
+     - Progress information for current tasks

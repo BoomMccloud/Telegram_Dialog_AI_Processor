@@ -137,6 +137,47 @@ EXPECTED_TABLES = {
             "user_selected_dialogs_pkey",
             "idx_user_selected_dialogs_user"
         ]
+    },
+    "user_selected_models": {
+        "columns": {
+            "model_id": "uuid",
+            "user_id": "bigint",
+            "model_name": "character varying",
+            "is_default": "boolean",
+            "system_prompt": "text",
+            "created_at": "timestamp with time zone",
+            "updated_at": "timestamp with time zone"
+        },
+        "constraints": [
+            "user_selected_models_pkey",  # Primary key constraint
+            "user_selected_models_user_id_key"  # Unique constraint
+        ],
+        "indexes": [
+            "user_selected_models_pkey",
+            "idx_user_selected_models_user"
+        ]
+    },
+    "processed_responses": {
+        "columns": {
+            "response_id": "uuid",
+            "message_id": "uuid",
+            "dialog_id": "bigint",
+            "user_id": "bigint",
+            "response_text": "text",
+            "created_at": "timestamp with time zone",
+            "status": "character varying",
+            "modified_text": "text",
+            "reviewed_at": "timestamp with time zone"
+        },
+        "constraints": [
+            "processed_responses_pkey",  # Primary key constraint
+            "processed_responses_message_id_fkey"  # Foreign key constraint
+        ],
+        "indexes": [
+            "processed_responses_pkey",
+            "idx_processed_responses_dialog",
+            "idx_processed_responses_user"
+        ]
     }
 }
 
@@ -225,6 +266,31 @@ CREATE_TABLE_STATEMENTS = {
         processing_settings JSONB,
         UNIQUE(user_id, dialog_id)
     )
+    """,
+    "user_selected_models": """
+    CREATE TABLE user_selected_models (
+        model_id UUID PRIMARY KEY,
+        user_id BIGINT NOT NULL UNIQUE,
+        model_name VARCHAR(255) NOT NULL,
+        is_default BOOLEAN DEFAULT false,
+        system_prompt TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    )
+    """,
+    "processed_responses": """
+    CREATE TABLE processed_responses (
+        response_id UUID PRIMARY KEY,
+        message_id UUID NOT NULL,
+        dialog_id BIGINT NOT NULL,
+        user_id BIGINT NOT NULL,
+        response_text TEXT NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'modified')),
+        modified_text TEXT,
+        reviewed_at TIMESTAMP WITH TIME ZONE,
+        FOREIGN KEY (message_id) REFERENCES message_history(message_id)
+    )
     """
 }
 
@@ -235,7 +301,10 @@ CREATE_INDEX_STATEMENTS = [
     "CREATE INDEX idx_processing_priority ON processing_queue USING BTREE (status, priority DESC, created_at)",
     "CREATE INDEX idx_processing_queue_status ON processing_queue (status, priority DESC)",
     "CREATE INDEX idx_auth_data_active ON authentication_data (is_active, last_active_at DESC)",
-    "CREATE INDEX idx_user_selected_dialogs_user ON user_selected_dialogs (user_id, is_active, priority DESC)"
+    "CREATE INDEX idx_user_selected_dialogs_user ON user_selected_dialogs (user_id, is_active, priority DESC)",
+    "CREATE INDEX idx_user_selected_models_user ON user_selected_models (user_id)",
+    "CREATE INDEX idx_processed_responses_dialog ON processed_responses (dialog_id, created_at DESC)",
+    "CREATE INDEX idx_processed_responses_user ON processed_responses (user_id, status, created_at DESC)"
 ]
 
 # SQL statements for creating extensions

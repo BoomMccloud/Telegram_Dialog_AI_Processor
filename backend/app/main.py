@@ -3,11 +3,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import os
 import logging
+from contextlib import asynccontextmanager
 
 from .api.auth import router as auth_router
 from .api.messages import router as messages_router
 from .api.dialogs import router as dialogs_router
-from .db.migrations import check_and_migrate_database
+from .db.migrations import check_and_migrate_database, init_db
+from .db.migrate_model_data import migrate_model_data
+from .middleware.session_middleware import verify_session
 
 # Load environment variables
 load_dotenv()
@@ -26,12 +29,42 @@ if DEV_MODE:
     except ImportError:
         logger.warning("Development routes could not be imported")
 
-app = FastAPI(title="Telegram Dialog Processor")
+# Configure CORS origins
+allowed_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
+
+# Setup lifespan manager
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: initialize database
+    try:
+        logger.info("Initializing database...")
+        await init_db()
+        logger.info("Database initialization complete.")
+        
+        # Run model data migration
+        logger.info("Running model data migration...")
+        await migrate_model_data()
+        logger.info("Model data migration complete.")
+        
+    except Exception as e:
+        logger.error(f"Error during startup: {str(e)}")
+    
+    yield
+    
+    # Shutdown: cleanup
+    logger.info("Shutting down application...")
+
+app = FastAPI(
+    title="Telegram Dialog AI Processor",
+    description="API for processing Telegram messages with AI",
+    version="0.1.0",
+    lifespan=lifespan
+)
 
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"] if DEV_MODE else [os.getenv("FRONTEND_URL", "http://localhost:3000")],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
