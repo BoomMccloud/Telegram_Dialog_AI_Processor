@@ -24,21 +24,38 @@ interface Dialog {
   };
 }
 
+// Interface for selected dialogs from the API
+interface SelectedDialog {
+  selection_id: string;
+  dialog_id: number;
+  dialog_name: string;
+  is_active: boolean;
+  processing_enabled: boolean;
+  auto_reply_enabled: boolean;
+  response_approval_required: boolean;
+  priority: number;
+  created_at: string;
+  updated_at: string;
+}
+
 interface ProcessingStatus {
   isProcessing: boolean;
   error: string | null;
   lastProcessed: number[];
+  lastUnprocessed: boolean;
 }
 
-type TabType = 'groups' | 'channels' | 'direct';
+// Update TabType to include 'selected'
+type TabType = 'groups' | 'channels' | 'direct' | 'selected';
 
 interface DialogListProps {
   dialogs: Dialog[];
   selectedDialogs: Set<number>;
   onToggleSelect: (dialogId: number) => void;
+  processedDialogs?: number[];
 }
 
-const DialogList: React.FC<DialogListProps> = ({ dialogs, selectedDialogs, onToggleSelect }) => {
+const DialogList: React.FC<DialogListProps> = ({ dialogs, selectedDialogs, onToggleSelect, processedDialogs = [] }) => {
   if (dialogs.length === 0) {
     return (
       <div className="text-center text-gray-500 dark:text-gray-400 py-4">
@@ -49,44 +66,55 @@ const DialogList: React.FC<DialogListProps> = ({ dialogs, selectedDialogs, onTog
 
   return (
     <div className="space-y-3">
-      {dialogs.map((dialog) => (
-        <div
-          key={dialog.id}
-          className={`
-            p-4 rounded-lg shadow bg-white dark:bg-gray-800 
-            hover:bg-gray-50 dark:hover:bg-gray-700 
-            cursor-pointer transition-colors border border-gray-200 dark:border-gray-700
-            flex justify-between items-center
-            ${selectedDialogs.has(dialog.id) ? 'ring-2 ring-blue-500 dark:ring-blue-400' : ''}
-          `}
-          onClick={() => onToggleSelect(dialog.id)}
-        >
-          <div className="flex items-center flex-1">
-            <input
-              type="checkbox"
-              checked={selectedDialogs.has(dialog.id)}
-              onChange={() => onToggleSelect(dialog.id)}
-              className="h-4 w-4 text-blue-600 rounded border-gray-300 
-                focus:ring-blue-500 dark:border-gray-600 dark:focus:ring-blue-400
-                mr-4"
-              onClick={(e) => e.stopPropagation()}
-            />
-            <h2 className="font-semibold text-lg dark:text-white truncate pr-4">
-              {dialog.name}
-            </h2>
-          </div>
-          <div className={`
-            flex items-center whitespace-nowrap px-3 py-1 rounded-full text-sm
-            ${dialog.unread_count > 0
-              ? 'bg-blue-500 dark:bg-blue-600 text-white'
-              : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
-            }`}
+      {dialogs.map((dialog) => {
+        const isProcessed = processedDialogs.includes(dialog.id);
+        return (
+          <div
+            key={dialog.id}
+            className={`
+              p-4 rounded-lg shadow bg-white dark:bg-gray-800 
+              hover:bg-gray-50 dark:hover:bg-gray-700 
+              cursor-pointer transition-colors border border-gray-200 dark:border-gray-700
+              flex justify-between items-center
+              ${selectedDialogs.has(dialog.id) ? 'ring-2 ring-blue-500 dark:ring-blue-400' : ''}
+              ${isProcessed ? 'border-l-4 border-l-green-500 dark:border-l-green-400' : ''}
+            `}
+            onClick={() => onToggleSelect(dialog.id)}
           >
-            <span className="font-medium">{dialog.unread_count || '0'}</span>
-            <span className="ml-1 font-normal">messages unread</span>
+            <div className="flex items-center flex-1">
+              <input
+                type="checkbox"
+                checked={selectedDialogs.has(dialog.id)}
+                onChange={() => onToggleSelect(dialog.id)}
+                className="h-4 w-4 text-blue-600 rounded border-gray-300 
+                  focus:ring-blue-500 dark:border-gray-600 dark:focus:ring-blue-400
+                  mr-4"
+                onClick={(e) => e.stopPropagation()}
+              />
+              <div className="flex items-center flex-1">
+                <h2 className="font-semibold text-lg dark:text-white truncate pr-2">
+                  {dialog.name}
+                </h2>
+                {isProcessed && (
+                  <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100 rounded-full whitespace-nowrap">
+                    Already processing
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className={`
+              flex items-center whitespace-nowrap px-3 py-1 rounded-full text-sm
+              ${dialog.unread_count > 0
+                ? 'bg-blue-500 dark:bg-blue-600 text-white'
+                : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
+              }`}
+            >
+              <span className="font-medium">{dialog.unread_count || '0'}</span>
+              <span className="ml-1 font-normal">messages unread</span>
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 };
@@ -99,10 +127,39 @@ const SelectionControls: React.FC<{
   onClearSelection: () => void;
   onProcessSelected: () => void;
   processingStatus: ProcessingStatus;
-}> = ({ dialogs, selectedDialogs, onSelectAll, onSelectUnread, onClearSelection, onProcessSelected, processingStatus }) => {
+  processedDialogs: number[];
+}> = ({ 
+  dialogs, 
+  selectedDialogs, 
+  onSelectAll, 
+  onSelectUnread, 
+  onClearSelection, 
+  onProcessSelected, 
+  processingStatus,
+  processedDialogs 
+}) => {
   const selectedCount = selectedDialogs.size;
   const totalCount = dialogs.length;
   const unreadCount = dialogs.filter(d => d.unread_count > 0).length;
+  
+  // Count how many selected dialogs are already being processed
+  const selectedDialogsArr = Array.from(selectedDialogs);
+  const alreadyProcessedCount = selectedDialogsArr.filter(id => processedDialogs.includes(id)).length;
+  
+  // Determine button state based on selection and processing status
+  const allSelectedAreProcessed = alreadyProcessedCount === selectedCount && selectedCount > 0;
+  const hasMixedSelection = alreadyProcessedCount > 0 && alreadyProcessedCount < selectedCount;
+  
+  // Button text changes based on selection state
+  const buttonText = allSelectedAreProcessed 
+    ? 'Stop Processing' 
+    : 'Start Processing';
+  
+  // Button is disabled if: no selection, mixed selection, or currently processing
+  const isButtonDisabled = 
+    selectedCount === 0 || 
+    hasMixedSelection || 
+    processingStatus.isProcessing;
 
   return (
     <div className="mb-4 flex flex-col gap-3 bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
@@ -137,12 +194,15 @@ const SelectionControls: React.FC<{
         </button>
         <button
           onClick={onProcessSelected}
-          disabled={selectedCount === 0 || processingStatus.isProcessing}
+          disabled={isButtonDisabled}
           className={`
             px-4 py-1.5 text-sm font-medium rounded-md transition-colors flex items-center gap-2
-            ${selectedCount > 0 && !processingStatus.isProcessing
-              ? 'bg-blue-500 dark:bg-blue-600 text-white hover:bg-blue-600 dark:hover:bg-blue-700 cursor-pointer'
-              : 'bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'}
+            ${!isButtonDisabled && !processingStatus.isProcessing
+              ? (allSelectedAreProcessed 
+                  ? 'bg-red-500 dark:bg-red-600 text-white hover:bg-red-600 dark:hover:bg-red-700'
+                  : 'bg-blue-500 dark:bg-blue-600 text-white hover:bg-blue-600 dark:hover:bg-blue-700') 
+              : 'bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500'} 
+            cursor-${isButtonDisabled ? 'not-allowed' : 'pointer'}
           `}
         >
           {processingStatus.isProcessing ? (
@@ -151,10 +211,16 @@ const SelectionControls: React.FC<{
               Processing...
             </>
           ) : (
-            'Process Selected'
+            buttonText
           )}
         </button>
       </div>
+      
+      {hasMixedSelection && (
+        <div className="text-sm text-amber-500 dark:text-amber-400">
+          Mixed selection: Please select either all processed or all unprocessed dialogs.
+        </div>
+      )}
       
       {processingStatus.error && (
         <div className="text-sm text-red-500 dark:text-red-400">
@@ -162,10 +228,16 @@ const SelectionControls: React.FC<{
         </div>
       )}
       
-      {processingStatus.lastProcessed.length > 0 && !processingStatus.error && (
-        <div className="text-sm text-green-600 dark:text-green-400">
-          Successfully queued {processingStatus.lastProcessed.length} chats for processing
-        </div>
+      {!processingStatus.error && (
+        processingStatus.lastProcessed.length > 0 ? (
+          <div className="text-sm text-green-600 dark:text-green-400">
+            Successfully queued {processingStatus.lastProcessed.length} chats for processing
+          </div>
+        ) : processingStatus.lastUnprocessed && (
+          <div className="text-sm text-green-600 dark:text-green-400">
+            Successfully removed selected chats from processing
+          </div>
+        )
       )}
     </div>
   );
@@ -215,14 +287,17 @@ interface ApiDialog {
 
 export default function MessagesPage() {
   const [dialogs, setDialogs] = useState<Dialog[]>([]);
-  const [activeTab, setActiveTab] = useState<TabType>('direct');
+  const [activeTab, setActiveTab] = useState<TabType>('selected');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedDialogs, setSelectedDialogs] = useState<Set<number>>(new Set());
+  const [apiSelectedDialogs, setApiSelectedDialogs] = useState<Dialog[]>([]);
+  const [loadingSelected, setLoadingSelected] = useState(false);
   const [processingStatus, setProcessingStatus] = useState<ProcessingStatus>({
     isProcessing: false,
     error: null,
-    lastProcessed: []
+    lastProcessed: [],
+    lastUnprocessed: false
   });
   const router = useRouter();
   
@@ -298,6 +373,66 @@ export default function MessagesPage() {
     return () => clearInterval(interval);
   }, [sessionId, router]);
 
+  // Function to fetch selected dialogs from the API
+  const fetchSelectedDialogs = async () => {
+    if (!sessionId) return;
+    
+    setLoadingSelected(true);
+    try {
+      console.log(`Fetching selected dialogs from: ${API_URL}/dialogs/${sessionId}/selected`);
+      const response = await fetch(`${API_URL}/dialogs/${sessionId}/selected`);
+      
+      if (!response.ok) {
+        const responseText = await response.text();
+        console.error('Error response text:', responseText);
+        throw new Error(`Failed to fetch selected dialogs: ${response.status} ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      console.log('Selected dialogs data:', data);
+      
+      // Transform the API data to match the Dialog interface
+      if (data && Array.isArray(data)) {
+        const transformedDialogs = data.map((dialog: SelectedDialog) => ({
+          id: dialog.dialog_id,
+          name: dialog.dialog_name,
+          unread_count: 0, // Selected dialogs don't have unread count
+          is_group: false, // We don't know the type from selected dialogs API
+          is_channel: false,
+          is_user: false,
+          // Add selected-specific data
+          processing_enabled: dialog.processing_enabled,
+          auto_reply_enabled: dialog.auto_reply_enabled,
+          priority: dialog.priority
+        }));
+        console.log('Transformed selected dialogs:', transformedDialogs);
+        setApiSelectedDialogs(transformedDialogs);
+      } else {
+        console.error('Unexpected response format for selected dialogs:', data);
+      }
+    } catch (err) {
+      console.error('Fetch selected dialogs error:', err);
+      // Don't set the main error state, just log it
+    } finally {
+      setLoadingSelected(false);
+    }
+  };
+
+  // Fetch selected dialogs whenever component mounts or session changes
+  useEffect(() => {
+    // Initially fetch selected dialogs when the component mounts
+    if (sessionId) {
+      fetchSelectedDialogs();
+    }
+  }, [sessionId]);
+
+  // Fetch selected dialogs when switching to the selected tab to ensure fresh data
+  useEffect(() => {
+    if (activeTab === 'selected' && sessionId) {
+      fetchSelectedDialogs();
+    }
+  }, [activeTab, sessionId]);
+
   const handleToggleSelect = (dialogId: number) => {
     setSelectedDialogs(prev => {
       const newSelection = new Set(prev);
@@ -327,6 +462,16 @@ export default function MessagesPage() {
   const handleProcessSelected = async () => {
     if (selectedDialogs.size === 0 || processingStatus.isProcessing) return;
 
+    // Get the list of processed dialogs
+    const processedDialogsList = [
+      ...processingStatus.lastProcessed,
+      ...apiSelectedDialogs.map(d => d.id)
+    ];
+    
+    // Check if all selected dialogs are already being processed
+    const selectedDialogsArr = Array.from(selectedDialogs);
+    const allSelectedAreProcessed = selectedDialogsArr.every(id => processedDialogsList.includes(id));
+    
     setProcessingStatus(prev => ({
       ...prev,
       isProcessing: true,
@@ -334,53 +479,88 @@ export default function MessagesPage() {
     }));
 
     try {
-      // Process each selected dialog individually
-      const selectPromises = Array.from(selectedDialogs).map(dialogId => {
-        // Find the dialog object to get the name
-        const dialog = dialogs.find(d => d.id === dialogId);
-        if (!dialog) {
-          throw new Error(`Dialog with ID ${dialogId} not found`);
-        }
-        
-        return fetch(`${API_URL}/dialogs/${sessionId}/select`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            dialog_id: dialogId,
-            dialog_name: dialog.name, // Include the dialog name
-            processing_enabled: true, // Match the backend field name
-            priority: 1, // Default priority
-          }),
+      if (allSelectedAreProcessed) {
+        // Handle STOP PROCESSING - remove dialogs from processing
+        const unprocessPromises = Array.from(selectedDialogs).map(dialogId => {
+          // Find the dialog in apiSelectedDialogs to get the selection_id
+          const selectedDialog = apiSelectedDialogs.find(d => d.id === dialogId);
+          if (!selectedDialog) {
+            throw new Error(`Dialog with ID ${dialogId} not found in selected dialogs`);
+          }
+          
+          // Call the API to remove from processing using DELETE method
+          return fetch(`${API_URL}/dialogs/${sessionId}/selected/${dialogId}`, {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json',
+            }
+          });
         });
-      });
-      
-      // Wait for all selections to complete
-      const results = await Promise.all(selectPromises);
-      
-      // Check if any requests failed
-      const failedRequests = results.filter(response => !response.ok);
-      if (failedRequests.length > 0) {
-        throw new Error(`Failed to select ${failedRequests.length} dialogs`);
+        
+        // Wait for all unselections to complete
+        const results = await Promise.all(unprocessPromises);
+        
+        // Check if any requests failed
+        const failedRequests = results.filter(response => !response.ok);
+        if (failedRequests.length > 0) {
+          throw new Error(`Failed to unselect ${failedRequests.length} dialogs`);
+        }
+
+        // Refresh the selected dialogs after unselecting
+        await fetchSelectedDialogs();
+
+        setProcessingStatus(prev => ({
+          ...prev,
+          isProcessing: false,
+          error: null,
+          lastProcessed: [],
+          lastUnprocessed: true
+        }));
+
+      } else {
+        // Handle START PROCESSING - original logic to add dialogs for processing
+        const selectPromises = Array.from(selectedDialogs).map(dialogId => {
+          // Find the dialog object to get the name
+          const dialog = dialogs.find(d => d.id === dialogId);
+          if (!dialog) {
+            throw new Error(`Dialog with ID ${dialogId} not found`);
+          }
+          
+          return fetch(`${API_URL}/dialogs/${sessionId}/select`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              dialog_id: dialogId,
+              dialog_name: dialog.name,
+              processing_enabled: true,
+              priority: 1,
+            }),
+          });
+        });
+        
+        // Wait for all selections to complete
+        const results = await Promise.all(selectPromises);
+        
+        // Check if any requests failed
+        const failedRequests = results.filter(response => !response.ok);
+        if (failedRequests.length > 0) {
+          throw new Error(`Failed to select ${failedRequests.length} dialogs`);
+        }
+
+        setProcessingStatus(prev => ({
+          ...prev,
+          isProcessing: false,
+          error: null,
+          lastProcessed: Array.from(selectedDialogs),
+          lastUnprocessed: false
+        }));
       }
-
-      // Save processed dialogs to localStorage
-      const processedDialogs = new Set(
-        JSON.parse(localStorage.getItem('processedDialogs') || '[]')
-      );
-      selectedDialogs.forEach(id => processedDialogs.add(id));
-      localStorage.setItem('processedDialogs', JSON.stringify(Array.from(processedDialogs)));
-
-      setProcessingStatus(prev => ({
-        ...prev,
-        isProcessing: false,
-        error: null,
-        lastProcessed: Array.from(selectedDialogs)
-      }));
 
       // Clear selection after successful processing
       setSelectedDialogs(new Set());
+      
     } catch (err) {
       setProcessingStatus(prev => ({
         ...prev,
@@ -413,13 +593,16 @@ export default function MessagesPage() {
   const filteredDialogs = {
     groups: dialogs.filter(d => d.is_group),
     channels: dialogs.filter(d => d.is_channel),
-    direct: dialogs.filter(d => d.is_user)
+    direct: dialogs.filter(d => d.is_user),
+    selected: apiSelectedDialogs
   };
 
-  const totalUnread = {
-    groups: filteredDialogs.groups.reduce((sum, d) => sum + d.unread_count, 0),
-    channels: filteredDialogs.channels.reduce((sum, d) => sum + d.unread_count, 0),
-    direct: filteredDialogs.direct.reduce((sum, d) => sum + d.unread_count, 0)
+  // Change to count dialogs instead of unread messages
+  const totalDialogs = {
+    groups: filteredDialogs.groups.length,
+    channels: filteredDialogs.channels.length,
+    direct: filteredDialogs.direct.length,
+    selected: filteredDialogs.selected.length
   };
 
   return (
@@ -434,9 +617,10 @@ export default function MessagesPage() {
         <div className="border-b border-gray-200 dark:border-gray-700">
           <nav className="-mb-px flex space-x-8" aria-label="Tabs">
             {[
-              { id: 'direct', name: 'Direct Messages', count: totalUnread.direct },
-              { id: 'groups', name: 'Groups', count: totalUnread.groups },
-              { id: 'channels', name: 'Channels', count: totalUnread.channels },
+              { id: 'selected', name: 'Selected', count: totalDialogs.selected },
+              { id: 'direct', name: 'Direct Messages', count: totalDialogs.direct },
+              { id: 'groups', name: 'Groups', count: totalDialogs.groups },
+              { id: 'channels', name: 'Channels', count: totalDialogs.channels },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -450,22 +634,25 @@ export default function MessagesPage() {
                 `}
               >
                 {tab.name}
-                {tab.count > 0 && (
-                  <span className={`
-                    ml-2 py-0.5 px-2 rounded-full text-xs
-                    ${activeTab === tab.id 
-                      ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400' 
-                      : 'bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-300'}
-                  `}>
-                    {tab.count}
-                  </span>
-                )}
+                <span className="ml-2 py-0.5 px-2 rounded-full text-xs font-normal
+                  bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
+                >
+                  {tab.count}
+                </span>
               </button>
             ))}
           </nav>
         </div>
       </div>
 
+      {/* Show loading indicator when switching to Selected tab */}
+      {activeTab === 'selected' && loadingSelected && (
+        <div className="flex justify-center my-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-white"></div>
+        </div>
+      )}
+
+      {/* Show existing selection controls */}
       <SelectionControls
         dialogs={filteredDialogs[activeTab]}
         selectedDialogs={selectedDialogs}
@@ -474,15 +661,30 @@ export default function MessagesPage() {
         onClearSelection={handleClearSelection}
         onProcessSelected={handleProcessSelected}
         processingStatus={processingStatus}
+        processedDialogs={[
+          ...processingStatus.lastProcessed,
+          ...apiSelectedDialogs.map(d => d.id)
+        ]}
+      />
+      
+      {/* Show the dialog list filtered by the active tab */}
+      <DialogList
+        dialogs={filteredDialogs[activeTab]}
+        selectedDialogs={selectedDialogs}
+        onToggleSelect={handleToggleSelect}
+        processedDialogs={[
+          ...processingStatus.lastProcessed,
+          ...apiSelectedDialogs.map(d => d.id)
+        ]}
       />
 
-      <div className="mt-4">
-        <DialogList 
-          dialogs={filteredDialogs[activeTab]}
-          selectedDialogs={selectedDialogs}
-          onToggleSelect={handleToggleSelect}
-        />
-      </div>
+      {/* Show empty state for selected dialogs */}
+      {activeTab === 'selected' && apiSelectedDialogs.length === 0 && !loadingSelected && (
+        <div className="text-center text-gray-500 dark:text-gray-400 py-8 my-4 bg-white dark:bg-gray-800 rounded-lg shadow">
+          <p className="mb-2">No dialogs selected for processing.</p>
+          <p className="text-sm">Select dialogs from other tabs and click &quot;Process Selected&quot; to add them here.</p>
+        </div>
+      )}
     </main>
   );
 } 
