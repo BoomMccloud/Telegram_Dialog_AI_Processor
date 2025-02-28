@@ -1,9 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useTheme } from '../ThemeContext';
-import { MoonIcon, SunIcon } from '@heroicons/react/24/outline';
+import { MoonIcon, SunIcon, ArrowRightOnRectangleIcon } from '@heroicons/react/24/outline';
 
 interface NavigationItem {
   name: string;
@@ -12,6 +12,7 @@ interface NavigationItem {
 
 export default function MainNavigation() {
   const pathname = usePathname();
+  const router = useRouter();
   const { theme, toggleTheme } = useTheme();
   
   const navigation: NavigationItem[] = [
@@ -29,6 +30,12 @@ export default function MainNavigation() {
     
     // Check if the pathname starts with the path (for nested routes)
     return pathname.startsWith(path);
+  };
+
+  // Handle logout
+  const handleLogout = () => {
+    localStorage.removeItem('sessionId');
+    router.push('/');
   };
 
   return (
@@ -59,7 +66,7 @@ export default function MainNavigation() {
               ))}
             </div>
           </div>
-          <div className="flex items-center">
+          <div className="flex items-center space-x-2">
             <button
               onClick={toggleTheme}
               className="rounded-full p-2 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-white focus:outline-none"
@@ -70,6 +77,14 @@ export default function MainNavigation() {
               ) : (
                 <MoonIcon className="h-5 w-5" />
               )}
+            </button>
+            <button
+              onClick={handleLogout}
+              className="rounded-full p-2 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-white focus:outline-none"
+              aria-label="Logout"
+              title="Logout"
+            >
+              <ArrowRightOnRectangleIcon className="h-5 w-5" />
             </button>
           </div>
         </div>

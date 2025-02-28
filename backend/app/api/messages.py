@@ -10,11 +10,12 @@ class MessageSend(BaseModel):
     text: str
 
 @router.get("/dialogs/{session_id}")
-async def list_dialogs(session_id: str) -> List[Dict]:
+async def list_dialogs(session_id: str) -> Dict:
     """Get list of dialogs (chats)"""
     try:
         dialogs = await get_dialogs(session_id)
-        return dialogs
+        # Return dialogs wrapped in an object with a 'dialogs' key to match dev format
+        return {"dialogs": dialogs}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
