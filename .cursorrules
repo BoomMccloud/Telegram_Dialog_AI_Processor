@@ -241,6 +241,8 @@ Completed:
    - CORS configuration added
    - Message retrieval functionality implemented
    - Dialog listing functionality implemented
+   - API endpoints for selecting and unselecting dialogs implemented and tested
+   - Database storage for user selected dialogs operational
 
 2. Frontend (Next.js):
    - Project created with Next.js 14, TypeScript, and Tailwind CSS
@@ -249,6 +251,9 @@ Completed:
    - Environment configuration set up
    - Messages page implemented showing chat dialogs
    - Chat selection and filtering UI implemented
+   - Dialog selection UI with visual indicators for processing status
+   - Start/Stop processing functionality working correctly with API integration
+   - Success/error message handling implemented for processing operations
 
 3. Docker Setup:
    - Docker Compose configuration complete with:
@@ -266,12 +271,11 @@ Completed:
    - Chat retrieval working
 
 Next Steps:
-1. Implement database storage for user frontend input
-2. Implement message processing using the Llama model
-3. Add auto-reply functionality
-4. Implement user dialog selection persistence
-5. Add message history and context view
-6. Enhance the UI with more responsive design
+1. Implement message processing using the Llama model
+2. Add auto-reply functionality
+3. Add message history and context view
+4. Enhance the UI with more responsive design
+5. Implement user preference settings for dialog processing
 
 ## MVP Development Focus
 
@@ -366,6 +370,42 @@ I've successfully implemented and tested:
 3. Set up a working development environment with:
    - Database running in Docker
    - Frontend and backend running locally
+
+### Current Status - User Dialog Selection and Processing Implemented
+
+I've successfully implemented the dialog selection and processing functionality:
+
+1. **Frontend UI Enhancements**:
+   - Added visual indicators for dialogs that are being processed (green badge and left border)
+   - Implemented chat selection UI with checkboxes and selection controls
+   - Added "Start Processing" and "Stop Processing" functionality
+   - Improved error/success feedback messages for user actions
+   - Implemented tab-based navigation with "Selected" tab showing currently processed dialogs
+
+2. **Backend API Integration**:
+   - Integrated with backend APIs for selecting and unselecting dialogs
+   - Implemented proper error handling for API requests
+   - Fixed issues with API endpoint calls (corrected the DELETE method for unselecting dialogs)
+   - Added automatic refresh of selected dialogs after processing changes
+   
+3. **User Experience Improvements**:
+   - Added feedback messages indicating successful actions
+   - Implemented visual states for processing operations
+   - Added validation to prevent mixed selection of processed/unprocessed dialogs
+   - Added loading states during API operations
+
+The system now allows users to:
+- Select dialogs from different categories (Direct Messages, Groups, Channels)
+- Start processing selected dialogs with visual confirmation
+- Stop processing previously selected dialogs
+- See which dialogs are currently being processed
+- View all currently processed dialogs in the "Selected" tab
+
+Next steps:
+1. Implement the actual message processing using the Llama model
+2. Add auto-reply functionality based on processed messages
+3. Implement more detailed processing settings for individual dialogs
+4. Add message history and context viewing capabilities
 
 ### Current Status - Next Priority: Database Storage for User Input
 
