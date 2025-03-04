@@ -9,6 +9,8 @@ from contextlib import asynccontextmanager
 from .api.auth import router as auth_router
 from .api.messages import router as messages_router
 from .api.dialogs import router as dialogs_router
+from .api.models import router as models_router
+from .api.responses import router as responses_router
 from .db.migrations import check_and_migrate_database, init_db
 from .db.migrate_model_data import migrate_model_data
 from .api import auth, dialogs, messages, models
@@ -136,6 +138,8 @@ if DEV_MODE:
 app.include_router(auth_router, prefix="/api", tags=["auth"])
 app.include_router(messages_router, prefix="/api", tags=["messages"])
 app.include_router(dialogs_router)
+app.include_router(models_router)
+app.include_router(responses_router)
 
 @app.get("/health")
 async def health_check():

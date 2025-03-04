@@ -4,27 +4,42 @@ import re
 import uuid
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Tuple, Dict, Optional, Any
 
 # Import the raw database connection
 from app.db.database import get_raw_connection
+from app.utils.logging import get_logger
+from app.services.claude_processor import ClaudeProcessor, get_available_claude_models
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # --------------------------
 # Configuration Constants
 # --------------------------
 MODEL_CONFIGS = {
     "llama3": {
-        "model_path": os.getenv("LLAMA_MODEL_PATH", "/path/to/llama-3-8b.gguf"),
-        "n_gpu_layers": -1,  # Automatically detect the optimal number of layers
-        "n_ctx": 4096, 
-        "chat_format": "llama-3",  # Must specify the correct format
-        "verbose": False
+        "model_path": "/models/llama-3-8b-instruct.Q4_K_M.gguf",
+        "n_ctx": 8192,
+        "n_gpu_layers": -1,
+        "verbose": False,
+        "n_batch": 512,
     },
-    # Can be extended with other models
+    "llama2": {
+        "model_path": "/models/llama-2-13b-chat.Q5_K_M.gguf",
+        "n_ctx": 4096,
+        "n_gpu_layers": -1,
+        "verbose": False,
+        "n_batch": 512,
+    },
+    "mistral": {
+        "model_path": "/models/mistral-7b-instruct-v0.1.Q5_K_M.gguf",
+        "n_ctx": 4096,
+        "n_gpu_layers": -1,
+        "verbose": False,
+        "n_batch": 512,
+    },
 }
 
 DEFAULT_GENERATION_PARAMS = {
@@ -37,36 +52,14 @@ DEFAULT_GENERATION_PARAMS = {
     "mirostat_tau": 5
 }
 
-DEFAULT_SYSTEM_PROMPT = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
-# Role Definition
-You are an AI assistant, respond to messages with:
-
-# Critical Directives
-✦ MUST analyze ALL historical messages
-✦ ALWAYS prioritize context-based responses
-✦ If context is unclear: Ask SPECIFIC follow-up questions
-✦ Minimum action verbs per response: 1 (e.g. "confirm", "schedule", "review")
-
-# Tone Guidelines
-✦ Professional yet approachable
-✦ Balanced formality (avoid both stiff and casual extremes)
-✦ Show appreciation when appropriate
-✦ Use concise but complete sentences
-
-# Response Strategy
-1. Extract key entities (names/dates/actions)
-2. Mirror the partner's communication style
-3. Propose concrete next steps when possible
-
-# Response Template Examples
-[Positive] "Confirmed, the materials will reach you by EOD Wednesday. Appreciate your patience."
-[Neutral] "Let's schedule a brief sync tomorrow AM. Please share your availability."
-[Urgent] "Need the signed docs by 3PM CST today. Will follow up via email."
-
-# Strict Prohibitions
-1. Never use emoticons or slang
-2. Avoid jargon like "leverage" or "synergy"
-3. Never make promises beyond authority<|eot_id|>"""
+DEFAULT_SYSTEM_PROMPT = """
+You are a helpful assistant analyzing Telegram messages. Your job is to:
+1. Understand the context of the conversation
+2. Generate a concise, relevant response
+3. Be natural and helpful in your tone
+4. Only respond to messages that need a response
+5. Keep your responses under 150 words unless more detail is explicitly needed
+"""
 
 
 # --------------------------
@@ -413,118 +406,114 @@ class DialogProcessor:
 # Background Task Functions
 # --------------------------
 async def process_dialog_queue_item(queue_id: str, session_id: str = None):
-    """Process a single item from the processing queue"""
+    """
+    Process a queued dialog item
+    
+    Args:
+        queue_id: The ID of the queue item to process
+        session_id: Optional session ID for tracking
+        
+    Returns:
+        Processing result
+    """
     conn = await get_raw_connection()
     try:
-        # Get the queue item
-        queue_item = await conn.fetchrow(
+        # Get queue item
+        row = await conn.fetchrow(
             """
-            SELECT q.*, m.dialog_id 
-            FROM processing_queue q
-            JOIN message_history m ON q.message_id = m.message_id
-            WHERE q.queue_id = $1
-            """,
+            SELECT * FROM processing_queue 
+            WHERE id = $1 AND status = 'pending'
+            """, 
             queue_id
         )
         
-        if not queue_item:
-            logger.warning(f"Queue item {queue_id} not found")
-            return False
+        if not row:
+            logger.warning(f"Queue item {queue_id} not found or not pending")
+            return {"success": False, "error": "Queue item not found or not pending"}
+            
+        # Parse queue item data
+        queue_item = dict(row)
+        dialog_id = queue_item["dialog_id"]
+        user_id = queue_item["user_id"]
         
-        # Mark as started
+        # Update queue status to processing
         await conn.execute(
             """
-            UPDATE processing_queue
-            SET status = 'processing', started_at = $1
-            WHERE queue_id = $2
-            """,
-            datetime.utcnow(), queue_id
+            UPDATE processing_queue 
+            SET status = 'processing', 
+                started_at = NOW()
+            WHERE id = $1
+            """, 
+            queue_id
         )
         
-        # Get the user ID for this dialog
-        dialog_selection = await conn.fetchrow(
+        # Get user's selected model
+        model_info = await get_user_model(user_id)
+        model_name = model_info.get("model_name", "llama3")
+        system_prompt = model_info.get("system_prompt")
+        
+        # Process the dialog
+        result = None
+        error = None
+        
+        try:
+            # Check if we're using a Claude model
+            if model_name.startswith("claude-"):
+                processor = ClaudeProcessor(model_name=model_name, system_prompt=system_prompt)
+                result = await processor.process_dialog(dialog_id, user_id, session_id)
+            else:
+                # Use the local LLM processor
+                processor = DialogProcessor(model_name=model_name, system_prompt=system_prompt)
+                result = await processor.process_dialog(dialog_id, user_id, session_id)
+                
+        except Exception as e:
+            error = str(e)
+            logger.error(f"Error processing dialog: {error}")
+            result = {"success": False, "error": error}
+        
+        # Update queue with results
+        status = "completed" if result.get("success", False) else "failed"
+        processed_count = result.get("processed_count", 0) if result else 0
+        error_msg = result.get("error", "") if result else error or "Unknown error"
+        
+        await conn.execute(
             """
-            SELECT user_id
-            FROM user_selected_dialogs
-            WHERE dialog_id = $1 AND is_active = true
-            LIMIT 1
-            """,
-            queue_item["dialog_id"]
+            UPDATE processing_queue 
+            SET status = $1, 
+                completed_at = NOW(),
+                processed_count = $2,
+                error = $3,
+                result = $4
+            WHERE id = $5
+            """, 
+            status, 
+            processed_count,
+            error_msg if not result or not result.get("success", False) else None,
+            json.dumps(result) if result else None,
+            queue_id
         )
         
-        if not dialog_selection:
-            logger.warning(f"No active dialog selection found for dialog {queue_item['dialog_id']}")
-            await conn.execute(
-                """
-                UPDATE processing_queue
-                SET status = 'error', error_message = $1, completed_at = $2
-                WHERE queue_id = $3
-                """,
-                "No active dialog selection found", datetime.utcnow(), queue_id
-            )
-            return False
+        return result or {"success": False, "error": error or "Unknown processing error"}
         
-        # Get the model details from user_selected_models
-        user_id = dialog_selection["user_id"]
-        model_selection = await conn.fetchrow(
-            """
-            SELECT model_name, system_prompt
-            FROM user_selected_models
-            WHERE user_id = $1
-            LIMIT 1
-            """,
-            user_id
-        )
-        
-        # Use default model if none selected
-        model_name = model_selection["model_name"] if model_selection else "llama3"
-        system_prompt = model_selection["system_prompt"] if model_selection and model_selection["system_prompt"] else DEFAULT_SYSTEM_PROMPT
-        
-        # Process the message
-        processor = DialogProcessor(model_name=model_name, system_prompt=system_prompt)
-        result = await processor.process_dialog(
-            queue_item["dialog_id"], 
-            user_id,
-            session_id
-        )
-        
-        # Update queue item status
-        if result.get("success", False):
-            await conn.execute(
-                """
-                UPDATE processing_queue
-                SET status = 'completed', completed_at = $1
-                WHERE queue_id = $2
-                """,
-                datetime.utcnow(), queue_id
-            )
-            return True
-        else:
-            await conn.execute(
-                """
-                UPDATE processing_queue
-                SET status = 'error', error_message = $1, completed_at = $2
-                WHERE queue_id = $3
-                """,
-                result.get("error", "Unknown error"), datetime.utcnow(), queue_id
-            )
-            return False
-    
     except Exception as e:
-        logger.error(f"Error processing queue item {queue_id}: {str(e)}")
+        logger.error(f"Error in process_dialog_queue_item: {str(e)}")
+        # Update queue status to failed
         try:
             await conn.execute(
                 """
-                UPDATE processing_queue
-                SET status = 'error', error_message = $1, completed_at = $2
-                WHERE queue_id = $3
-                """,
-                str(e), datetime.utcnow(), queue_id
+                UPDATE processing_queue 
+                SET status = 'failed', 
+                    completed_at = NOW(),
+                    error = $1
+                WHERE id = $2
+                """, 
+                str(e),
+                queue_id
             )
-        except:
-            pass
-        return False
-    
+        except Exception as update_err:
+            logger.error(f"Failed to update queue status: {str(update_err)}")
+            
+        return {"success": False, "error": str(e)}
     finally:
         await conn.close()
 
@@ -598,99 +587,102 @@ async def enqueue_dialog_for_processing(dialog_id: int, user_id: int) -> Dict:
 # User Model Selection Functions
 # --------------------------
 async def get_available_models() -> List[Dict]:
-    """Get list of available models"""
-    # For now, just return the hardcoded models
+    """
+    Get list of available models
+    
+    Returns:
+        List of model configurations
+    """
     models = []
-    for model_name, config in MODEL_CONFIGS.items():
+    
+    # Add local LLM models
+    for model_id in MODEL_CONFIGS.keys():
         models.append({
-            "model_id": model_name,
-            "model_name": model_name.capitalize(),
-            "description": f"Language model using {model_name} architecture",
-            "is_default": model_name == "llama3"
+            "id": model_id,
+            "name": model_id.capitalize(),
+            "description": f"Local {model_id.capitalize()} model"
         })
+    
+    # Add Claude models
+    claude_models = await get_available_claude_models()
+    models.extend(claude_models)
     
     return models
 
 
 async def select_model_for_user(user_id: int, model_name: str, system_prompt: Optional[str] = None) -> Dict:
-    """Set a model as the user's default"""
+    """
+    Select a model for a user
+    
+    Args:
+        user_id: User ID
+        model_name: Model name to select
+        system_prompt: Optional system prompt to use
+        
+    Returns:
+        Dictionary with operation result
+    """
     conn = await get_raw_connection()
     try:
-        # Generate a model ID
-        model_id = str(uuid.uuid4())
+        # Validate model
+        available_models = await get_available_models()
+        valid_model_ids = [model["id"] for model in available_models]
         
-        # Check if model exists in configuration
-        if model_name not in MODEL_CONFIGS:
+        if model_name not in valid_model_ids:
             return {
-                "success": False,
-                "error": f"Model {model_name} not available"
+                "success": False, 
+                "error": f"Invalid model: {model_name}. Valid models: {', '.join(valid_model_ids)}"
             }
         
-        # Check if user already has a model selected
-        existing_model = await conn.fetchrow(
+        # Use default system prompt if none provided
+        if not system_prompt:
+            system_prompt = DEFAULT_SYSTEM_PROMPT
+        
+        # Check if user has existing selection
+        existing = await conn.fetchrow(
             """
-            SELECT model_id, system_prompt FROM user_selected_models
+            SELECT * FROM user_selected_models 
             WHERE user_id = $1
             """,
             user_id
         )
         
-        # If system_prompt not provided, keep existing one if available
-        if system_prompt is None and existing_model and existing_model["system_prompt"]:
-            system_prompt = existing_model["system_prompt"]
-        elif system_prompt is None:
-            system_prompt = DEFAULT_SYSTEM_PROMPT
-        
-        if existing_model:
-            # Update existing model
+        if existing:
+            # Update existing selection
             await conn.execute(
                 """
-                UPDATE user_selected_models
-                SET model_name = $1, system_prompt = $2, updated_at = $3
-                WHERE user_id = $4
+                UPDATE user_selected_models 
+                SET model_name = $1, 
+                    system_prompt = $2,
+                    updated_at = NOW()
+                WHERE user_id = $3
                 """,
-                model_name, system_prompt, datetime.utcnow(), user_id
-            )
-            
-            model_id = existing_model["model_id"]
-        else:
-            # Insert new model selection
-            await conn.execute(
-                """
-                INSERT INTO user_selected_models (
-                    model_id,
-                    user_id,
-                    model_name,
-                    system_prompt,
-                    is_default,
-                    created_at,
-                    updated_at
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-                """,
-                model_id,
-                user_id,
                 model_name,
                 system_prompt,
-                True,
-                datetime.utcnow(),
-                datetime.utcnow()
+                user_id
+            )
+        else:
+            # Create new selection
+            await conn.execute(
+                """
+                INSERT INTO user_selected_models 
+                (user_id, model_name, system_prompt, created_at, updated_at)
+                VALUES ($1, $2, $3, NOW(), NOW())
+                """,
+                user_id,
+                model_name,
+                system_prompt
             )
         
         return {
             "success": True,
-            "user_id": user_id,
-            "model_id": model_id,
             "model_name": model_name,
             "system_prompt": system_prompt
         }
     
     except Exception as e:
-        logger.error(f"Error selecting model for user {user_id}: {str(e)}")
-        return {
-            "success": False,
-            "error": str(e)
-        }
-    
+        logger.error(f"Error selecting model: {str(e)}")
+        return {"success": False, "error": str(e)}
     finally:
         await conn.close()
 
