@@ -1,5 +1,10 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
+# Clacky-related configuration
+.1024*
+!.1024
+.breakpoints
+
 # commit message files
 commit_msg*.txt
 *_commit_msg.txt
@@ -34,6 +39,7 @@ yarn-error.log*
 # local env files
 .env*.local
 .env
+backend/.env
 .env.docker
 #.env.example
 
@@ -49,11 +55,15 @@ credentials.json
 # asdf
 .tool-versions
 
-# pycache
+# Python-specific ignores
+__pycache__/
+*.py[cod]
+*$py.class
 **/__pycache__/
 
 # python virtual environment
 /venv/
+.venv/
 
 # pytest
 .pytest_cache/
@@ -64,8 +74,6 @@ credentials.json
 # Token tracking logs
 token_logs/
 test_token_logs/
-
-.venv/
 
 backend/sessions/
 backend/server.log
