@@ -15,7 +15,7 @@ from httpx import AsyncClient
 
 from app.main import app
 from app.db.base import Base
-from app.services.session_manager import SessionManager
+from app.middleware.session import SessionMiddleware
 from app.services.background_tasks import BackgroundTaskManager
 
 # Test database URL
@@ -68,9 +68,12 @@ async def db_session(engine):
         await session.rollback()
 
 @pytest_asyncio.fixture
-def session_manager():
-    """Create session manager for testing"""
-    return SessionManager(test_settings)
+def session_middleware():
+    """Create session middleware for testing"""
+    app = FastAPI()
+    middleware = SessionMiddleware(app)
+    middleware.jwt_secret = test_settings["jwt_secret"]
+    return middleware
 
 @pytest_asyncio.fixture
 def background_tasks():
@@ -78,9 +81,10 @@ def background_tasks():
     return BackgroundTaskManager()
 
 @pytest_asyncio.fixture
-async def test_app(db_session, session_manager, background_tasks):
+async def test_app(db_session, session_middleware, background_tasks):
     """Create test application with dependencies"""
     app.state.db_pool = lambda: db_session
+    app.state.session_middleware = session_middleware
     app.state.background_tasks = background_tasks
     return app
 

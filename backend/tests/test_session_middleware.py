@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 import jwt
 from datetime import datetime, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
+import uuid
 
 from app.middleware.session import SessionMiddleware, verify_session_dependency, SessionData
 from app.models.session import Session, SessionStatus
@@ -185,3 +186,114 @@ async def test_cleanup_expired_sessions(test_app, db):
     # Verify valid session remains
     valid_db = await db.fetchrow("SELECT * FROM sessions WHERE token = $1", valid.token)
     assert valid_db is not None 
+
+@pytest.mark.asyncio
+async def test_jwt_token_validation(test_app, db):
+    """Test JWT token validation specifics"""
+    session_middleware = test_app.state.session_middleware
+    
+    # Test token expiration
+    session = await session_middleware.create_session(db=db, telegram_id=123456)
+    token_data = jwt.decode(session.token, session_middleware.jwt_secret, algorithms=["HS256"])
+    assert "exp" in token_data
+    assert "jti" in token_data
+    
+    # Test token tampering
+    tampered_token = session.token[:-1] + ("1" if session.token[-1] == "0" else "0")
+    with pytest.raises(HTTPException) as exc_info:
+        await session_middleware.verify_session(tampered_token, db=db)
+    assert exc_info.value.status_code == 401
+    
+    # Test expired token
+    expired_token_data = {
+        "jti": str(uuid.uuid4()),
+        "exp": datetime.utcnow() - timedelta(minutes=1)
+    }
+    expired_token = jwt.encode(expired_token_data, session_middleware.jwt_secret, algorithm="HS256")
+    with pytest.raises(HTTPException) as exc_info:
+        await session_middleware.verify_session(expired_token, db=db)
+    assert exc_info.value.status_code == 401
+
+@pytest.mark.asyncio
+async def test_public_paths_access(test_app, test_client):
+    """Test access to public paths"""
+    # Test all defined public paths
+    public_paths = [
+        "/health",
+        "/api/auth/qr",
+        "/api/auth/session/verify",
+        "/api/auth/dev-login",
+        "/docs",
+        "/redoc",
+        "/openapi.json"
+    ]
+    
+    for path in public_paths:
+        response = test_client.get(path)
+        assert response.status_code != 401, f"Public path {path} should not require authentication"
+
+@pytest.mark.asyncio
+async def test_session_metadata(test_app, db):
+    """Test session metadata handling"""
+    session_middleware = test_app.state.session_middleware
+    
+    # Create session with metadata
+    metadata = {"device": "test_device", "ip": "127.0.0.1"}
+    session = await session_middleware.create_session(
+        db=db,
+        telegram_id=123456,
+        metadata=metadata
+    )
+    
+    # Verify metadata is stored and retrieved
+    verified = await session_middleware.verify_session(session.token, db=db)
+    assert verified.metadata == metadata
+    
+    # Update metadata
+    updated_metadata = {"device": "new_device", "ip": "127.0.0.2"}
+    session.metadata = updated_metadata
+    await db.commit()
+    
+    # Verify updated metadata
+    verified = await session_middleware.verify_session(session.token, db=db)
+    assert verified.metadata == updated_metadata
+
+@pytest.mark.asyncio
+async def test_session_update_errors(test_app, db):
+    """Test error cases for session updates"""
+    session_middleware = test_app.state.session_middleware
+    
+    # Test updating non-existent session
+    with pytest.raises(HTTPException) as exc_info:
+        await session_middleware.update_session("non-existent-token", 123456, db=db)
+    assert exc_info.value.status_code == 401
+    
+    # Test updating expired session
+    session = await session_middleware.create_session(db=db, is_qr=True)
+    await db.execute("""
+        UPDATE sessions 
+        SET expires_at = NOW() - interval '1 hour'
+        WHERE token = $1
+    """, session.token)
+    
+    with pytest.raises(HTTPException) as exc_info:
+        await session_middleware.update_session(session.token, 123456, db=db)
+    assert exc_info.value.status_code == 401
+
+@pytest.mark.asyncio
+async def test_concurrent_sessions(test_app, db):
+    """Test handling of concurrent sessions"""
+    session_middleware = test_app.state.session_middleware
+    
+    # Create multiple sessions for same user
+    telegram_id = 123456
+    session1 = await session_middleware.create_session(db=db, telegram_id=telegram_id)
+    session2 = await session_middleware.create_session(db=db, telegram_id=telegram_id)
+    
+    # Verify both sessions are valid
+    verified1 = await session_middleware.verify_session(session1.token, db=db)
+    verified2 = await session_middleware.verify_session(session2.token, db=db)
+    
+    assert verified1.telegram_id == telegram_id
+    assert verified2.telegram_id == telegram_id
+    assert verified1.token != verified2.token 
