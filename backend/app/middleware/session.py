@@ -6,14 +6,15 @@ for handling user authentication in the FastAPI application.
 """
 
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Optional
 import uuid
 
 import jwt
 from fastapi import FastAPI, Request, Response, HTTPException, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from pydantic import BaseModel, Field
+from starlette.middleware.base import BaseHTTPMiddleware
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -27,15 +28,29 @@ logger = get_logger(__name__)
 # Security scheme for JWT tokens
 security = HTTPBearer(auto_error=False)
 
+def utcnow() -> datetime:
+    """Get current UTC datetime with timezone info"""
+    return datetime.now(timezone.utc)
+
 class SessionData(BaseModel):
     """Data structure for session information"""
-    id: uuid.UUID = Field(default_factory=uuid.uuid4)
+    id: uuid.UUID
     telegram_id: Optional[int] = None
     status: str
     token: str
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime
     expires_at: datetime
-    session_metadata: Dict = Field(default_factory=dict)
+    session_metadata: Dict = {}
+
+    @model_validator(mode='before')
+    def set_defaults(cls, values):
+        if 'id' not in values:
+            values['id'] = uuid.uuid4()
+        if 'created_at' not in values:
+            values['created_at'] = utcnow()
+        if 'session_metadata' not in values:
+            values['session_metadata'] = {}
+        return values
 
 # List of paths that don't require authentication
 PUBLIC_PATHS = {
@@ -48,7 +63,7 @@ PUBLIC_PATHS = {
     "/openapi.json"
 }
 
-class SessionMiddleware:
+class SessionMiddleware(BaseHTTPMiddleware):
     """JWT-based session management middleware with FastAPI"""
     
     def __init__(self, app: FastAPI):
@@ -58,82 +73,14 @@ class SessionMiddleware:
         Args:
             app: FastAPI application instance
         """
+        super().__init__(app)
         self.app = app
         self.jwt_secret = os.getenv("JWT_SECRET", "your-secret-key")
         self.access_token_expire_minutes = 1440  # 24 hours
         self.qr_token_expire_minutes = 10  # 10 minutes for QR code sessions
         logger.info("Session middleware initialized with SQLAlchemy ORM")
 
-    async def create_session(self, db: AsyncSession, telegram_id: Optional[int] = None, is_qr: bool = False) -> Session:
-        """Create and store session in database using ORM
-        
-        Args:
-            db: SQLAlchemy AsyncSession
-            telegram_id: Optional Telegram user ID for pre-authenticated sessions
-            is_qr: Whether this is a QR code authentication session
-            
-        Returns:
-            The created session object
-        """
-        # Generate JWT token
-        token_data = {
-            "jti": str(uuid.uuid4()),
-            "exp": datetime.utcnow() + timedelta(
-                minutes=self.qr_token_expire_minutes if is_qr else self.access_token_expire_minutes
-            )
-        }
-        token = jwt.encode(token_data, self.jwt_secret, algorithm="HS256")
-        
-        # Create session
-        session = Session(
-            token=token,
-            telegram_id=telegram_id,
-            status=SessionStatus.PENDING if not telegram_id else SessionStatus.AUTHENTICATED,
-            expires_at=token_data["exp"]
-        )
-        db.add(session)
-        await db.commit()
-        await db.refresh(session)
-        return session
-               
-    async def verify_session(self, token: str, db: AsyncSession) -> Session:
-        """Verify and return session data using ORM"""
-        stmt = select(Session).where(
-            Session.token == token,
-            Session.expires_at > datetime.utcnow()
-        )
-        result = await db.execute(stmt)
-        session = result.scalar_one_or_none()
-        
-        if not session:
-            raise HTTPException(401, "Invalid or expired session")
-            
-        return session
-           
-    async def update_session(self, token: str, telegram_id: int, db: AsyncSession) -> Session:
-        """Update session after successful authentication using ORM"""
-        stmt = select(Session).where(Session.token == token)
-        result = await db.execute(stmt)
-        session = result.scalar_one_or_none()
-        
-        if not session:
-            raise HTTPException(401, "Session not found")
-            
-        session.telegram_id = telegram_id
-        session.status = SessionStatus.AUTHENTICATED
-        session.expires_at = datetime.utcnow() + timedelta(days=7)
-        
-        await db.commit()
-        await db.refresh(session)
-        return session
-        
-    async def cleanup_expired_sessions(self):
-        """Clean up expired sessions using ORM"""
-        stmt = delete(Session).where(Session.expires_at < datetime.utcnow())
-        await self.db.execute(stmt)
-        await self.db.commit()
-        
-    async def __call__(self, request: Request, call_next) -> Response:
+    async def dispatch(self, request: Request, call_next) -> Response:
         """Process each request through the session middleware"""
         if request.url.path in PUBLIC_PATHS:
             return await call_next(request)
@@ -169,6 +116,105 @@ class SessionMiddleware:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Internal server error"
             )
+
+    async def create_session(self, db: AsyncSession, telegram_id: Optional[int] = None, is_qr: bool = False, metadata: Dict = None) -> Session:
+        """Create and store session in database using ORM
+        
+        Args:
+            db: SQLAlchemy AsyncSession
+            telegram_id: Optional Telegram user ID for pre-authenticated sessions
+            is_qr: Whether this is a QR code authentication session
+            metadata: Optional session metadata
+            
+        Returns:
+            The created session object
+            
+        Raises:
+            HTTPException: If telegram_id is provided but user doesn't exist
+        """
+        # If telegram_id is provided, verify user exists
+        if telegram_id:
+            stmt = select(User).where(User.telegram_id == telegram_id)
+            result = await db.execute(stmt)
+            user = result.scalar_one_or_none()
+            if not user:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"User with telegram_id {telegram_id} not found"
+                )
+        
+        # Generate JWT token
+        token_data = {
+            "jti": str(uuid.uuid4()),
+            "exp": utcnow() + timedelta(
+                minutes=self.qr_token_expire_minutes if is_qr else self.access_token_expire_minutes
+            )
+        }
+        token = jwt.encode(token_data, self.jwt_secret, algorithm="HS256")
+        
+        # Create session
+        session = Session(
+            token=token,
+            telegram_id=telegram_id,
+            status=SessionStatus.PENDING if not telegram_id else SessionStatus.AUTHENTICATED,
+            expires_at=token_data["exp"],
+            metadata=metadata or {}
+        )
+        db.add(session)
+        await db.commit()
+        await db.refresh(session)
+        return session
+               
+    async def verify_session(self, token: str, db: AsyncSession) -> Session:
+        """Verify and return session data using ORM"""
+        stmt = select(Session).where(
+            Session.token == token,
+            Session.expires_at > utcnow()
+        )
+        result = await db.execute(stmt)
+        session = result.scalar_one_or_none()
+        
+        if not session:
+            raise HTTPException(401, "Invalid or expired session")
+            
+        return session
+           
+    async def update_session(self, token: str, telegram_id: int, db: AsyncSession) -> Session:
+        """Update session after successful authentication using ORM"""
+        # Verify user exists
+        stmt = select(User).where(User.telegram_id == telegram_id)
+        result = await db.execute(stmt)
+        user = result.scalar_one_or_none()
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"User with telegram_id {telegram_id} not found"
+            )
+        
+        # Get session
+        stmt = select(Session).where(
+            Session.token == token,
+            Session.expires_at > utcnow()
+        )
+        result = await db.execute(stmt)
+        session = result.scalar_one_or_none()
+        
+        if not session:
+            raise HTTPException(401, "Session not found or expired")
+            
+        session.telegram_id = telegram_id
+        session.status = SessionStatus.AUTHENTICATED
+        session.expires_at = utcnow() + timedelta(days=7)
+        
+        await db.commit()
+        await db.refresh(session)
+        return session
+        
+    async def cleanup_expired_sessions(self, db: AsyncSession):
+        """Clean up expired sessions using ORM"""
+        stmt = delete(Session).where(Session.expires_at < utcnow())
+        await db.execute(stmt)
+        await db.commit()
 
 async def verify_session_dependency(
     request: Request,

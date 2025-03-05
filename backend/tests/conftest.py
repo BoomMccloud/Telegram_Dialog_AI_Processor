@@ -10,69 +10,91 @@ import asyncpg
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from httpx import AsyncClient
+from fastapi.testclient import TestClient
+from dotenv import load_dotenv
+from sqlalchemy.pool import NullPool
 
 from app.main import app
 from app.db.base import Base
-from app.middleware.session import SessionMiddleware
+from app.middleware.session import SessionMiddleware, verify_session_dependency, SessionData
 from app.services.background_tasks import BackgroundTaskManager
 
-# Test database URL
-TEST_DATABASE_URL = "postgresql+asyncpg://postgres:postgres@localhost:5432/telegram_processor_test"
+# Load environment variables
+load_dotenv()
+
+# Get database configuration from environment
+DB_USER = os.getenv("POSTGRES_USER", "postgres")
+DB_PASSWORD = os.getenv("POSTGRES_PASSWORD", "postgres")
+DB_HOST = os.getenv("POSTGRES_HOST", "localhost")
+DB_PORT = os.getenv("POSTGRES_PORT", "5432")
+DB_NAME = os.getenv("POSTGRES_DB", "telegram_dialog_dev")
+
+# Database URLs
+DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+SQLALCHEMY_DATABASE_URL = f"postgresql+asyncpg://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
 # Test settings
 test_settings = {
-    "jwt_secret": "test-secret-key-for-testing-only",
-    "access_token_expire_minutes": 60,
+    "jwt_secret": os.getenv("JWT_SECRET_KEY", "test-secret-key-for-testing-only"),
+    "access_token_expire_minutes": int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60")),
     "refresh_token_expire_minutes": 10080
 }
 
-@pytest.fixture(scope="session")
-def event_loop():
-    """Create an instance of the default event loop for each test case."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
-
 @pytest_asyncio.fixture(scope="session")
 async def engine():
-    """Create test database engine"""
-    engine = create_async_engine(TEST_DATABASE_URL)
-    
-    # Create tables
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)  # Clean up old tables
-        await conn.run_sync(Base.metadata.create_all)
-    
-    yield engine
-    
-    # Clean up
-    async with engine.begin() as conn:
+    """Create a test database engine."""
+    # Create the engine with test settings
+    test_engine = create_async_engine(
+        SQLALCHEMY_DATABASE_URL,
+        poolclass=NullPool,  # Disable connection pooling for tests
+        echo=True,  # Enable SQL logging
+    )
+
+    async with test_engine.begin() as conn:
+        # Drop all tables and recreate them for a clean test environment
         await conn.run_sync(Base.metadata.drop_all)
-    await engine.dispose()
+        await conn.run_sync(Base.metadata.create_all)
+
+    try:
+        yield test_engine
+    finally:
+        await test_engine.dispose()
 
 @pytest_asyncio.fixture
 async def db_session(engine):
-    """Create database session for testing"""
-    TestingSessionLocal = sessionmaker(
-        engine,
+    """Create a test database session."""
+    # Create session factory
+    async_session = sessionmaker(
+        bind=engine,
         class_=AsyncSession,
         expire_on_commit=False,
         autocommit=False,
         autoflush=False
     )
-    
-    async with TestingSessionLocal() as session:
-        yield session
-        await session.rollback()
+
+    # Create session
+    async with async_session() as session:
+        try:
+            # Clean up tables before each test
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.drop_all)
+                await conn.run_sync(Base.metadata.create_all)
+            yield session
+        finally:
+            await session.rollback()
+            await session.close()
 
 @pytest_asyncio.fixture
-def session_middleware():
+async def session_middleware(db_session):
     """Create session middleware for testing"""
-    app = FastAPI()
-    middleware = SessionMiddleware(app)
-    middleware.jwt_secret = test_settings["jwt_secret"]
+    # Set JWT secret in environment
+    os.environ["JWT_SECRET"] = test_settings["jwt_secret"]
+    
+    # Create middleware
+    middleware = SessionMiddleware(app=None)  # We'll set this later when adding to the app
+    middleware.db = db_session  # Ensure the middleware has access to the db session
     return middleware
 
 @pytest_asyncio.fixture
@@ -83,9 +105,26 @@ def background_tasks():
 @pytest_asyncio.fixture
 async def test_app(db_session, session_middleware, background_tasks):
     """Create test application with dependencies"""
+    # Create a new FastAPI instance for testing
+    app = FastAPI()
+    
+    # Set up app state
     app.state.db_pool = lambda: db_session
     app.state.session_middleware = session_middleware
     app.state.background_tasks = background_tasks
+    
+    # Add session middleware to the middleware stack
+    app.add_middleware(SessionMiddleware)
+    
+    # Add test routes
+    @app.get("/health")
+    async def health_check():
+        return {"status": "ok"}
+        
+    @app.get("/api/protected")
+    async def protected_route(session: SessionData = Depends(verify_session_dependency)):
+        return {"session_id": str(session.id)}
+    
     return app
 
 @pytest_asyncio.fixture
@@ -94,69 +133,9 @@ async def client(test_app):
     async with AsyncClient(app=test_app, base_url="http://test") as client:
         yield client
 
-@pytest_asyncio.fixture
-async def db_pool(event_loop):
-    """Create a test database and pool."""
-    # Create test database
-    sys_conn = await asyncpg.connect(
-        "postgresql://postgres:postgres@localhost:5432/postgres",
-        loop=event_loop
-    )
-    
-    try:
-        await sys_conn.execute(
-            f'DROP DATABASE IF EXISTS {TEST_DATABASE_URL.split("/")[-1]}'
-        )
-        await sys_conn.execute(
-            f'CREATE DATABASE {TEST_DATABASE_URL.split("/")[-1]}'
-        )
-    finally:
-        await sys_conn.close()
-    
-    # Create pool
-    pool = await asyncpg.create_pool(TEST_DATABASE_URL, loop=event_loop)
-    
-    # Run migrations
-    async with pool.acquire() as conn:
-        # Create sessions table
-        await conn.execute("""
-            CREATE TABLE IF NOT EXISTS sessions (
-                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                telegram_id INTEGER,
-                status VARCHAR(20) NOT NULL CHECK (status IN ('pending', 'authenticated', 'error', 'expired')),
-                token VARCHAR(500) NOT NULL UNIQUE,
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                expires_at TIMESTAMPTZ NOT NULL,
-                metadata JSONB DEFAULT '{}'::jsonb
-            )
-        """)
-    
-    yield pool
-    
-    # Cleanup
-    await pool.close()
-    
-    # Drop test database
-    sys_conn = await asyncpg.connect(
-        "postgresql://postgres:postgres@localhost:5432/postgres",
-        loop=event_loop
-    )
-    try:
-        await sys_conn.execute(
-            f'DROP DATABASE IF EXISTS {TEST_DATABASE_URL.split("/")[-1]}'
-        )
-    finally:
-        await sys_conn.close()
-
-@pytest_asyncio.fixture
-async def db(db_pool, event_loop):
-    """Get a database connection for each test."""
-    async with db_pool.acquire() as conn:
-        # Start transaction
-        tr = conn.transaction()
-        await tr.start()
-        
-        yield conn
-        
-        # Rollback transaction
-        await tr.rollback() 
+@pytest.fixture
+def test_client(test_app):
+    """Create a test client for the FastAPI application"""
+    client = TestClient(test_app)
+    client.app = test_app  # Ensure the app is properly set
+    return client 
