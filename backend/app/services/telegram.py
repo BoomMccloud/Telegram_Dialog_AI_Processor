@@ -3,34 +3,35 @@ from typing import List, Dict
 import os
 import logging
 from datetime import datetime, timedelta
-from .auth import get_or_load_session
+from .auth import client_sessions
 
 # Configure logging
 logger = logging.getLogger(__name__)
 
-async def get_dialogs(session_id: str) -> List[Dict]:
+async def get_dialogs(token: str) -> List[Dict]:
     """Get list of dialogs (chats)"""
-    logger.info(f"Getting dialogs for session {session_id}")
+    logger.info(f"Getting dialogs for session {token}")
     
-    session = get_or_load_session(session_id)
+    # Get client from memory
+    session = client_sessions.get(token)
     if not session or not session.get("client"):
-        logger.error(f"Invalid or expired session: {session_id}")
+        logger.error(f"Invalid or expired session: {token}")
         raise ValueError("Invalid or expired session")
     
     client = session["client"]
     
     # Check if client is connected
     if not client.is_connected():
-        logger.info(f"Client not connected, connecting now for session {session_id}")
+        logger.info(f"Client not connected, connecting now for session {token}")
         await client.connect()
     
     if not await client.is_user_authorized():
-        logger.error(f"Client is not authorized for session {session_id}")
+        logger.error(f"Client is not authorized for session {token}")
         raise ValueError("Client is not authorized")
 
     dialogs = []
     try:
-        logger.info(f"Starting to fetch dialogs for session {session_id}")
+        logger.info(f"Starting to fetch dialogs for session {token}")
         count = 0
         async for dialog in client.iter_dialogs():
             count += 1
@@ -53,16 +54,17 @@ async def get_dialogs(session_id: str) -> List[Dict]:
             dialogs.append(dialog_info)
             logger.info(f"Found dialog: {dialog_info['name']} (ID: {dialog_info['id']}, Type: {dialog_type})")
         
-        logger.info(f"Total dialogs found: {count} for session {session_id}")
+        logger.info(f"Total dialogs found: {count} for session {token}")
     except Exception as e:
         logger.error(f"Error fetching dialogs: {str(e)}")
         raise ValueError(f"Failed to fetch dialogs: {str(e)}")
     
     return dialogs
 
-async def get_recent_messages(session_id: str, limit: int = 20) -> List[Dict]:
+async def get_recent_messages(token: str, limit: int = 20) -> List[Dict]:
     """Get recent messages from all dialogs"""
-    session = get_or_load_session(session_id)
+    # Get client from memory
+    session = client_sessions.get(token)
     if not session or not session.get("client"):
         raise ValueError("Invalid or expired session")
     
@@ -93,9 +95,10 @@ async def get_recent_messages(session_id: str, limit: int = 20) -> List[Dict]:
     messages.sort(key=lambda x: x["date"], reverse=True)
     return messages[:limit]
 
-async def send_message(session_id: str, dialog_id: int, text: str) -> Dict:
+async def send_message(token: str, dialog_id: int, text: str) -> Dict:
     """Send a message to a specific dialog"""
-    session = get_or_load_session(session_id)
+    # Get client from memory
+    session = client_sessions.get(token)
     if not session or not session.get("client"):
         raise ValueError("Invalid or expired session")
     

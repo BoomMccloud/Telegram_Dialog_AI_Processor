@@ -101,7 +101,7 @@ class DialogProcessor:
             logger.error(f"Model initialization failed: {str(e)}")
             return False
 
-    async def process_dialog(self, dialog_id: int, user_id: int, session_id: str) -> Dict[str, Any]:
+    async def process_dialog(self, dialog_id: int, user_id: int, token: str) -> Dict[str, Any]:
         """Process messages from a dialog and store results"""
         try:
             # Initialize model if not yet initialized
@@ -248,125 +248,98 @@ class DialogProcessor:
             message_block = [
                 f"<|start_header_id|>{role_type}<|end_header_id|>",
                 m.get('message_text', '')[:200].strip(),
-                "<|eot_id|>"
+                "<|end_message_id|>"
             ]
             message_history.append("\n".join(message_block))
         
-        return (
-            prompt +
-            "\n".join(message_history) +
-            "\n<|start_header_id|>assistant<|end_header_id|>\n"
-        )
+        # Add message history to prompt
+        if message_history:
+            prompt += "\n\nMessage History:\n" + "\n".join(message_history)
+        
+        # Add final instruction
+        prompt += "\n\nPlease analyze the conversation and generate a response if needed."
+        
+        return prompt
 
     async def _generate_response(self, prompt: str) -> str:
         """Generate a response using the language model"""
         try:
-            if not self.llm:
-                await self.init_model()
-                if not self.llm:
-                    return "Error: Model not initialized"
-            
-            # Run in an executor to avoid blocking the event loop
-            loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(
-                None, 
-                lambda: self.llm.create_completion(prompt=prompt, **DEFAULT_GENERATION_PARAMS)
+            # Generate response
+            response = self.llm(
+                prompt,
+                **DEFAULT_GENERATION_PARAMS
             )
             
-            response = result['choices'][0]['text'].strip()
-            return self._post_process(response)
+            # Post-process the response
+            response_text = self._post_process(response["choices"][0]["text"])
+            
+            return response_text
         
         except Exception as e:
-            logger.error(f"Error generating response: {str(e)}")
-            return "Error generating response. Please try again later."
+            logger.error(f"Failed to generate response: {str(e)}")
+            return ""
 
     def _post_process(self, text: str) -> str:
-        """Clean up the generated response"""
-        # Basic cleaning
+        """Post-process the generated text"""
+        # Remove any special tokens
+        text = re.sub(r'<\|.*?\|>', '', text)
+        
+        # Remove extra whitespace
         text = re.sub(r'\s+', ' ', text).strip()
         
-        # Remove anything after EOT marker
-        if "<|eot_id|>" in text:
-            text = text.split("<|eot_id|>")[0].strip()
+        # Remove any remaining special characters
+        text = re.sub(r'[^\w\s.,!?-]', '', text)
         
-        # Filter obviously invalid content
-        invalid_patterns = [
-            r'\[\w+\]',  # Filter marked content
-            r'\.{3,}',  # Delete ellipsis
-            r'\b(n/a|undefined)\b'
-        ]
-        for p in invalid_patterns:
-            text = re.sub(p, '', text)
-        
-        return text.strip() or "I need more information to provide a helpful response."
+        # Truncate if too long
+        if len(text) > 500:
+            text = text[:497] + "..."
+            
+        return text
 
-    async def _store_processing_result(self, message: Dict, response_text: str, 
-                                      context_messages: List[Dict], dialog_id: int, 
-                                      user_id: int) -> Dict:
+    async def _store_processing_result(
+        self, 
+        message: Dict, 
+        response_text: str, 
+        context_messages: List[Dict],
+        dialog_id: int,
+        user_id: int
+    ) -> Dict:
         """Store the processing result in the database"""
         conn = await get_raw_connection()
         try:
-            # Generate a new UUID for the response
-            response_id = str(uuid.uuid4())
+            # Generate a UUID for the result
+            result_id = str(uuid.uuid4())
             
-            # Prepare context messages JSON
-            context_json = json.dumps([
-                {
-                    "message_id": m.get("message_id", ""),
-                    "sender_name": m.get("sender_name", ""),
-                    "message_text": m.get("message_text", ""),
-                    "message_date": m.get("message_date", "")
-                } for m in context_messages
-            ])
-            
-            # Insert into processed_responses table
+            # Store the result
             result = await conn.fetchrow(
-                """
-                INSERT INTO processed_responses (
-                    response_id,
-                    message_id,
-                    dialog_id,
-                    user_id,
-                    response_text,
-                    created_at,
-                    status
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-                RETURNING *
-                """,
-                response_id,
-                message.get("message_id", ""),
-                dialog_id,
-                user_id,
-                response_text,
-                datetime.utcnow(),
-                "pending"
-            )
-            
-            # Insert into processing_results table for compatibility
-            await conn.execute(
                 """
                 INSERT INTO processing_results (
                     result_id,
+                    user_id,
+                    dialog_id,
                     message_id,
-                    processed_text,
-                    response_text,
+                    model_name,
+                    system_prompt,
                     context_messages,
-                    processing_date,
-                    auto_reply_sent,
-                    user_interaction_status
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                    response_text,
+                    created_at,
+                    updated_at
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                RETURNING *
                 """,
-                str(uuid.uuid4()),
-                message.get("message_id", ""),
-                message.get("message_text", ""),
+                result_id,
+                user_id,
+                dialog_id,
+                message["message_id"],
+                self.model_name,
+                self.system_prompt,
+                json.dumps(context_messages),
                 response_text,
-                context_json,
                 datetime.utcnow(),
-                False,
-                "pending"
+                datetime.utcnow()
             )
             
-            # Convert result to dictionary
+            # Convert to dictionary
             result_dict = dict(result)
             
             # Convert datetime objects to strings
@@ -378,11 +351,7 @@ class DialogProcessor:
         
         except Exception as e:
             logger.error(f"Failed to store processing result: {str(e)}")
-            return {
-                "response_id": "error",
-                "message_id": message.get("message_id", ""),
-                "error": str(e)
-            }
+            return {}
         
         finally:
             await conn.close()
@@ -394,137 +363,98 @@ class DialogProcessor:
             await conn.execute(
                 """
                 UPDATE message_history
-                SET is_processed = true
-                WHERE message_id = $1
+                SET is_processed = true,
+                    processed_at = $1
+                WHERE message_id = $2
                 """,
+                datetime.utcnow(),
                 message_id
             )
             return True
-        
         except Exception as e:
-            logger.error(f"Failed to mark message as processed: {str(e)}")
+            logger.error(f"Failed to mark message {message_id} as processed: {str(e)}")
             return False
-        
         finally:
             await conn.close()
+
+
+async def process_dialog_queue_item(queue_id: str, token: str = None):
+    """Process a dialog from the processing queue"""
+    conn = await get_raw_connection()
+    try:
+        # Get the queue item
+        queue_item = await conn.fetchrow(
+            """
+            SELECT * FROM processing_queue
+            WHERE queue_id = $1
+            """,
+            queue_id
+        )
+        
+        if not queue_item:
+            logger.error(f"Queue item {queue_id} not found")
+            return
+        
+        # Get the user's selected model
+        user_id = queue_item["user_id"]
+        dialog_id = queue_item["dialog_id"]
+        
+        user_model = await get_user_model(user_id)
+        if not user_model:
+            logger.error(f"No model selected for user {user_id}")
+            return
+        
+        # Initialize processor
+        processor = DialogProcessor(
+            model_name=user_model["model_name"],
+            system_prompt=user_model.get("system_prompt")
+        )
+        
+        # Process the dialog
+        result = await processor.process_dialog(dialog_id, user_id, token)
+        
+        # Update queue item status
+        status = "completed" if result.get("success", False) else "failed"
+        error = result.get("error", "") if not result.get("success", False) else None
+        
+        await conn.execute(
+            """
+            UPDATE processing_queue
+            SET status = $1,
+                error = $2,
+                completed_at = $3,
+                updated_at = $4
+            WHERE queue_id = $5
+            """,
+            status,
+            error,
+            datetime.utcnow() if status == "completed" else None,
+            datetime.utcnow(),
+            queue_id
+        )
+        
+    except Exception as e:
+        logger.error(f"Failed to process queue item {queue_id}: {str(e)}")
+        # Update queue item with error
+        await conn.execute(
+            """
+            UPDATE processing_queue
+            SET status = 'failed',
+                error = $1,
+                updated_at = $2
+            WHERE queue_id = $3
+            """,
+            str(e),
+            datetime.utcnow(),
+            queue_id
+        )
+    finally:
+        await conn.close()
 
 
 # --------------------------
 # Background Task Functions
 # --------------------------
-async def process_dialog_queue_item(queue_id: str, session_id: str = None):
-    """
-    Process a queued dialog item
-    
-    Args:
-        queue_id: The ID of the queue item to process
-        session_id: Optional session ID for tracking
-        
-    Returns:
-        Processing result
-    """
-    conn = await get_raw_connection()
-    try:
-        # Get queue item
-        row = await conn.fetchrow(
-            """
-            SELECT * FROM processing_queue 
-            WHERE id = $1 AND status = 'pending'
-            """, 
-            queue_id
-        )
-        
-        if not row:
-            logger.warning(f"Queue item {queue_id} not found or not pending")
-            return {"success": False, "error": "Queue item not found or not pending"}
-            
-        # Parse queue item data
-        queue_item = dict(row)
-        dialog_id = queue_item["dialog_id"]
-        user_id = queue_item["user_id"]
-        
-        # Update queue status to processing
-        await conn.execute(
-            """
-            UPDATE processing_queue 
-            SET status = 'processing', 
-                started_at = NOW()
-            WHERE id = $1
-            """, 
-            queue_id
-        )
-        
-        # Get user's selected model
-        model_info = await get_user_model(user_id)
-        model_name = model_info.get("model_name", "llama3")
-        system_prompt = model_info.get("system_prompt")
-        
-        # Process the dialog
-        result = None
-        error = None
-        
-        try:
-            # Check if we're using a Claude model
-            if model_name.startswith("claude-"):
-                processor = ClaudeProcessor(model_name=model_name, system_prompt=system_prompt)
-                result = await processor.process_dialog(dialog_id, user_id, session_id)
-            else:
-                # Use the local LLM processor
-                processor = DialogProcessor(model_name=model_name, system_prompt=system_prompt)
-                result = await processor.process_dialog(dialog_id, user_id, session_id)
-                
-        except Exception as e:
-            error = str(e)
-            logger.error(f"Error processing dialog: {error}")
-            result = {"success": False, "error": error}
-        
-        # Update queue with results
-        status = "completed" if result.get("success", False) else "failed"
-        processed_count = result.get("processed_count", 0) if result else 0
-        error_msg = result.get("error", "") if result else error or "Unknown error"
-        
-        await conn.execute(
-            """
-            UPDATE processing_queue 
-            SET status = $1, 
-                completed_at = NOW(),
-                processed_count = $2,
-                error = $3,
-                result = $4
-            WHERE id = $5
-            """, 
-            status, 
-            processed_count,
-            error_msg if not result or not result.get("success", False) else None,
-            json.dumps(result) if result else None,
-            queue_id
-        )
-        
-        return result or {"success": False, "error": error or "Unknown processing error"}
-        
-    except Exception as e:
-        logger.error(f"Error in process_dialog_queue_item: {str(e)}")
-        # Update queue status to failed
-        try:
-            await conn.execute(
-                """
-                UPDATE processing_queue 
-                SET status = 'failed', 
-                    completed_at = NOW(),
-                    error = $1
-                WHERE id = $2
-                """, 
-                str(e),
-                queue_id
-            )
-        except Exception as update_err:
-            logger.error(f"Failed to update queue status: {str(update_err)}")
-            
-        return {"success": False, "error": str(e)}
-    finally:
-        await conn.close()
-
-
 async def enqueue_dialog_for_processing(dialog_id: int, user_id: int) -> Dict:
     """Add a dialog to the processing queue"""
     conn = await get_raw_connection()

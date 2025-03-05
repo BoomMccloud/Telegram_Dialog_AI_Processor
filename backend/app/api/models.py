@@ -1,8 +1,8 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends
 from typing import Dict, List, Optional
 from pydantic import BaseModel
 
-from app.services.auth import get_or_load_session
+from app.middleware.session import SessionMiddleware
 from app.services.model_processor import (
     get_available_models, select_model_for_user, get_user_model
 )
@@ -34,28 +34,24 @@ async def list_available_models() -> List[Dict]:
         )
 
 
-@router.post("/{session_id}/select")
+@router.post("/{token}/select")
 async def select_model(
-    session_id: str,
-    model_selection: ModelSelection
+    token: str,
+    model_selection: ModelSelection,
+    session_middleware: SessionMiddleware = Depends()
 ) -> Dict:
     """
     Select a model for the user
     
     Args:
-        session_id: The session ID of the user
+        token: The session token of the user
         model_selection: The model to select and optional system prompt
     
     Returns:
         The selected model information
     """
     # Validate session
-    session = get_or_load_session(session_id)
-    if not session:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired session"
-        )
+    session = await session_middleware.verify_session(token)
     
     # Get user_id from session
     user_id = session.get("user_id")
@@ -96,26 +92,22 @@ async def select_model(
         )
 
 
-@router.get("/{session_id}/selected")
+@router.get("/{token}/selected")
 async def get_selected_model(
-    session_id: str
+    token: str,
+    session_middleware: SessionMiddleware = Depends()
 ) -> Dict:
     """
     Get the user's currently selected model
     
     Args:
-        session_id: The session ID of the user
+        token: The session token of the user
     
     Returns:
         The user's selected model information
     """
     # Validate session
-    session = get_or_load_session(session_id)
-    if not session:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired session"
-        )
+    session = await session_middleware.verify_session(token)
     
     # Get user_id from session
     user_id = session.get("user_id")

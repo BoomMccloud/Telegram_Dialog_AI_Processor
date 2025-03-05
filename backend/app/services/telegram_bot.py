@@ -4,6 +4,7 @@ import os
 import json
 from datetime import datetime
 from .auth import qr_sessions
+from app.db.database import get_raw_connection
 
 class TelegramBot:
     def __init__(self):
@@ -30,22 +31,46 @@ class TelegramBot:
         async def scan_handler(event):
             """Handle QR code scanning"""
             try:
-                # Get session ID from message
-                session_id = event.message.text.split()[1]
-                if session_id not in qr_sessions:
-                    await event.respond('Invalid or expired QR code.')
-                    return
+                # Get token from message
+                token = event.message.text.split()[1]
                 
-                # Get user's Telegram ID
-                sender = await event.get_sender()
-                telegram_id = sender.id
-                
-                # Update session with Telegram ID
-                session = qr_sessions[session_id]
-                session["status"] = "authenticated"
-                session["telegram_id"] = telegram_id
-                
-                await event.respond('Authentication successful! You can now close this chat.')
+                # Get database connection
+                conn = await get_raw_connection()
+                try:
+                    # Get session from database
+                    session = await conn.fetchrow(
+                        """
+                        SELECT * FROM sessions
+                        WHERE token = $1 AND expires_at > NOW()
+                        """,
+                        token
+                    )
+                    
+                    if not session:
+                        await event.respond('Invalid or expired QR code.')
+                        return
+                    
+                    # Get user's Telegram ID
+                    sender = await event.get_sender()
+                    telegram_id = sender.id
+                    
+                    # Update session with Telegram ID and mark as authenticated
+                    await conn.execute(
+                        """
+                        UPDATE sessions
+                        SET status = 'authenticated',
+                            telegram_id = $1,
+                            updated_at = NOW()
+                        WHERE token = $2
+                        """,
+                        telegram_id,
+                        token
+                    )
+                    
+                    await event.respond('Authentication successful! You can now close this chat.')
+                    
+                finally:
+                    await conn.close()
                 
             except Exception as e:
                 await event.respond('Authentication failed. Please try again.')

@@ -8,8 +8,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
 
 export default function Home() {
   const [qrCode, setQrCode] = useState<string>('');
-  const [sessionId, setSessionId] = useState<string>('');
-  const [sessionToken, setSessionToken] = useState<string>('');
+  const [token, setToken] = useState<string>('');
   const [authStatus, setAuthStatus] = useState<string>('pending');
   const [isLoading, setIsLoading] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<number>(Date.now());
@@ -24,8 +23,7 @@ export default function Home() {
       });
       const data = await response.json();
       setQrCode(data.qr_code);
-      setSessionId(data.session_id);
-      setSessionToken(data.token);
+      setToken(data.token);
       setAuthStatus('pending');
       setLastRefresh(Date.now());
       login(data.token, 'pending');
@@ -38,13 +36,13 @@ export default function Home() {
   };
 
   const checkSessionStatus = async () => {
-    if (!sessionId || !sessionToken) return;
+    if (!token) return;
 
     try {
       console.log('Checking session status...');
-      const response = await fetch(`${API_URL}/auth/session/verify?session_id=${sessionId}`, {
+      const response = await fetch(`${API_URL}/auth/session/verify`, {
         headers: {
-          'Authorization': `Bearer ${sessionToken}`
+          'Authorization': `Bearer ${token}`
         }
       });
       
@@ -83,7 +81,7 @@ export default function Home() {
       if (data.status === 'authenticated') {
         console.log('Authentication successful, storing session and redirecting...');
         // If we get a new token in the response, use that instead
-        const finalToken = data.token || sessionToken;
+        const finalToken = data.token || token;
         login(finalToken, 'authenticated');
         router.push('/home');
       }
@@ -95,11 +93,11 @@ export default function Home() {
 
   // Create QR session on initial load or when needed
   useEffect(() => {
-    const shouldCreateSession = !qrCode && !isLoading && !sessionId && !sessionToken;
+    const shouldCreateSession = !qrCode && !isLoading && !token;
     if (shouldCreateSession) {
       createQrSession();
     }
-  }, [qrCode, isLoading, sessionId, sessionToken]); // Add dependencies to re-run when needed
+  }, [qrCode, isLoading, token]); // Add dependencies to re-run when needed
 
   // Refresh QR code every 9 minutes (before the 10-minute expiration)
   useEffect(() => {
@@ -125,7 +123,7 @@ export default function Home() {
   useEffect(() => {
     let intervalId: NodeJS.Timeout | null = null;
     
-    if (sessionId && sessionToken && authStatus === 'pending') {
+    if (token && authStatus === 'pending') {
       intervalId = setInterval(checkSessionStatus, 2000);
     }
     
@@ -134,7 +132,7 @@ export default function Home() {
         clearInterval(intervalId);
       }
     };
-  }, [sessionId, sessionToken, authStatus]);
+  }, [token, authStatus]);
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-between p-24">

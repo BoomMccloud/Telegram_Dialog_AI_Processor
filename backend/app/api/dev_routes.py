@@ -1,8 +1,14 @@
 """
 Development-only API routes that override standard routes with mock data.
 These routes will only work when the APP_ENV is set to 'development'.
+CURRENTLY DISABLED FOR DEBUGGING THE MAIN APP.
 """
 
+# Empty router for now - all development routes are temporarily disabled
+router = APIRouter()
+
+# Keeping the imports commented out for reference
+"""
 from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, HTTPException, Depends, Query, Path, Body
 from fastapi.responses import JSONResponse
@@ -15,29 +21,34 @@ import uuid
 from pathlib import Path
 
 from app.api.dependencies import get_mock_dialogs, get_mock_messages
-from app.models.dialog import Dialog, Message
-from app.services.auth import get_or_load_session, client_sessions
+from app.middleware.session import SessionMiddleware
+from app.services.auth import client_sessions
+from app.api.messages import DialogListResponse, Message, MessageResponse
+"""
 
+# The rest of the implementation is commented out for now while debugging the main app
+"""
 # Setup logging
 logger = logging.getLogger(__name__)
 
-# Only create the router if we're in development mode
-router = APIRouter()
+class SessionStatusResponse(BaseModel):
+    status: str
+    user_id: int
+    expires_at: str
 
-@router.get("/api/dialogs/{session_id}")
-async def dev_list_dialogs(session_id: str):
-    """
-    Development-only route that overrides the standard API with mock data.
-    Returns a list of mock dialogs without requiring a real Telegram client.
-    """
-    # Get session from memory or file storage
-    session = get_or_load_session(session_id)
-    
-    # In development mode, we just need to verify the session exists
-    # We don't need to verify if the client is authorized
-    if not session:
-        logger.warning(f"Invalid or expired session: {session_id}")
-        raise HTTPException(status_code=401, detail="Invalid or expired session")
+class PaginatedMessagesResponse(BaseModel):
+    messages: List[Message]
+    total: int
+    limit: int
+    offset: int
+
+@router.get("/api/dialogs/{token}", response_model=DialogListResponse)
+async def dev_list_dialogs(
+    token: str,
+    session_middleware: SessionMiddleware = Depends()
+):
+    # Validate the session
+    session = await session_middleware.verify_session(token)
     
     # Get mock dialogs
     mock_dialogs = get_mock_dialogs()
@@ -45,25 +56,16 @@ async def dev_list_dialogs(session_id: str):
     # Return the mock dialogs
     return {"dialogs": mock_dialogs}
 
-@router.get("/api/messages/{session_id}")
+@router.get("/api/messages/{token}", response_model=PaginatedMessagesResponse)
 async def dev_list_messages(
-    session_id: str,
+    token: str,
     limit: Optional[int] = Query(20, description="Maximum number of messages to return"),
     offset: Optional[int] = Query(0, description="Number of messages to skip"),
-    dialog_id: Optional[str] = Query(None, description="Filter messages by dialog ID")
+    dialog_id: Optional[str] = Query(None, description="Filter messages by dialog ID"),
+    session_middleware: SessionMiddleware = Depends()
 ):
-    """
-    Development-only route that overrides the standard API with mock data.
-    Returns a list of mock messages without requiring a real Telegram client.
-    """
-    # Get session from memory or file storage
-    session = get_or_load_session(session_id)
-    
-    # In development mode, we just need to verify the session exists
-    # We don't need to verify if the client is authorized
-    if not session:
-        logger.warning(f"Invalid or expired session: {session_id}")
-        raise HTTPException(status_code=401, detail="Invalid or expired session")
+    # Validate the session
+    session = await session_middleware.verify_session(token)
     
     # Get mock messages
     mock_messages = get_mock_messages()
@@ -83,49 +85,42 @@ async def dev_list_messages(
         "offset": offset
     }
 
-# Add more development routes as needed
+@router.get("/api/auth/session/{token}", response_model=SessionStatusResponse)
+async def dev_check_session(
+    token: str,
+    session_middleware: SessionMiddleware = Depends()
+):
+    try:
+        # Validate the session
+        session = await session_middleware.verify_session(token)
+        
+        # Return the actual session status
+        return {
+            "status": session.get("status", "authenticated"),  # Default to authenticated if no status
+            "user_id": session.get("user_id", 12345678),  # Use session user_id or default
+            "expires_at": session.get("expires_at", (datetime.utcnow() + timedelta(hours=24))).isoformat()
+        }
+    except HTTPException as e:
+        if e.status_code == 401:
+            return JSONResponse(
+                status_code=401, 
+                content={"status": "error", "message": "Invalid or expired session"}
+            )
+        raise
 
-# Route for checking session status
-@router.get("/api/auth/session/{session_id}")
-async def dev_check_session(session_id: str):
-    """
-    Development-only route that checks the session status.
-    """
-    # Get session from memory or file storage
-    session = get_or_load_session(session_id)
-    
-    # In development mode, we just need to verify the session exists
-    if not session:
-        logger.warning(f"Invalid or expired session: {session_id}")
-        return JSONResponse(
-            status_code=401, 
-            content={"status": "error", "message": "Invalid or expired session"}
-        )
-    
-    # Return the actual session status
-    return {
-        "status": session.get("status", "pending"),  # Default to pending if no status
-        "user_id": session.get("user_id", 12345678),  # Use session user_id or default
-        "expires_at": session.get("expires_at", (datetime.utcnow() + timedelta(hours=24))).isoformat()
-    }
-
-@router.post("/api/dialogs/{session_id}/select")
+@router.post("/api/dialogs/{token}/select")
 async def dev_select_dialog(
-    session_id: str,
-    dialog: dict = Body(...)
+    token: str,
+    dialog: dict = Body(...),
+    session_middleware: SessionMiddleware = Depends()
 ):
     """
     Development-only route for selecting a dialog for processing.
     This adds the dialog to the user's selected dialogs in the database,
     allowing testing of database persistence without a real Telegram client.
     """
-    # Get session from memory or file storage
-    session = get_or_load_session(session_id)
-    
-    # In development mode, we just need to verify the session exists
-    if not session:
-        logger.warning(f"Invalid or expired session: {session_id}")
-        raise HTTPException(status_code=401, detail="Invalid or expired session")
+    # Validate the session
+    session = await session_middleware.verify_session(token)
     
     # Get user_id from session
     user_id = session.get("user_id", 12345678)  # Default to mock user ID in dev mode
@@ -410,3 +405,4 @@ async def dev_process_dialogs(
         "message": f"Queued {dialog_count} dialogs for processing",
         "processed_dialog_ids": dialog_ids
     } 
+""" 
