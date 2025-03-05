@@ -239,53 +239,176 @@ Next action: Create the new `SessionMiddleware` class in `backend/app/middleware
 ## Implementation Plan
 
 1. **Phase 1: Backend Middleware (Current Focus)**
+
+   a) **Database Schema**
+   ```sql
+   -- Add to backend migrations
+   CREATE TABLE IF NOT EXISTS sessions (
+       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+       user_id INTEGER REFERENCES users(id),
+       status VARCHAR(20) NOT NULL CHECK (status IN ('pending', 'authenticated', 'error', 'expired')),
+       token VARCHAR(500) NOT NULL UNIQUE,
+       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+       expires_at TIMESTAMPTZ NOT NULL,
+       metadata JSONB DEFAULT '{}'::jsonb,
+       
+       -- Indexes for common queries
+       INDEX idx_sessions_token (token),
+       INDEX idx_sessions_user_id (user_id),
+       INDEX idx_sessions_status (status)
+   );
+   ```
+
+   b) **Session Middleware Implementation**
    ```python
    # backend/app/middleware/session.py
+   from fastapi import Request, HTTPException
+   from app.db.database import get_raw_connection
+   
    class SessionMiddleware:
-       def __init__(self):
-           self.secret_key = os.getenv("JWT_SECRET_KEY")
+       def __init__(self, conn=Depends(get_raw_connection)):
+           self.conn = conn
+           self.jwt_secret = os.getenv("JWT_SECRET")
            
-       def create_session(self, user_id: int) -> str:
-           # Create JWT token
+       async def _store_session(self, token: str, user_id: Optional[int] = None) -> dict:
+           """Store session in database"""
+           async with self.conn.transaction():
+               session = await self.conn.fetchrow("""
+                   INSERT INTO sessions (token, user_id, status, expires_at)
+                   VALUES ($1, $2, $3, NOW() + interval '7 days')
+                   RETURNING *
+               """, token, user_id, 'pending')
+               return dict(session)
+               
+       async def verify_session(self, token: str) -> dict:
+           """Verify and return session data"""
+           session = await self.conn.fetchrow("""
+               SELECT * FROM sessions 
+               WHERE token = $1 AND expires_at > NOW()
+           """, token)
            
-       def verify_session(self, token: str) -> Optional[dict]:
-           # Verify JWT token
+           if not session:
+               raise HTTPException(401, "Invalid or expired session")
+               
+           return dict(session)
            
-       async def __call__(self, request: Request, call_next):
-           # Middleware implementation
+       async def update_session(self, token: str, user_id: int) -> dict:
+           """Update session after successful authentication"""
+           session = await self.conn.fetchrow("""
+               UPDATE sessions 
+               SET 
+                   user_id = $1,
+                   status = 'authenticated',
+                   expires_at = NOW() + interval '7 days'
+               WHERE token = $2
+               RETURNING *
+           """, user_id, token)
+           
+           if not session:
+               raise HTTPException(401, "Session not found")
+               
+           return dict(session)
    ```
 
-2. **Phase 2: Frontend Session Context**
+   c) **Session Cleanup Job**
+   ```python
+   # backend/app/services/cleanup.py
+   async def cleanup_expired_sessions():
+       """Clean up expired sessions periodically"""
+       conn = await get_raw_connection()
+       try:
+           await conn.execute("""
+               DELETE FROM sessions 
+               WHERE expires_at < NOW()
+           """)
+       finally:
+           await conn.close()
+   ```
+
+2. **Phase 2: Frontend Session Management**
+
+   a) **Session Types**
    ```typescript
-   // frontend/src/app/SessionContext.tsx
-   interface SessionState {
-     sessionId: string | null;
-     status: 'pending' | 'authenticated' | 'error' | null;
-     lastChecked: Date | null;
+   // frontend/src/types/auth.ts
+   export interface Session {
+     id: string;
+     userId?: number;
+     status: 'pending' | 'authenticated' | 'error' | 'expired';
+     token: string;
+     expiresAt: string;
    }
    
-   export function SessionProvider({ children }) {
-     // Implementation
+   export interface AuthError {
+     code: string;
+     message: string;
    }
    ```
 
-3. **Phase 3: Backend Route Updates**
-   ```python
-   # backend/app/api/auth.py
-   @router.post("/auth/qr")
-   async def create_qr_auth():
-       # Simplified QR login
-       
-   @router.get("/auth/session/{session_id}")
-   async def check_session_status(session_id: str):
-       # Simple session check
+   b) **Session Hook**
+   ```typescript
+   // frontend/src/app/hooks/useSession.ts
+   export function useSession() {
+     const [session, setSession] = useState<Session | null>(null);
+     const router = useRouter();
+     
+     const checkSession = useCallback(async (token: string) => {
+       try {
+         const response = await fetch(`${API_URL}/auth/session/verify`, {
+           headers: { 'Authorization': `Bearer ${token}` }
+         });
+         
+         if (!response.ok) {
+           throw new Error('Session invalid');
+         }
+         
+         const data = await response.json();
+         setSession(data);
+         
+         return data;
+       } catch (err) {
+         localStorage.removeItem('session_token');
+         setSession(null);
+         throw err;
+       }
+     }, []);
+     
+     // ... rest of the implementation
+   }
    ```
 
-4. **Phase 4: Cleanup and Testing**
-   - Remove old session files
-   - Update dependencies
-   - Add tests
-   - Document new system
+3. **Phase 3: Migration Steps**
+
+   a) Create and run database migration
+   b) Implement new SessionMiddleware
+   c) Update frontend to use new session types
+   d) Add session cleanup job to backend startup
+   e) Test all authentication flows
+   f) Remove old file-based session code
+   g) Update documentation
+
+4. **Phase 4: Testing**
+
+   a) **Session Flow Tests**
+   ```python
+   # backend/tests/test_auth.py
+   async def test_session_lifecycle():
+       """Test complete session lifecycle"""
+       # Create session
+       response = await client.post("/api/auth/qr")
+       assert response.status_code == 200
+       session_data = response.json()
+       
+       # Verify pending session
+       response = await client.get(
+           "/api/auth/session/verify",
+           headers={"Authorization": f"Bearer {session_data['token']}"}
+       )
+       assert response.status_code == 200
+       assert response.json()["status"] == "pending"
+       
+       # Test complete auth flow
+       # ... rest of the test implementation
+   ```
 
 ## Next Steps and Action Items
 
