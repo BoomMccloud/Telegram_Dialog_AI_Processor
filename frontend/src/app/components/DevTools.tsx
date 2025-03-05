@@ -36,11 +36,16 @@ export default function DevTools() {
       });
 
       if (!response.ok) {
-        throw new Error('Login failed: ' + await response.text());
+        const errorText = await response.text();
+        console.error('Login failed:', errorText);
+        throw new Error('Login failed: ' + errorText);
       }
 
       const data = await response.json();
-      login(data.access_token, 'authenticated');
+      console.log('Login response:', data);
+      
+      // Store the token and session ID with authenticated status
+      login(data.token, data.session_id, 'authenticated');
       alert('Development login successful!');
     } catch (error) {
       console.error('Login error:', error);

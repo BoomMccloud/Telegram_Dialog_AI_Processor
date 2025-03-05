@@ -138,6 +138,14 @@ If needed, you can further use the `web_scraper.py` file to scrape the web page 
 - For hybrid development environments, run just the database in Docker while keeping the backend and frontend running locally. This approach gives you the benefits of containerized persistence while maintaining fast development cycles. Use `docker-compose up -d postgres` to start only the database service, then run the backend with environment variables set to connect to the containerized database.
 - When switching between development and production modes in a web application, ensure data formats remain consistent. Mock data APIs often have slightly different response formats than real APIs. Always check the response structure in both environments and adjust the backend to maintain format consistency.
 
+## New Lesson
+
+- When setting up test fixtures that configure application state:
+  - Ensure the same state is properly initialized in the production application
+  - Test environment should mirror production setup as closely as possible
+  - Add startup checks to verify required state is properly initialized
+  - Be explicit about dependency initialization and storage
+
 # Multi-Agent Scratchpad
 
 ## Background and Motivation

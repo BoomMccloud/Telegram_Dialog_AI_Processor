@@ -26,7 +26,7 @@ export default function Home() {
       setToken(data.token);
       setAuthStatus('pending');
       setLastRefresh(Date.now());
-      login(data.token, 'pending');
+      login(data.token, data.session_id, 'pending');
     } catch (error) {
       console.error('Error creating QR session:', error);
       setAuthStatus('error');
@@ -82,7 +82,7 @@ export default function Home() {
         console.log('Authentication successful, storing session and redirecting...');
         // If we get a new token in the response, use that instead
         const finalToken = data.token || token;
-        login(finalToken, 'authenticated');
+        login(finalToken, data.session_id, 'authenticated');
         router.push('/home');
       }
     } catch (error) {

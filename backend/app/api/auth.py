@@ -223,6 +223,22 @@ async def dev_login(
         )
         
     try:
+        # Check if user exists, create if not
+        stmt = select(User).where(User.telegram_id == login_data.telegram_id)
+        result = await db.execute(stmt)
+        user = result.scalar_one_or_none()
+        
+        if not user:
+            user = User(
+                telegram_id=login_data.telegram_id,
+                username=f"test_user_{login_data.telegram_id}",
+                first_name="Test",
+                last_name="User"
+            )
+            db.add(user)
+            await db.commit()
+            logger.info(f"Created test user with telegram_id {login_data.telegram_id}")
+        
         session_middleware = request.app.state.session_middleware
         session = await session_middleware.create_session(db=db, telegram_id=login_data.telegram_id)
         

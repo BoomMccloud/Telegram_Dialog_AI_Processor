@@ -53,6 +53,12 @@ async def lifespan(app: FastAPI):
     )
     logger.info(f"Started periodic cleanup task with interval {cleanup_interval} seconds")
     
+    # Initialize session middleware
+    session_middleware = SessionMiddleware(app)
+    
+    # Store instances in app state
+    app.state.session_middleware = session_middleware
+    
     yield
     
     # Clean up background tasks

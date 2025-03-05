@@ -24,7 +24,7 @@ interface SessionContextType {
     loading: boolean;
     error: string | null;
     isAuthenticated: boolean;
-    login: (token: string, sessionId: string) => void;
+    login: (token: string, sessionId: string, status?: 'pending' | 'authenticated') => void;
     logout: () => Promise<void>;
     checkSession: () => Promise<void>;
 }
@@ -70,13 +70,13 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         }
     }, [session?.expires_at]);
 
-    const login = (token: string, sessionId: string) => {
+    const login = (token: string, sessionId: string, status: 'pending' | 'authenticated' = 'pending') => {
         localStorage.setItem('session_token', token);
         localStorage.setItem('session_id', sessionId);
         setSession({
             id: sessionId,
             token,
-            status: 'pending',
+            status,
             expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString() // 10 minutes for QR sessions
         });
         setError(null);
