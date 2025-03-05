@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, status, Depends
 from typing import Dict, List, Optional
 from pydantic import BaseModel
 
-from app.middleware.session import SessionMiddleware
+from app.middleware.session import verify_session_dependency, SessionData
 from app.services.model_processor import (
     get_available_models, select_model_for_user, get_user_model
 )
@@ -34,27 +34,22 @@ async def list_available_models() -> List[Dict]:
         )
 
 
-@router.post("/{token}/select")
+@router.post("/select")
 async def select_model(
-    token: str,
     model_selection: ModelSelection,
-    session_middleware: SessionMiddleware = Depends()
+    session: SessionData = Depends(verify_session_dependency)
 ) -> Dict:
     """
     Select a model for the user
     
     Args:
-        token: The session token of the user
         model_selection: The model to select and optional system prompt
     
     Returns:
         The selected model information
     """
-    # Validate session
-    session = await session_middleware.verify_session(token)
-    
     # Get user_id from session
-    user_id = session.get("user_id")
+    user_id = session.telegram_id
     if not user_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -92,25 +87,18 @@ async def select_model(
         )
 
 
-@router.get("/{token}/selected")
+@router.get("/selected")
 async def get_selected_model(
-    token: str,
-    session_middleware: SessionMiddleware = Depends()
+    session: SessionData = Depends(verify_session_dependency)
 ) -> Dict:
     """
     Get the user's currently selected model
     
-    Args:
-        token: The session token of the user
-    
     Returns:
         The user's selected model information
     """
-    # Validate session
-    session = await session_middleware.verify_session(token)
-    
     # Get user_id from session
-    user_id = session.get("user_id")
+    user_id = session.telegram_id
     if not user_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

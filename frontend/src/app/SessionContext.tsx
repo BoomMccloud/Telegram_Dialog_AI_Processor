@@ -3,11 +3,20 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+export interface User {
+    telegram_id: number;
+    username?: string;
+    first_name?: string;
+    last_name?: string;
+}
+
 export interface Session {
+    id: string;
     token: string;
     status: 'pending' | 'authenticated' | 'error' | 'expired';
     telegram_id?: number;
-    expires_at?: string;
+    expires_at: string;
+    user?: User;
 }
 
 interface SessionContextType {
@@ -15,8 +24,8 @@ interface SessionContextType {
     loading: boolean;
     error: string | null;
     isAuthenticated: boolean;
-    login: (token?: string, status?: string) => void;
-    logout: () => void;
+    login: (token: string, sessionId: string) => void;
+    logout: () => Promise<void>;
     checkSession: () => Promise<void>;
 }
 
@@ -32,29 +41,63 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         const token = localStorage.getItem('session_token');
-        if (token) {
+        const sessionId = localStorage.getItem('session_id');
+        if (token && sessionId) {
             checkSession();
         } else {
             setLoading(false);
         }
 
+        // Check session every minute
         const interval = setInterval(checkSession, 60000);
         return () => clearInterval(interval);
     }, []);
 
-    const login = (token?: string, status: string = 'pending') => {
-        if (token) {
-            localStorage.setItem('session_token', token);
-            setSession({
-                token,
-                status: status as Session['status']
-            });
-            setError(null);
+    // Check if session is expired
+    useEffect(() => {
+        if (session?.expires_at) {
+            const expiresAt = new Date(session.expires_at);
+            const now = new Date();
+            if (expiresAt <= now) {
+                logout();
+            } else {
+                // Set timeout to logout when session expires
+                const timeout = setTimeout(() => {
+                    logout();
+                }, expiresAt.getTime() - now.getTime());
+                return () => clearTimeout(timeout);
+            }
         }
+    }, [session?.expires_at]);
+
+    const login = (token: string, sessionId: string) => {
+        localStorage.setItem('session_token', token);
+        localStorage.setItem('session_id', sessionId);
+        setSession({
+            id: sessionId,
+            token,
+            status: 'pending',
+            expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString() // 10 minutes for QR sessions
+        });
+        setError(null);
     };
 
-    const logout = () => {
+    const logout = async () => {
+        const token = localStorage.getItem('session_token');
+        if (token) {
+            try {
+                await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/logout`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+            } catch (err) {
+                console.error('Logout failed:', err);
+            }
+        }
         localStorage.removeItem('session_token');
+        localStorage.removeItem('session_id');
         setSession(null);
         setError(null);
         router.push('/');
@@ -71,7 +114,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         try {
             setLoading(true);
             const response = await fetch(
-                `${process.env.NEXT_PUBLIC_API_URL}/api/auth/session/verify?token=${token}`,
+                `${process.env.NEXT_PUBLIC_API_URL}/api/auth/session/verify`,
                 {
                     headers: {
                         'Authorization': `Bearer ${token}`
@@ -80,19 +123,27 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
             );
 
             if (!response.ok) {
-                throw new Error('Session invalid');
+                if (response.status === 401) {
+                    throw new Error('Session expired');
+                }
+                throw new Error('Session verification failed');
             }
 
             const data = await response.json();
             setSession({
+                id: localStorage.getItem('session_id') || '',
                 token,
-                ...data
+                status: data.status,
+                telegram_id: data.telegram_id,
+                expires_at: data.expires_at,
+                user: data.user
             });
             setError(null);
 
         } catch (err) {
             console.error('Session check failed:', err);
             localStorage.removeItem('session_token');
+            localStorage.removeItem('session_id');
             setSession(null);
             setError(err instanceof Error ? err.message : 'Session verification failed');
             router.push('/');

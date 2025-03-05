@@ -17,6 +17,7 @@ from .db.database import get_db, DATABASE_URL
 from .db.base import Base
 from .services.background_tasks import BackgroundTaskManager
 from .services.cleanup import run_periodic_cleanup
+from .middleware.session import SessionMiddleware
 
 logger = get_logger(__name__)
 
@@ -71,6 +72,9 @@ app.add_middleware(
     allow_methods=["*"],  # Allows all methods
     allow_headers=["*"],  # Allows all headers
 )
+
+# Add session middleware
+app.add_middleware(SessionMiddleware)
 
 # Include routers
 app.include_router(auth_router)

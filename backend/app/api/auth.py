@@ -12,12 +12,11 @@ from pydantic import BaseModel
 from telethon import TelegramClient
 from pathlib import Path
 
-from ..dependencies.auth import get_session_manager, get_current_session, get_refresh_session
 from ..utils.logging import get_logger
 from ..db.database import get_db
 from ..models.session import Session, SessionStatus
 from ..models.user import User
-from ..services.session_manager import SessionManager
+from ..middleware.session import SessionMiddleware, verify_session_dependency
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -32,32 +31,22 @@ class DevLoginRequest(BaseModel):
     """Request model for development login"""
     telegram_id: int
 
-class TokenResponse(BaseModel):
-    """Response model for token endpoints"""
-    access_token: str
-    refresh_token: str
-    token_type: str = "bearer"
-    expires_in: int
-
 class QRAuthResponse(BaseModel):
     """Response model for QR authentication"""
     session_id: str
     qr_code: str
-    expires_in: int
+    expires_at: str
 
 @router.post("/qr", response_model=QRAuthResponse)
 async def create_qr_auth(
     request: Request,
-    db: AsyncSession = Depends(get_db),
-    session_manager = Depends(get_session_manager)
+    db: AsyncSession = Depends(get_db)
 ):
     """Create a new QR code authentication session"""
     try:
         # Create initial session
-        session = await session_manager.create_session(
-            db=db,
-            device_info={"user_agent": request.headers.get("user-agent")}
-        )
+        session_middleware = request.app.state.session_middleware
+        session = await session_middleware.create_session(db=db, is_qr=True)
         
         # Create Telegram client with session file in sessions directory
         session_file = str(SESSIONS_DIR / f'session_{session.id}')
@@ -88,14 +77,14 @@ async def create_qr_auth(
                 qr_login,
                 str(session.id),
                 db,
-                session_manager
+                session_middleware
             )
         )
         
         return {
             "session_id": str(session.id),
             "qr_code": qr_base64,
-            "expires_in": session_manager.access_token_expire * 60  # Convert to seconds
+            "expires_at": session.expires_at.isoformat()
         }
         
     except Exception as e:
@@ -105,39 +94,18 @@ async def create_qr_auth(
             detail=str(e)
         )
 
-@router.post("/refresh", response_model=TokenResponse)
-async def refresh_token(
-    db: AsyncSession = Depends(get_db),
-    session: Session = Depends(get_refresh_session)
-):
-    """Create new access token using refresh token"""
-    try:
-        session_manager = get_session_manager()
-        new_session = await session_manager.refresh_session(db, session.refresh_token)
-        
-        return {
-            "access_token": new_session.token,
-            "refresh_token": new_session.refresh_token,
-            "token_type": "bearer",
-            "expires_in": session_manager.access_token_expire * 60  # Convert to seconds
-        }
-        
-    except Exception as e:
-        logger.error(f"Token refresh failed: {str(e)}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
-
 @router.post("/logout")
 async def logout(
-    db: AsyncSession = Depends(get_db),
-    session: Session = Depends(get_current_session)
+    request: Request,
+    session: Session = Depends(verify_session_dependency)
 ):
     """Log out and invalidate the current session"""
     try:
-        session_manager = get_session_manager()
-        await session_manager.invalidate_session(db, session.token)
+        # Delete session from database
+        async with request.app.state.db_pool() as db:
+            stmt = delete(Session).where(Session.id == session.id)
+            await db.execute(stmt)
+            await db.commit()
         return {"status": "success"}
         
     except Exception as e:
@@ -149,7 +117,7 @@ async def logout(
 
 @router.get("/session/verify")
 async def verify_session_status(
-    session: Session = Depends(get_current_session),
+    session: Session = Depends(verify_session_dependency),
     db: AsyncSession = Depends(get_db)
 ):
     """Verify session status and return user data if authenticated"""
@@ -180,7 +148,7 @@ async def monitor_qr_login(
     qr_login: Any,
     session_id: str,
     db: AsyncSession,
-    session_manager: SessionManager
+    session_middleware: SessionMiddleware
 ):
     """Monitor QR login process in the background"""
     try:
@@ -192,38 +160,25 @@ async def monitor_qr_login(
             me = await client.get_me()
             telegram_id = me.id
             
-            # Find session
-            stmt = select(Session).where(Session.id == session_id)
-            result = await db.execute(stmt)
-            session = result.scalar_one_or_none()
+            # Update session with user info
+            await session_middleware.update_session(session_id, telegram_id, db)
             
-            if session:
-                # Update session with user info
-                session.telegram_id = telegram_id
-                session.status = SessionStatus.AUTHENTICATED
-                session.session_metadata.update({
-                    "telegram_id": telegram_id,
-                    "username": me.username,
-                    "first_name": me.first_name,
-                    "last_name": me.last_name
-                })
-                
-                # Create or update user
-                stmt = select(User).where(User.telegram_id == telegram_id)
-                result = await db.execute(stmt)
-                user = result.scalar_one_or_none()
-                
-                if not user:
-                    user = User(
-                        telegram_id=telegram_id,
-                        username=me.username,
-                        first_name=me.first_name,
-                        last_name=me.last_name
-                    )
-                    db.add(user)
-                
+            # Create or update user
+            stmt = select(User).where(User.telegram_id == telegram_id)
+            result = await db.execute(stmt)
+            user = result.scalar_one_or_none()
+            
+            if not user:
+                user = User(
+                    telegram_id=telegram_id,
+                    username=me.username,
+                    first_name=me.first_name,
+                    last_name=me.last_name
+                )
+                db.add(user)
                 await db.commit()
-                logger.info(f"Session {session_id} authenticated for user {telegram_id}")
+            
+            logger.info(f"Session {session_id} authenticated for user {telegram_id}")
             
         else:
             logger.warning(f"QR login failed for session {session_id}")
@@ -248,53 +203,38 @@ async def monitor_qr_login(
             await db.commit()
     finally:
         # Clean up client
-        if client:
-            await client.disconnect()
+        await client.disconnect()
+        # Remove session file
+        session_file = SESSIONS_DIR / f'session_{session_id}'
+        if session_file.exists():
+            session_file.unlink()
 
-# Development-only routes
-if os.getenv("APP_ENV") == "development":
-    @router.post("/dev-login", response_model=TokenResponse)
-    async def dev_login(
-        request: Request,
-        login_data: DevLoginRequest,
-        db: AsyncSession = Depends(get_db),
-        session_manager = Depends(get_session_manager)
-    ):
-        """Development-only endpoint to create an authenticated session"""
-        try:
-            # Check if user exists, create if not
-            stmt = select(User).where(User.telegram_id == login_data.telegram_id)
-            result = await db.execute(stmt)
-            user = result.scalar_one_or_none()
-            
-            if not user:
-                user = User(
-                    telegram_id=login_data.telegram_id,
-                    username=f"dev_user_{login_data.telegram_id}",
-                    first_name="Dev",
-                    last_name="User"
-                )
-                db.add(user)
-                await db.commit()
-                logger.info(f"Created development user with telegram_id={login_data.telegram_id}")
-            
-            # Create authenticated session
-            session = await session_manager.create_session(
-                db=db,
-                telegram_id=login_data.telegram_id,
-                device_info={"user_agent": request.headers.get("user-agent")}
-            )
-            
-            return {
-                "access_token": session.token,
-                "refresh_token": session.refresh_token,
-                "token_type": "bearer",
-                "expires_in": session_manager.access_token_expire * 60  # Convert to seconds
-            }
-            
-        except Exception as e:
-            logger.error(f"Development login failed: {str(e)}", exc_info=True)
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=str(e)
-            ) 
+@router.post("/dev-login")
+async def dev_login(
+    request: Request,
+    login_data: DevLoginRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """Development-only endpoint for quick login"""
+    if os.getenv("ENVIRONMENT") != "development":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This endpoint is only available in development mode"
+        )
+        
+    try:
+        session_middleware = request.app.state.session_middleware
+        session = await session_middleware.create_session(db=db, telegram_id=login_data.telegram_id)
+        
+        return {
+            "session_id": str(session.id),
+            "token": session.token,
+            "expires_at": session.expires_at.isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Dev login failed: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        ) 
