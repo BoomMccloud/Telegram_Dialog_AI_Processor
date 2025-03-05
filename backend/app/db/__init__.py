@@ -1,9 +1,6 @@
-from app.db.database import get_db, get_raw_connection
-from app.db.migrations import init_db, check_and_migrate_database
+"""
+Database package initialization
+"""
+from .init_db import run_migrations
 
-__all__ = [
-    "get_db",
-    "get_raw_connection",
-    "init_db",
-    "check_and_migrate_database"
-] 
+__all__ = ['run_migrations'] 

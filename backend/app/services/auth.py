@@ -14,12 +14,15 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict
 import asyncio
 import logging
+from fastapi import Request
+from telethon.tl.custom import QRLogin
+import io
 
 # Configure logging
 logger = logging.getLogger(__name__)
 
-# Store client sessions temporarily (in memory)
-client_sessions: Dict[str, dict] = {}
+# Global storage for client sessions
+client_sessions: Dict[str, Dict] = {}
 
 # Path to store sessions persistently
 # Convert to absolute path to avoid any confusion
@@ -29,15 +32,6 @@ SESSIONS_DIR = os.path.join(BASE_DIR, "sessions", "data")
 print(f"DEBUG: Initializing auth service with SESSIONS_DIR={SESSIONS_DIR}")
 print(f"DEBUG: Checking if directory exists: {os.path.exists(SESSIONS_DIR)}")
 print(f"DEBUG: Checking if directory is writable: {os.access(SESSIONS_DIR, os.W_OK) if os.path.exists(SESSIONS_DIR) else False}")
-
-# Initialize session middleware
-session_middleware = None
-
-def init_session_middleware(middleware):
-    """Initialize the session middleware instance"""
-    global session_middleware
-    session_middleware = middleware
-    logger.info("Session middleware initialized")
 
 def ensure_sessions_dir():
     """
@@ -174,75 +168,53 @@ async def create_telegram_client() -> tuple[TelegramClient, str]:
     
     return client, session_id
 
-async def create_auth_session() -> dict:
-    """Create a new authentication session using Telethon's QR login"""
-    logger.info("Starting QR code authentication session creation")
-    
-    # Check environment variables
-    api_id = os.getenv("TELEGRAM_API_ID")
-    api_hash = os.getenv("TELEGRAM_API_HASH")
-    
-    if not api_id or not api_hash:
-        logger.error("Missing Telegram API credentials")
-        raise ValueError("TELEGRAM_API_ID and TELEGRAM_API_HASH environment variables are required")
-    
-    logger.debug(f"Using Telegram API ID: {api_id}")
-    
+async def create_auth_session() -> Dict:
+    """Create a new QR code authentication session"""
     try:
-        # Create Telegram client
-        logger.info("Creating Telegram client...")
-        client, session_id = await create_telegram_client()
-        logger.info(f"Created Telegram client with session ID: {session_id}")
+        # Get session middleware from app state
+        from ..main import app
+        session_middleware = app.state.session_middleware
         
-        try:
-            # Get the QR code login data from Telethon
-            logger.info("Requesting QR login from Telegram...")
-            qr_login = await client.qr_login()
-            logger.info(f"Created QR login for session {session_id}")
-            
-            # Create a JWT token for the QR session
-            logger.info("Creating JWT token for QR session...")
-            token = await session_middleware.create_session(is_qr=True)
-            
-            # Store client info in memory
-            logger.info("Storing session in memory...")
-            client_sessions[session_id] = {
-                "client": client,
-                "qr_login": qr_login,
-                "token": token,
-                "created_at": datetime.utcnow()
-            }
-            
-            # Generate QR code
-            logger.info("Generating QR code image...")
-            qr = qrcode.QRCode(version=1, box_size=10, border=5)
-            qr.add_data(qr_login.url)
-            qr.make(fit=True)
-            
-            # Create QR code image
-            img = qr.make_image(fill_color="black", back_color="white")
-            buffered = BytesIO()
-            img.save(buffered, format="PNG")
-            qr_code = base64.b64encode(buffered.getvalue()).decode()
-            logger.info("QR code image generated successfully")
-            
-            # Start monitoring the QR login in the background
-            logger.info("Starting QR login monitoring...")
-            asyncio.create_task(monitor_login(client, qr_login, session_id))
-            
-            return {
-                "session_id": session_id,
-                "token": token,
-                "qr_code": qr_code
-            }
-            
-        except Exception as e:
-            logger.error(f"Error during QR login setup: {str(e)}")
-            await client.disconnect()
-            raise
-            
+        # Create initial session token
+        token = await session_middleware.create_session(is_qr=True)
+        
+        # Create Telegram client
+        client = TelegramClient(
+            'anon',
+            api_id=int(os.getenv("TELEGRAM_API_ID")),
+            api_hash=os.getenv("TELEGRAM_API_HASH")
+        )
+        
+        # Connect and get QR login data
+        await client.connect()
+        qr_login = await client.qr_login()
+        
+        # Store session data
+        client_sessions[token] = {
+            "client": client,
+            "qr_login": qr_login,
+            "token": token,
+            "status": "pending"
+        }
+        
+        # Generate QR code
+        qr = qrcode.QRCode()
+        qr.add_data(qr_login.url)
+        qr_image = qr.make_image()
+        
+        # Convert QR image to base64
+        buffered = io.BytesIO()
+        qr_image.save(buffered, format="PNG")
+        qr_base64 = base64.b64encode(buffered.getvalue()).decode()
+        
+        return {
+            "token": token,
+            "qr_code": qr_base64,
+            "status": "pending"
+        }
+        
     except Exception as e:
-        logger.error(f"Failed to create QR login: {str(e)}")
+        logger.error(f"Error creating auth session: {str(e)}", exc_info=True)
         raise
 
 async def monitor_login(client, qr_login, session_id):
@@ -296,23 +268,26 @@ async def monitor_login(client, qr_login, session_id):
             await client_sessions[session_id]["client"].disconnect()
             del client_sessions[session_id]
 
-async def get_session_status(session_id: str) -> Optional[dict]:
-    """Get the current status of a session"""
-    session_data = client_sessions.get(session_id)
-    if not session_data:
-        return None
-        
-    token = session_data["token"]
+async def get_session_status(token: str) -> Optional[Dict]:
+    """Get the status of an authentication session"""
     try:
-        # Get session from database
+        # Get session middleware from app state
+        from ..main import app
+        session_middleware = app.state.session_middleware
+        
+        # Verify session in database
         session = await session_middleware.verify_session(token)
+        if not session:
+            return None
+            
         return {
             "status": session.status,
             "telegram_id": session.telegram_id,
-            "metadata": session.metadata
+            "expires_at": session.expires_at.isoformat()
         }
+        
     except Exception as e:
-        logger.error(f"Error getting session status: {str(e)}")
+        logger.error(f"Error verifying session token: {str(e)}")
         return None
 
 async def cleanup_sessions():

@@ -5,16 +5,16 @@ This module provides a JWT-based session management system with PostgreSQL stora
 for handling user authentication in the FastAPI application.
 """
 
+import json
 import os
 from datetime import datetime, timedelta
-from typing import Dict, Optional, Callable
+from typing import Dict, Optional
 import uuid
 
 import jwt
-from fastapi import HTTPException, Request, status, Depends
+from fastapi import FastAPI, Request, Response, HTTPException, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
-from starlette.types import ASGIApp, Receive, Scope, Send
 
 from app.utils.logging import get_logger
 from app.db.database import get_raw_connection
@@ -34,15 +34,25 @@ class SessionData(BaseModel):
     expires_at: datetime
     metadata: Dict = {}
 
+# List of paths that don't require authentication
+PUBLIC_PATHS = {
+    "/api/auth/qr",
+    "/api/auth/session/verify",
+    "/health",
+    "/docs",
+    "/redoc",
+    "/openapi.json"
+}
+
 class SessionMiddleware:
     """JWT-based session management middleware with PostgreSQL storage"""
     
-    def __init__(self, app: Optional[ASGIApp] = None):
+    def __init__(self, app: Optional[FastAPI] = None):
         """
         Initialize the session middleware with configuration
         
         Args:
-            app: Optional ASGI application
+            app: Optional FastAPI application
         """
         self.app = app
         self.secret_key = os.getenv("JWT_SECRET_KEY", "your-secret-key")  # Default for development
@@ -56,50 +66,37 @@ class SessionMiddleware:
         # Store self in app state if app is provided
         if app and hasattr(app, 'state'):
             app.state.session_middleware = self
-    
-    async def __call__(self, scope: Scope, receive: Receive, send: Send):
-        """
-        ASGI middleware implementation
-        
-        Args:
-            scope: The ASGI connection scope
-            receive: The ASGI receive function
-            send: The ASGI send function
-        """
-        if not self.app:
-            raise RuntimeError("SessionMiddleware requires an ASGI application when used as middleware")
             
-        if scope["type"] != "http":
-            await self.app(scope, receive, send)
-            return
-
-        # Add middleware instance to scope for access in endpoints
-        scope["session_middleware"] = self
-        
-        # Skip auth for non-protected routes
-        path = scope.get("path", "")
-        if path in ["/api/auth/qr", "/api/auth/session", "/health"]:
-            await self.app(scope, receive, send)
-            return
-            
-        # Get token from headers
-        headers = dict(scope.get("headers", []))
-        auth_header = headers.get(b"authorization", b"").decode()
-        
-        if auth_header.startswith("Bearer "):
-            token = auth_header.split(" ")[1]
-            try:
-                # Verify the session
-                session = await self.verify_session(token)
-                # Add session data to scope
-                scope["session"] = session
-            except Exception as e:
-                logger.warning(f"Session verification failed: {str(e)}")
-                # Continue without session for error handling in the route
-                pass
-        
-        # Continue processing the request
-        await self.app(scope, receive, send)
+            # Add middleware to FastAPI app
+            @app.middleware("http")
+            async def session_middleware(request: Request, call_next):
+                # Skip auth for public routes
+                if request.url.path in PUBLIC_PATHS:
+                    return await call_next(request)
+                
+                # Get token from headers
+                auth_header = request.headers.get("authorization", "")
+                if auth_header.startswith("Bearer "):
+                    token = auth_header.split(" ")[1]
+                    try:
+                        # Verify the session
+                        session = await self.verify_session(token)
+                        # Add session data to request state
+                        request.state.session = session
+                    except Exception as e:
+                        logger.warning(f"Session verification failed: {str(e)}")
+                        raise HTTPException(
+                            status_code=status.HTTP_401_UNAUTHORIZED,
+                            detail="Invalid or expired session"
+                        )
+                else:
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="Authorization header required"
+                    )
+                
+                response = await call_next(request)
+                return response
     
     async def create_session(self, telegram_id: Optional[int] = None, is_qr: bool = False) -> str:
         """
@@ -113,11 +110,14 @@ class SessionMiddleware:
             JWT token string
         """
         try:
+            logger.debug(f"Creating session: telegram_id={telegram_id}, is_qr={is_qr}")
+            
             # Set expiration time based on session type
             expires_at = datetime.utcnow() + (
                 timedelta(minutes=self.qr_token_expire_minutes) if is_qr 
                 else timedelta(minutes=self.access_token_expire_minutes)
             )
+            logger.debug(f"Session will expire at: {expires_at}")
             
             # Create token payload
             payload = {
@@ -127,6 +127,7 @@ class SessionMiddleware:
                 "iat": datetime.utcnow(),
                 "is_qr": is_qr
             }
+            logger.debug(f"Created JWT payload: {payload}")
             
             # Create JWT token
             token = jwt.encode(
@@ -134,9 +135,12 @@ class SessionMiddleware:
                 self.secret_key,
                 algorithm=self.algorithm
             )
+            logger.debug("JWT token created successfully")
             
             # Store session in database
-            async with await get_raw_connection() as conn:
+            logger.debug("Storing session in database...")
+            conn = await get_raw_connection()
+            try:
                 session = await conn.fetchrow("""
                     INSERT INTO sessions (
                         telegram_id, status, token, expires_at, 
@@ -149,14 +153,17 @@ class SessionMiddleware:
                 'pending' if is_qr else 'authenticated',
                 token,
                 expires_at,
-                {'is_qr': is_qr}
+                json.dumps({'is_qr': is_qr})  # Convert metadata to JSON string
                 )
-            
-            logger.debug(f"Created session token for user {telegram_id} (QR: {is_qr})")
-            return token
+                logger.debug("Session stored in database successfully")
+                
+                logger.info(f"Created session token for user {telegram_id} (QR: {is_qr})")
+                return token
+            finally:
+                await conn.close()
             
         except Exception as e:
-            logger.error(f"Error creating session token: {str(e)}")
+            logger.error(f"Error creating session token: {str(e)}", exc_info=True)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Failed to create session: {str(e)}"
@@ -198,7 +205,8 @@ class SessionMiddleware:
                 )
                 
             # Then verify session in database
-            async with await get_raw_connection() as conn:
+            conn = await get_raw_connection()
+            try:
                 session = await conn.fetchrow("""
                     SELECT * FROM sessions 
                     WHERE token = $1 
@@ -214,6 +222,8 @@ class SessionMiddleware:
                     
                 # Convert to SessionData model
                 return SessionData(**dict(session))
+            finally:
+                await conn.close()
             
         except HTTPException:
             raise
@@ -251,9 +261,10 @@ class SessionMiddleware:
                 algorithm=self.algorithm
             )
             
-            # Update database
-            async with await get_raw_connection() as conn:
-                session = await conn.fetchrow("""
+            # Update session in database
+            conn = await get_raw_connection()
+            try:
+                await conn.execute("""
                     UPDATE sessions 
                     SET 
                         telegram_id = COALESCE($1, telegram_id),
@@ -262,7 +273,6 @@ class SessionMiddleware:
                         expires_at = COALESCE($4, expires_at),
                         metadata = COALESCE($5, metadata)
                     WHERE token = $6
-                    RETURNING *
                 """,
                 updates.get('telegram_id'),
                 updates.get('status'),
@@ -272,17 +282,11 @@ class SessionMiddleware:
                 token
                 )
                 
-                if not session:
-                    raise HTTPException(
-                        status_code=status.HTTP_404_NOT_FOUND,
-                        detail="Session not found"
-                    )
+                logger.debug(f"Updated session for user {current_session.telegram_id}")
+                return new_token
+            finally:
+                await conn.close()
             
-            logger.info(f"Updated session for user {session['telegram_id']}")
-            return new_token
-            
-        except HTTPException:
-            raise
         except Exception as e:
             logger.error(f"Error updating session: {str(e)}")
             raise HTTPException(
@@ -291,18 +295,68 @@ class SessionMiddleware:
             )
     
     async def cleanup_expired_sessions(self):
-        """Clean up expired sessions from database"""
+        """Clean up expired sessions from the database"""
         try:
-            async with await get_raw_connection() as conn:
-                await conn.execute("""
-                    UPDATE sessions 
-                    SET status = 'expired'
-                    WHERE (expires_at < NOW() OR status = 'pending')
-                      AND status != 'expired'
+            conn = await get_raw_connection()
+            try:
+                result = await conn.execute("""
+                    DELETE FROM sessions 
+                    WHERE expires_at < NOW() 
+                      OR status = 'expired'
                 """)
-                
-            logger.info("Cleaned up expired sessions")
-            
+                logger.info(f"Cleaned up expired sessions: {result}")
+            finally:
+                await conn.close()
         except Exception as e:
-            logger.error(f"Error cleaning up sessions: {str(e)}")
-            # Don't raise exception as this is a background task 
+            logger.error(f"Error cleaning up sessions: {str(e)}") 
+
+async def verify_session_dependency(
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+) -> SessionData:
+    """
+    FastAPI dependency for verifying session in route handlers
+    
+    Args:
+        request: FastAPI request object
+        credentials: Optional HTTP authorization credentials
+        
+    Returns:
+        The session data if valid
+        
+    Raises:
+        HTTPException: If session is missing or invalid
+    """
+    if not credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authorization header required"
+        )
+    
+    try:
+        session_middleware = request.app.state.session_middleware
+        session = await session_middleware.verify_session(credentials.credentials)
+        return session
+    except Exception as e:
+        logger.warning(f"Session verification failed: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired session"
+        )
+
+async def admin_only(session: SessionData = Depends(verify_session_dependency)) -> SessionData:
+    """
+    Verify that the user has admin privileges
+    
+    Args:
+        session: Session data from verify_session dependency
+        
+    Returns:
+        The session data if valid
+        
+    Raises:
+        HTTPException: If user is not an admin
+    """
+    # This is a placeholder for future admin validation
+    # For now, just return the session
+    return session 
