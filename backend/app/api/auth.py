@@ -47,12 +47,13 @@ async def dev_login(
         session_middleware = request.app.state.session_middleware
         
         # Create authenticated session
-        session_data = await session_middleware.create_session(telegram_id=login_data.telegram_id)
+        session_data = await session_middleware.create_session(db=db, telegram_id=login_data.telegram_id)
         
         # Update session to authenticated state
         session_data = await session_middleware.update_session(
             session_data.token,
-            login_data.telegram_id
+            login_data.telegram_id,
+            db=db
         )
         
         logger.info(f"Development login successful for Telegram ID: {login_data.telegram_id}")

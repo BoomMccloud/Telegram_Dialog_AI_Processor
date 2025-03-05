@@ -64,13 +64,13 @@ class SessionMiddleware:
         self.qr_token_expire_minutes = 10  # 10 minutes for QR code sessions
         logger.info("Session middleware initialized with SQLAlchemy ORM")
 
-    async def create_session(self, telegram_id: Optional[int] = None, is_qr: bool = False, db: AsyncSession = Depends(get_db)) -> Session:
+    async def create_session(self, db: AsyncSession, telegram_id: Optional[int] = None, is_qr: bool = False) -> Session:
         """Create and store session in database using ORM
         
         Args:
+            db: SQLAlchemy AsyncSession
             telegram_id: Optional Telegram user ID for pre-authenticated sessions
             is_qr: Whether this is a QR code authentication session
-            db: SQLAlchemy AsyncSession
             
         Returns:
             The created session object
@@ -110,10 +110,10 @@ class SessionMiddleware:
             
         return session
            
-    async def update_session(self, token: str, telegram_id: int) -> Session:
+    async def update_session(self, token: str, telegram_id: int, db: AsyncSession) -> Session:
         """Update session after successful authentication using ORM"""
         stmt = select(Session).where(Session.token == token)
-        result = await self.db.execute(stmt)
+        result = await db.execute(stmt)
         session = result.scalar_one_or_none()
         
         if not session:
@@ -123,8 +123,8 @@ class SessionMiddleware:
         session.status = SessionStatus.AUTHENTICATED
         session.expires_at = datetime.utcnow() + timedelta(days=7)
         
-        await self.db.commit()
-        await self.db.refresh(session)
+        await db.commit()
+        await db.refresh(session)
         return session
         
     async def cleanup_expired_sessions(self):
