@@ -156,239 +156,153 @@ The system is designed to help users efficiently manage Telegram conversations b
 
 ## Key Challenges and Analysis
 
-1. Claude API Integration Challenges:
-   - Adapting existing processing pipeline to use Claude API
-   - Optimizing prompt formatting for Claude's capabilities
-   - Implementing proper rate limiting and error handling
-   - Managing API costs and token usage efficiently
+Current Issue: Session management logic is scattered across multiple places, making it hard to maintain and debug. We need to refactor the session management system to follow a cleaner architecture.
 
-2. Background Processing Challenges:
-   - Implementing resilient message queue processing
-   - Handling periodic data fetching without overloading resources
-   - Ensuring proper transaction management and error recovery
-   - Managing concurrency with multiple users and dialogs
+1. **Current Problems**:
+   - Session logic is duplicated across frontend, backend, and middleware
+   - File-based session storage adds unnecessary complexity
+   - Multiple expiration checks causing inconsistent behavior
+   - Unclear separation of concerns between components
 
-3. User Experience Considerations:
-   - Designing an intuitive response review interface
-   - Minimizing latency in message processing workflow
-   - Providing clear feedback on processing status
-   - Balancing automation with user control
+2. **Proposed Architecture**:
+   - Frontend: Handles session state and periodic checks
+   - Middleware: Centralizes session validation
+   - Backend: Focuses only on business logic
+   - JWT-based sessions for stateless operation
 
-4. Security and Data Management:
-   - Secure handling of Telegram authentication credentials
-   - Protecting user data and message content
-   - Implementing proper access controls
-   - Ensuring data consistency across system components
+3. **Security Considerations**:
+   - JWT tokens with proper expiration
+   - Secure token storage in frontend
+   - Clear session invalidation process
+   - Protection against token tampering
 
 ## High-level Task Breakdown
 
-1. Claude Integration (In Progress):
-   - Implement `ClaudeProcessor` class adapting the existing architecture
-   - Set up authentication with Claude API using environment variables
-   - Optimize prompt formatting and context management for Claude
-   - Implement proper error handling and rate limiting
+1. **Backend Middleware Implementation**:
+   - Create new `SessionMiddleware` class
+   - Implement JWT-based session management
+   - Add session validation logic
+   - Remove file-based session storage
 
-2. Message Processing System:
-   - Create API endpoints for triggering message processing
-   - Implement background task system for queue management
-   - Set up periodic data fetching from selected Telegram dialogs
-   - Develop status tracking for processing tasks
+2. **Frontend Session Management**:
+   - Update `SessionContext` with new state management
+   - Implement periodic session checks
+   - Add proper error handling
+   - Update QR code login flow
 
-3. Response Management:
-   - Implement endpoints for retrieving processed responses
-   - Create API for approving, rejecting, or modifying responses
-   - Develop storage system for tracking response status
-   - Implement optional automatic response sending
+3. **Backend Route Cleanup**:
+   - Simplify auth routes to remove session management
+   - Update QR login endpoint
+   - Remove unnecessary session endpoints
+   - Add proper error responses
 
-4. Frontend Components:
-   - Build response review interface
-   - Create model configuration UI
-   - Implement processing status indicators
-   - Develop notification system for new responses
-
-5. Testing and Deployment:
-   - Conduct end-to-end testing with real data
-   - Optimize performance for concurrent users
-   - Finalize Docker configuration for production deployment
-   - Set up monitoring and logging
-
-## Development Workflow
-
-1. Local Development:
-   - Prerequisites: Docker, Node.js, Python
-   - Setup steps for development environment
-
-2. Git Workflow:
-   - Branch naming conventions and PR requirements
-
-3. CI/CD Pipeline:
-   - Testing and deployment automation
+4. **Testing and Validation**:
+   - Test session creation flow
+   - Verify expiration handling
+   - Check error scenarios
+   - Validate security measures
 
 ## Current Status / Progress Tracking
 
-Status: MVP Implementation In Progress
-
-Completed:
-1. Backend (FastAPI):
-   - Project structure set up
-   - Basic FastAPI application created
-   - Telethon QR login implementation complete and working
-   - Authentication endpoints created and tested
-   - CORS configuration added
-   - Message retrieval functionality implemented
-   - Dialog listing functionality implemented
-   - API endpoints for selecting and unselecting dialogs implemented and tested
-   - Database storage for user selected dialogs operational
-   - Database schema extended with `user_selected_models` and `processed_responses` tables
-   - Model selection API endpoints implemented and tested
-   - Data migration system implemented for schema updates
-   - **Session management and middleware issues fixed**
-
-2. Frontend (Next.js):
-   - Project created with Next.js 14, TypeScript, and Tailwind CSS
-   - Login page implemented with QR code display
-   - Authentication status polling implemented 
-   - Environment configuration set up
-   - Messages page implemented showing chat dialogs
-   - Chat selection and filtering UI implemented
-   - Dialog selection UI with visual indicators for processing status
-   - Start/Stop processing functionality working correctly with API integration
-   - Success/error message handling implemented for processing operations
-
-3. Docker Setup:
-   - Docker Compose configuration complete with:
-     - PostgreSQL database
-     - FastAPI backend
-     - Next.js frontend
-   - Proper service dependencies and health checks configured
-   - Environment variable configuration implemented
-   - Database initialization and migration scripts integrated
-
-4. Design Improvements:
-   - Simplified model and system prompt management:
-     - Moved system_prompt from dialog-level to user-level
-     - Implemented centralized model selection for all dialogs
-     - Created migration script for existing data
-   - Improved API structure with dedicated routers for different resources
-   - Enhanced development environment with hybrid Docker/local setup
-
-In Progress:
-1. Claude LLM Integration:
-   - Implementing ClaudeProcessor class for MVP
-   - Adapting existing dialog processing code to use Claude API
-   - Setting up proper error handling and rate limiting
+Status: Session Management Refactoring In Progress
 
 Next Steps:
-1. **Focus on finalizing Claude API integration**:
-   - Ensure prompt formatting and response handling are optimized for Claude
-   - Complete configuration of environment variables for API access
-   - Implement and test rate limiting and error handling
+1. **Create New Session Middleware**:
+   - Create `backend/app/middleware/session.py`
+   - Implement JWT-based session management
+   - Add session validation middleware
+   - Update FastAPI app to use new middleware
 
-2. **Complete API endpoints for message processing and response retrieval**
-3. **Implement background processing queue for message handling**
-4. **Develop periodic data fetching from selected dialogs**
-5. **Create frontend UI for response review**
-6. **Test end-to-end workflow with Claude integration**
+2. **Update Frontend Session Context**:
+   - Modify `frontend/src/app/SessionContext.tsx`
+   - Implement new session state management
+   - Add periodic session checks
+   - Update error handling
 
-## MVP Development Focus
+3. **Clean Up Backend Routes**:
+   - Update `backend/app/api/auth.py`
+   - Remove file-based session code
+   - Simplify QR login endpoint
+   - Update session status endpoint
 
-1. Core Features for MVP:
-   - Implement Telethon's direct client QR code-based Telegram login in FastAPI ✅
-   - Set up message retrieval from Telegram using Telethon ✅
-   - Store user preferences in the database ✅
-   - Process messages using the Claude model
-   - Display messages and responses on the frontend
-   - Allow users to review, approve, or reject AI-generated responses
-
-2. Next Steps and Action Items for MVP:
-   - **End-to-End MVP Implementation:**
-     - **Objective:** Implement a Telegram Dialog AI Processor using Claude LLM.
-     - **Current Focus:**
-       - Implement `ClaudeProcessor` class for the MVP
-       - Create API endpoints for message processing and response retrieval
-       - Develop background task system for periodic message fetching
-       - Build frontend UI for response review
-
-     - **Immediate Action Items:**
-       - Complete the Claude API integration
-       - Implement message queue processing system
-       - Create the response review API endpoints
-       - Test the end-to-end workflow with real data
+4. **Remove Legacy Code**:
+   - Remove file-based session storage
+   - Clean up unused session functions
+   - Update dependencies
 
 ## Executor's Feedback or Assistance Requests
 
-### Current Status - Claude Integration
+Ready to begin implementation of the new session management system. Will start with the backend middleware as it's the foundation for the new architecture.
 
-I'm currently working on implementing the Claude integration for the MVP. The implementation includes:
+Next action: Create the new `SessionMiddleware` class in `backend/app/middleware/session.py`.
 
-1. **ClaudeProcessor Class**:
-   - Creating a new service that adapts the existing DialogProcessor pattern for Claude
-   - Setting up connection to the Claude API using authentication from environment variables
-   - Implementing Claude-specific prompt formatting and response handling
+## Implementation Plan
 
-2. **API Endpoints**:
-   - Adding endpoints for processing messages with Claude
-   - Creating endpoints for retrieving and managing processed responses
-   - Implementing status tracking for background processing tasks
-
-3. **Background Processing**:
-   - Setting up a message processing queue worker
-   - Implementing periodic data fetching from selected dialogs
-   - Creating a background task monitoring system
-
-4. **Frontend Components** (Next Steps):
-   - Designing the response review interface
-   - Creating UI components for model configuration
-   - Implementing background task status indicators
-
-These components will complete the end-to-end MVP implementation, allowing users to process Telegram messages with Claude and review the generated responses through the web interface.
-
-### Critical Backend Error - Missing Middleware Module
-
-I've identified a critical error in the backend application:
-
-```
-ModuleNotFoundError: No module named 'app.middleware'
-```
-
-The error occurs because the backend is trying to import `verify_session` from `.middleware.session_middleware`, but the middleware module doesn't exist. This needs to be fixed before we can proceed with the implementation.
-
-**Resolution Steps:**
-1. Create the middleware directory structure in the backend:
+1. **Phase 1: Backend Middleware (Current Focus)**
+   ```python
+   # backend/app/middleware/session.py
+   class SessionMiddleware:
+       def __init__(self):
+           self.secret_key = os.getenv("JWT_SECRET_KEY")
+           
+       def create_session(self, user_id: int) -> str:
+           # Create JWT token
+           
+       def verify_session(self, token: str) -> Optional[dict]:
+           # Verify JWT token
+           
+       async def __call__(self, request: Request, call_next):
+           # Middleware implementation
    ```
-   backend/app/middleware/
+
+2. **Phase 2: Frontend Session Context**
+   ```typescript
+   // frontend/src/app/SessionContext.tsx
+   interface SessionState {
+     sessionId: string | null;
+     status: 'pending' | 'authenticated' | 'error' | null;
+     lastChecked: Date | null;
+   }
+   
+   export function SessionProvider({ children }) {
+     // Implementation
+   }
    ```
-2. Create a session middleware file:
+
+3. **Phase 3: Backend Route Updates**
+   ```python
+   # backend/app/api/auth.py
+   @router.post("/auth/qr")
+   async def create_qr_auth():
+       # Simplified QR login
+       
+   @router.get("/auth/session/{session_id}")
+   async def check_session_status(session_id: str):
+       # Simple session check
    ```
-   backend/app/middleware/session_middleware.py
-   ```
-3. Implement the `verify_session` function to handle session validation
 
-This is a blocking issue that must be addressed before we can continue with the Claude integration implementation.
+4. **Phase 4: Cleanup and Testing**
+   - Remove old session files
+   - Update dependencies
+   - Add tests
+   - Document new system
 
-**Status Update**: This issue has been resolved. The middleware module has been created and the session validation functionality is now working properly.
+## Next Steps and Action Items
 
-### Progress Update - March 2023
+1. **Immediate Actions**:
+   - Create new `session.py` middleware file
+   - Implement JWT token handling
+   - Add environment variables for JWT secret
+   - Update FastAPI app configuration
 
-**Completed Tasks:**
-1. ✅ Successfully implemented the `ClaudeProcessor` class to use Anthropic's Claude API
-2. ✅ Created a comprehensive responses API for managing AI-generated responses
-3. ✅ Integrated the responses router into the main FastAPI application
-4. ✅ Implemented session middleware for API endpoint security
-5. ✅ Updated the models router to support Claude model selection
-6. ✅ Implemented a background processing queue system for message handling
-7. ✅ Created an API for managing message processing tasks
+2. **Following Steps**:
+   - Update frontend session context
+   - Modify QR login flow
+   - Remove file-based session code
+   - Add comprehensive testing
 
-**Verified Configurations:**
-1. ✅ API endpoints are properly structured with correct route prefixes
-2. ✅ Authentication verification is working on all protected endpoints
-3. ✅ Response management includes proper status tracking (pending, approved, rejected, etc.)
-4. ✅ Database schema supports storing Claude-generated responses and metadata
-5. ✅ Queue system properly manages background tasks for processing messages
-
-**Next Steps:**
-1. Create frontend components for response review
-2. Set up periodic message fetching from selected dialogs
-3. Perform end-to-end testing with the Claude integration
-4. Optimize prompt formatting for Claude's capabilities
-5. Implement monitoring dashboard for queue processing
+3. **Final Phase**:
+   - Documentation updates
+   - Security review
+   - Performance testing
+   - Deployment preparation

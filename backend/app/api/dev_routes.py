@@ -102,9 +102,9 @@ async def dev_check_session(session_id: str):
             content={"status": "error", "message": "Invalid or expired session"}
         )
     
-    # Return success with mocked user data for development
+    # Return the actual session status
     return {
-        "status": "authenticated",
+        "status": session.get("status", "pending"),  # Default to pending if no status
         "user_id": session.get("user_id", 12345678),  # Use session user_id or default
         "expires_at": session.get("expires_at", (datetime.utcnow() + timedelta(hours=24))).isoformat()
     }

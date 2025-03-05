@@ -232,11 +232,11 @@ async def create_auth_session() -> dict:
         qr_login = await client.qr_login()
         print(f"Created QR login for session {session_id}")  # Debug log
         
-        # Store session info with a longer timeout (5 minutes)
+        # Store session info with a longer timeout (10 minutes)
         session_data = {
             "client": client,
             "created_at": datetime.utcnow(),
-            "expires_at": datetime.utcnow() + timedelta(minutes=5),
+            "expires_at": datetime.utcnow() + timedelta(minutes=10),
             "status": "pending",
             "user_id": None,
             "qr_login": qr_login
@@ -319,26 +319,8 @@ async def get_session_status(session_id: str) -> Optional[dict]:
     
     client = session.get("client")
     
-    # Check if session has expired
-    if datetime.utcnow() > session["expires_at"]:
-        print(f"Session {session_id} has expired")  # Debug log
-        if client:
-            await client.disconnect()
-        client_sessions.pop(session_id, None)
-        delete_session_file(session_id)
-        return {"status": "expired", "message": "Session has expired. Please request a new QR code."}
-    
-    # Check if client is still connected
-    if client and not client.is_connected():
-        print(f"Reconnecting client for session {session_id}")  # Debug log
-        try:
-            await client.connect()
-            print(f"Client reconnected for session {session_id}")  # Debug log
-        except Exception as e:
-            print(f"Error reconnecting client for session {session_id}: {str(e)}")  # Debug log
-            return {"status": "error", "message": "Failed to reconnect client"}
-    
-    # Return current session status
+    # Return current session status without checking expiration again
+    # since get_or_load_session already handles expiration checks
     print(f"Returning status for session {session_id}: {session['status']}")  # Debug log
     return {
         "status": session["status"],

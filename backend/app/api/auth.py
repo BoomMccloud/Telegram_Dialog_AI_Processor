@@ -1,11 +1,14 @@
 from fastapi import APIRouter, HTTPException, status
-from ..services.auth import create_auth_session, get_session_status, get_or_load_session, client_sessions, save_session_to_file, SESSIONS_DIR
+from ..services.auth import create_auth_session, get_session_status, get_or_load_session, client_sessions, save_session_to_file, SESSIONS_DIR, delete_session_file
 from typing import Dict, Optional
 from datetime import datetime, timedelta
 import os
 import json
+import logging
 
 router = APIRouter()
+
+logger = logging.getLogger(__name__)
 
 @router.post("/auth/qr")
 async def create_qr_auth():
@@ -21,7 +24,7 @@ async def check_session_status(session_id: str):
     """Check the status of an authentication session"""
     status = await get_session_status(session_id)
     if not status:
-        raise HTTPException(status_code=404, detail="Session not found or expired")
+        raise HTTPException(status_code=404, detail="Session not found")
     return status
 
 @router.post("/auth/session/{session_id}/refresh")
@@ -87,8 +90,8 @@ async def force_create_session(session_id: str) -> Dict:
     new_session = {
         "created_at": datetime.utcnow(),
         "expires_at": datetime.utcnow() + timedelta(hours=24),
-        "status": "authenticated",
-        "user_id": 12345678,  # Mock user ID
+        "status": "pending",  # Start as pending, require explicit authentication
+        "user_id": None,  # No user ID until authenticated
         "client": None
     }
     
@@ -128,6 +131,53 @@ async def force_create_session(session_id: str) -> Dict:
             "sessions_dir": SESSIONS_DIR,
             "app_env": os.getenv("APP_ENV", "development")
         }
+    }
+
+@router.post("/auth/force-session/{session_id}/authenticate")
+async def force_authenticate_session(session_id: str) -> Dict:
+    """
+    FOR DEVELOPMENT USE ONLY: Authenticate an existing session.
+    This is useful when developing to simulate Telegram authentication.
+    
+    WARNING: This should be disabled in production.
+    
+    Args:
+        session_id: The session ID to authenticate
+        
+    Returns:
+        Updated session information
+    """
+    # Only allow in development mode
+    if os.getenv("APP_ENV", "development").lower() in ["production", "prod"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This endpoint is only available in development mode"
+        )
+    
+    # Get the existing session
+    session = get_or_load_session(session_id)
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found"
+        )
+    
+    # Update session to authenticated state
+    session.update({
+        "status": "authenticated",
+        "user_id": 12345678,  # Mock user ID for development
+        "expires_at": datetime.utcnow() + timedelta(hours=24)
+    })
+    
+    # Save updated session
+    client_sessions[session_id] = session
+    save_session_to_file(session_id, session)
+    
+    return {
+        "status": "success",
+        "message": "Session authenticated successfully",
+        "session_id": session_id,
+        "expires_at": session["expires_at"].isoformat()
     }
 
 @router.get("/auth/sessions")
@@ -479,4 +529,43 @@ async def cleanup_stale_sessions():
         "total_sessions_removed": total_removed,
         "cleanup_details": cleanup_results,
         "message": f"Session cleanup complete. Removed {total_removed} stale or expired sessions."
-    } 
+    }
+
+@router.post("/auth/logout/{session_id}")
+async def logout_session(session_id: str):
+    """
+    Explicitly log out a session and clean up all associated resources.
+    This endpoint handles both active and inactive sessions.
+    """
+    try:
+        # Get the session
+        session = get_or_load_session(session_id)
+        if session:
+            # Disconnect the Telegram client if it exists
+            if session.get("client"):
+                try:
+                    await session["client"].disconnect()
+                except Exception as e:
+                    logger.error(f"Error disconnecting client for session {session_id}: {e}")
+
+            # Remove from in-memory storage
+            client_sessions.pop(session_id, None)
+            
+            # Remove session file
+            delete_session_file(session_id)
+            
+            # Remove Telethon session file if it exists
+            telethon_session_file = os.path.join(os.path.dirname(SESSIONS_DIR), f"{session_id}.session")
+            if os.path.exists(telethon_session_file):
+                try:
+                    os.remove(telethon_session_file)
+                except Exception as e:
+                    logger.error(f"Error removing Telethon session file: {e}")
+
+        return {"status": "success", "message": "Session logged out successfully"}
+    except Exception as e:
+        logger.error(f"Error during logout for session {session_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error during logout: {str(e)}"
+        ) 

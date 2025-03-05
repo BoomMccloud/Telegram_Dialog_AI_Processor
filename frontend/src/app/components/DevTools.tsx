@@ -3,9 +3,12 @@
 import { useState, useEffect } from 'react';
 import { useSession } from '../SessionContext';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+
 export default function DevTools() {
   const [isVisible, setIsVisible] = useState(false);
   const [mockSessionId, setMockSessionId] = useState('');
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
   const { sessionId, login, logout } = useSession();
   
   // Only show in development mode
@@ -41,6 +44,44 @@ export default function DevTools() {
       alert(`API Test Result: ${JSON.stringify(data)}`);
     } catch (e) {
       alert(`API Test Error: ${e}`);
+    }
+  };
+
+  const authenticateSession = async () => {
+    if (!sessionId) {
+      alert('No active session to authenticate');
+      return;
+    }
+
+    setIsAuthenticating(true);
+    try {
+      // Call the force-session/authenticate endpoint to authenticate the current session
+      const response = await fetch(`${API_URL}/auth/force-session/${sessionId}/authenticate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(error);
+      }
+
+      const data = await response.json();
+      if (data.status === 'success') {
+        alert('Session authenticated successfully!');
+        // Re-login with the same session ID to refresh the frontend state
+        login(sessionId);
+      } else {
+        throw new Error('Failed to authenticate session');
+      }
+    } catch (error) {
+      console.error('Error authenticating session:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Failed to authenticate session: ${errorMessage}`);
+    } finally {
+      setIsAuthenticating(false);
     }
   };
 
@@ -89,6 +130,18 @@ export default function DevTools() {
             className="bg-green-600 hover:bg-green-700 px-2 py-1 rounded text-xs"
           >
             Test API
+          </button>
+
+          <button
+            onClick={authenticateSession}
+            disabled={!sessionId || isAuthenticating}
+            className={`col-span-2 ${
+              isAuthenticating 
+                ? 'bg-yellow-600 cursor-wait' 
+                : 'bg-purple-600 hover:bg-purple-700'
+            } px-2 py-1 rounded text-xs`}
+          >
+            {isAuthenticating ? 'Authenticating...' : 'Authenticate Session'}
           </button>
         </div>
       </div>

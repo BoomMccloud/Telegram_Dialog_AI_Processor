@@ -9,7 +9,7 @@ interface SessionContextType {
   sessionId: string | null;
   status: SessionStatus;
   isAuthenticated: boolean;
-  login: (sessionId: string) => void;
+  login: (sessionId: string, initialStatus?: SessionStatus) => void;
   logout: () => void;
   refreshSession: () => Promise<boolean>;
   getSessionHeaders: () => HeadersInit;
@@ -56,28 +56,101 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     return interval;
   }, []);
 
+  // Login function
+  const login = useCallback((newSessionId: string, initialStatus?: SessionStatus) => {
+    // Clear any existing intervals before setting the new session
+    clearAllIntervals();
+    
+    localStorage.setItem(SESSION_KEY, newSessionId);
+    setSessionId(newSessionId);
+    
+    if (initialStatus) {
+      setStatus(initialStatus);
+      return;
+    }
+    
+    // Check the session status
+    fetch(`${API_URL}/auth/session/${newSessionId}`)
+      .then(response => response.json())
+      .then(data => {
+        setStatus(data.status);
+        console.log('Session login successful:', newSessionId, 'status:', data.status);
+        
+        // If authenticated and no initial status was provided, redirect to home
+        if (data.status === 'authenticated' && !initialStatus) {
+          router.push('/home');
+        }
+      })
+      .catch(error => {
+        console.error('Error checking session status:', error);
+        setStatus('error');
+      });
+  }, [clearAllIntervals, router]);
+
+  // Logout function
+  const logout = useCallback(async () => {
+    clearAllIntervals();
+    
+    // If we have a session ID, call the logout endpoint
+    if (sessionId) {
+      try {
+        // Call the explicit logout endpoint first
+        const response = await fetch(`${API_URL}/auth/logout/${sessionId}`, {
+          method: 'POST',
+          headers: {
+            'X-Session-ID': sessionId
+          }
+        });
+        
+        if (!response.ok) {
+          console.error('Error during logout:', await response.text());
+        }
+      } catch (error) {
+        console.error('Error during logout:', error);
+      }
+    }
+    
+    // Clear from localStorage
+    localStorage.removeItem(SESSION_KEY);
+    
+    // Clear the session state
+    setSessionId(null);
+    setStatus('unauthenticated');
+    
+    // Navigate to login page
+    router.push('/');
+    
+    console.log('Session logged out');
+  }, [clearAllIntervals, router, sessionId]);
+
   // Load session from localStorage on mount
   useEffect(() => {
     const loadStoredSession = async () => {
       const storedSessionId = localStorage.getItem(SESSION_KEY);
       
       if (storedSessionId) {
-        setSessionId(storedSessionId);
-        
-        // Check if the session is valid
+        // Don't set the session ID until we verify it's valid
         try {
           const response = await fetch(`${API_URL}/auth/session/${storedSessionId}`);
           
           if (response.ok) {
             const data = await response.json();
-            setStatus(data.status);
+            if (data.status === 'authenticated') {
+              setSessionId(storedSessionId);
+              setStatus('authenticated');
+            } else {
+              // Session exists but is not authenticated
+              await logout();
+            }
           } else {
-            // If session is invalid, clear it
-            logout();
+            // Session is invalid
+            await logout();
           }
         } catch (error) {
           console.error('Error validating session:', error);
           setStatus('error');
+          // Clean up invalid session
+          await logout();
         }
       }
     };
@@ -88,31 +161,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     return () => {
       clearAllIntervals();
     };
-  }, [clearAllIntervals]);
-
-  // Login function
-  const login = useCallback((newSessionId: string) => {
-    // Clear any existing intervals before setting the new session
-    clearAllIntervals();
-    
-    localStorage.setItem(SESSION_KEY, newSessionId);
-    setSessionId(newSessionId);
-    setStatus('authenticated');
-    
-    console.log('Session login successful:', newSessionId);
-  }, [clearAllIntervals]);
-
-  // Logout function
-  const logout = useCallback(() => {
-    clearAllIntervals();
-    
-    localStorage.removeItem(SESSION_KEY);
-    setSessionId(null);
-    setStatus('unauthenticated');
-    router.push('/');
-    
-    console.log('Session logged out');
-  }, [clearAllIntervals, router]);
+  }, [clearAllIntervals, logout]);
 
   // Create a managed fetch function that can be aborted when the session changes
   const managedFetch = useCallback(async (url: string, options: RequestInit = {}) => {
