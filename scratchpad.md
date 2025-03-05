@@ -8,7 +8,7 @@
 
 # Scratchpad
 
-Backend: 
+In backend folder: 
 PYTHONPATH=. uvicorn app.main:app --reload --port 8000
 APP_ENV=development JWT_SECRET_KEY=your-secure-key PYTHONPATH=. uvicorn app.main:app --reload --port 8000
 
