@@ -1,47 +1,59 @@
+"""Database connection utilities"""
+
 import os
 from typing import AsyncGenerator
-import logging
-
 import asyncpg
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-logger = logging.getLogger(__name__)
+from ..utils.logging import get_logger
 
-# Get database connection parameters from environment variables
-DB_USER = os.getenv("POSTGRES_USER", "postgres")
-DB_PASSWORD = os.getenv("POSTGRES_PASSWORD", "postgres")
-DB_NAME = os.getenv("POSTGRES_DB", "telegram_dialog")
-DB_HOST = os.getenv("POSTGRES_HOST", "postgres")
-DB_PORT = os.getenv("POSTGRES_PORT", "5432")
+logger = get_logger(__name__)
 
-DATABASE_URL = f"postgresql+asyncpg://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+# Use environment variables with defaults
+DATABASE_URL = os.getenv("DATABASE_URL", f"postgresql+asyncpg://{os.getenv('POSTGRES_USER', 'postgres')}:{os.getenv('POSTGRES_PASSWORD', 'postgres')}@{os.getenv('POSTGRES_HOST', 'localhost')}:{os.getenv('POSTGRES_PORT', '5432')}/{os.getenv('POSTGRES_DB', 'postgres')}")
 
-engine = create_async_engine(DATABASE_URL, echo=False)
-async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+# Create async engine
+engine = create_async_engine(DATABASE_URL)
+
+# Create session factory
+async_session = sessionmaker(
+    engine,
+    class_=AsyncSession,
+    expire_on_commit=False
+)
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    """
-    Dependency for getting async database session
-    """
+    """Get database session"""
     async with async_session() as session:
         try:
             yield session
         finally:
             await session.close()
 
-async def get_raw_connection():
-    """
-    Get a raw asyncpg connection for direct SQL execution
-    """
-    logger.debug(f"Creating raw database connection to {DB_HOST}:{DB_PORT}/{DB_NAME}")
-    return await asyncpg.connect(
-        user=DB_USER,
-        password=DB_PASSWORD,
-        database=DB_NAME,
-        host=DB_HOST,
-        port=DB_PORT
+async def get_raw_connection() -> asyncpg.Connection:
+    """Get raw asyncpg connection for migrations and direct queries"""
+    conn = await asyncpg.connect(
+        user=os.getenv("POSTGRES_USER", "postgres"),
+        password=os.getenv("POSTGRES_PASSWORD", "postgres"),
+        host=os.getenv("POSTGRES_HOST", "localhost"),
+        port=int(os.getenv("POSTGRES_PORT", "5432")),
+        database=os.getenv("POSTGRES_DB", "postgres")
     )
+    return conn
+
+async def get_raw_pool() -> asyncpg.Pool:
+    """Get connection pool for asyncpg"""
+    pool = await asyncpg.create_pool(
+        user=os.getenv("POSTGRES_USER", "postgres"),
+        password=os.getenv("POSTGRES_PASSWORD", "postgres"),
+        host=os.getenv("POSTGRES_HOST", "localhost"),
+        port=int(os.getenv("POSTGRES_PORT", "5432")),
+        database=os.getenv("POSTGRES_DB", "postgres"),
+        min_size=1,
+        max_size=10
+    )
+    return pool
 
 # Create a connection pool for better performance
 _pool = None
@@ -50,14 +62,14 @@ async def get_db_pool():
     """Get or create the database connection pool"""
     global _pool
     if _pool is None:
-        logger.info(f"Creating database connection pool to {DB_HOST}:{DB_PORT}/{DB_NAME}")
+        logger.info(f"Creating database connection pool to {DATABASE_URL}")
         try:
             _pool = await asyncpg.create_pool(
-                user=DB_USER,
-                password=DB_PASSWORD,
-                database=DB_NAME,
-                host=DB_HOST,
-                port=DB_PORT,
+                user=os.getenv("POSTGRES_USER", "postgres"),
+                password=os.getenv("POSTGRES_PASSWORD", "postgres"),
+                database=os.getenv("POSTGRES_DB", "telegram_dialog"),
+                host=os.getenv("POSTGRES_HOST", "localhost"),
+                port=int(os.getenv("POSTGRES_PORT", "5432")),
                 min_size=1,
                 max_size=10
             )

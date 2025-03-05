@@ -2,14 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import { useSession } from '../SessionContext';
+import Image from 'next/image';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
 
 export default function DevTools() {
   const [isVisible, setIsVisible] = useState(false);
-  const [mockToken, setMockToken] = useState('');
-  const [isAuthenticating, setIsAuthenticating] = useState(false);
-  const { token, login, logout } = useSession();
+  const [qrCode, setQrCode] = useState<string>('');
+  const [isGeneratingQR, setIsGeneratingQR] = useState(false);
+  const [telegramId, setTelegramId] = useState('');
+  const { session, login, logout } = useSession();
   
   // Only show in development mode
   useEffect(() => {
@@ -20,69 +22,62 @@ export default function DevTools() {
     return null;
   }
 
-  const setMockSession = () => {
-    if (mockToken && mockToken.trim() !== '') {
-      login(mockToken);
+  const generateQRCode = async () => {
+    setIsGeneratingQR(true);
+    try {
+      const response = await fetch(`${API_URL}/auth/qr`, {
+        method: 'POST',
+      });
+      const data = await response.json();
+      setQrCode(data.qr_code);
+      login(data.token, 'pending');
+    } catch (error) {
+      console.error('Error generating QR code:', error);
+      alert('Failed to generate QR code');
+    } finally {
+      setIsGeneratingQR(false);
+    }
+  };
+
+  const handleDevLogin = async () => {
+    if (!telegramId) {
+      alert('Please enter a Telegram ID');
+      return;
+    }
+
+    try {
+      // Call the development-only login endpoint
+      const response = await fetch(`${API_URL}/auth/dev-login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ telegram_id: parseInt(telegramId, 10) })
+      });
+
+      if (!response.ok) {
+        throw new Error('Login failed: ' + await response.text());
+      }
+
+      const data = await response.json();
+      login(data.token, 'authenticated');
+      setQrCode('');
+      alert('Development login successful!');
+    } catch (error) {
+      console.error('Login error:', error);
+      alert(error instanceof Error ? error.message : 'Login failed');
     }
   };
 
   const clearSession = () => {
     logout();
+    setQrCode('');
   };
 
   const copyToClipboard = () => {
-    if (token) {
-      navigator.clipboard.writeText(token);
+    if (session?.token) {
+      navigator.clipboard.writeText(session.token);
       alert('JWT token copied to clipboard!');
-    }
-  };
-
-  const testApi = async () => {
-    try {
-      const response = await fetch('/api/health');
-      const data = await response.json();
-      alert(`API Test Result: ${JSON.stringify(data)}`);
-    } catch (e) {
-      alert(`API Test Error: ${e}`);
-    }
-  };
-
-  const authenticateSession = async () => {
-    if (!token) {
-      alert('No active session to authenticate');
-      return;
-    }
-
-    setIsAuthenticating(true);
-    try {
-      // Call the force-authenticate endpoint to authenticate the current session
-      const response = await fetch(`${API_URL}/auth/force-authenticate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) {
-        const error = await response.text();
-        throw new Error(error);
-      }
-
-      const data = await response.json();
-      if (data.status === 'success') {
-        alert('Session authenticated successfully!');
-        // Re-login with the same token to refresh the frontend state
-        login(token);
-      } else {
-        throw new Error('Failed to authenticate session');
-      }
-    } catch (error) {
-      console.error('Error authenticating session:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      alert(`Failed to authenticate session: ${errorMessage}`);
-    } finally {
-      setIsAuthenticating(false);
     }
   };
 
@@ -91,22 +86,48 @@ export default function DevTools() {
       <h3 className="text-lg font-bold mb-4">Development Tools</h3>
       
       <div className="space-y-4">
-        <div>
-          <label className="block mb-2">Mock JWT Token:</label>
+        <div className="space-y-2">
+          <p className="text-sm">Quick Development Login:</p>
           <input
-            type="text"
-            value={mockToken}
-            onChange={(e) => setMockToken(e.target.value)}
+            type="number"
+            value={telegramId}
+            onChange={(e) => setTelegramId(e.target.value)}
+            placeholder="Enter Telegram ID"
             className="w-full p-2 text-black rounded"
-            placeholder="Enter JWT token"
           />
           <button
-            onClick={setMockSession}
-            className="mt-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+            onClick={handleDevLogin}
+            className="w-full px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600"
+            disabled={!telegramId}
           >
-            Set Mock Session
+            Dev Login
           </button>
         </div>
+
+        <div className="border-t border-gray-600 my-4"></div>
+
+        {qrCode ? (
+          <div className="space-y-2">
+            <p className="text-sm">QR Code Authentication:</p>
+            <div className="bg-white p-2 rounded">
+              <Image
+                src={`data:image/png;base64,${qrCode}`}
+                alt="QR Code"
+                width={200}
+                height={200}
+                className="mx-auto"
+              />
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={generateQRCode}
+            className="w-full px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+            disabled={isGeneratingQR}
+          >
+            {isGeneratingQR ? 'Generating QR...' : 'Generate QR Code'}
+          </button>
+        )}
 
         <div className="space-y-2">
           <button
@@ -119,31 +140,16 @@ export default function DevTools() {
           <button
             onClick={copyToClipboard}
             className="w-full px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
-            disabled={!token}
+            disabled={!session?.token}
           >
             Copy JWT Token
-          </button>
-          
-          <button
-            onClick={authenticateSession}
-            className="w-full px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600"
-            disabled={!token || isAuthenticating}
-          >
-            {isAuthenticating ? 'Authenticating...' : 'Force Authenticate'}
-          </button>
-          
-          <button
-            onClick={testApi}
-            className="w-full px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600"
-          >
-            Test API
           </button>
         </div>
 
         <div className="mt-4 text-sm">
           <p>Current Token:</p>
-          <pre className="mt-1 p-2 bg-gray-700 rounded overflow-x-auto">
-            {token || 'No token'}
+          <pre className="mt-1 p-2 bg-gray-700 rounded overflow-x-auto max-w-[300px] break-all">
+            {session?.token || 'No token'}
           </pre>
         </div>
       </div>

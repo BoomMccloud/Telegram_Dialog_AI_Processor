@@ -1,92 +1,74 @@
 """
-Database initialization and migration utilities
+Database initialization and migration management.
 """
 
-import asyncio
+import os
 import logging
-import sys
 from pathlib import Path
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from .database import get_raw_connection
+from app.db.database import get_db
+from app.db.base import Base
+from app.utils.logging import get_logger
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout)
-    ]
-)
+logger = get_logger(__name__)
 
-logger = logging.getLogger(__name__)
-
-async def wait_for_postgres(max_retries=10, retry_interval=5):
-    """
-    Wait for PostgreSQL to be ready
-    """
-    for i in range(max_retries):
-        try:
-            logger.info(f"Attempting to connect to PostgreSQL (attempt {i+1}/{max_retries})...")
-            conn = await get_raw_connection()
-            await conn.close()
-            logger.info("Successfully connected to PostgreSQL")
-            return True
-        except Exception as e:
-            logger.error(f"Failed to connect to PostgreSQL: {str(e)}")
-            if i < max_retries - 1:
-                logger.info(f"Retrying in {retry_interval} seconds...")
-                await asyncio.sleep(retry_interval)
-            else:
-                logger.error("Max retries reached. Could not connect to PostgreSQL.")
-                return False
-
-async def run_migrations():
-    """Run all pending database migrations"""
+async def init_db(db: AsyncSession) -> None:
+    """Initialize database with all models and run migrations"""
     try:
-        # First wait for PostgreSQL to be ready
-        if not await wait_for_postgres():
-            raise Exception("Could not connect to PostgreSQL")
+        # Create all tables
+        async with db.begin():
+            await db.execute(text("CREATE EXTENSION IF NOT EXISTS pgcrypto;"))
+            await db.run_sync(Base.metadata.create_all)
+            
+        # Run migrations
+        await run_migrations(db)
+        logger.info("Database initialized successfully")
+        
+    except Exception as e:
+        logger.error(f"Error initializing database: {str(e)}")
+        raise
 
-        conn = await get_raw_connection()
-        try:
-            # Create migrations table if it doesn't exist
-            await conn.execute("""
-                CREATE TABLE IF NOT EXISTS migrations (
-                    id SERIAL PRIMARY KEY,
-                    name VARCHAR(255) NOT NULL UNIQUE,
-                    applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+async def run_migrations(db: AsyncSession) -> None:
+    """Run SQL migrations from the migrations directory"""
+    try:
+        # Get migrations directory
+        migrations_dir = Path(__file__).parent / "migrations"
+        if not migrations_dir.exists():
+            logger.warning("No migrations directory found")
+            return
+            
+        # Get applied migrations
+        result = await db.execute(text("SELECT name FROM migrations"))
+        applied = {row[0] for row in result.fetchall()}
+        
+        # Get migration files
+        migration_files = sorted([
+            f for f in migrations_dir.glob("*.sql")
+            if f.stem not in applied
+        ])
+        
+        if not migration_files:
+            logger.info("No new migrations to apply")
+            return
+            
+        # Apply migrations in order
+        for migration_file in migration_files:
+            logger.info(f"Applying migration: {migration_file.name}")
+            
+            # Read and execute migration
+            sql = migration_file.read_text()
+            async with db.begin():
+                await db.execute(text(sql))
+                
+                # Record migration
+                await db.execute(
+                    text("INSERT INTO migrations (name) VALUES (:name)"),
+                    {"name": migration_file.stem}
                 )
-            """)
             
-            # Get list of applied migrations
-            applied = await conn.fetch("SELECT name FROM migrations")
-            applied_names = {row['name'] for row in applied}
-            
-            # Get all migration files
-            migrations_dir = Path(__file__).parent / 'migrations'
-            migration_files = sorted([f for f in migrations_dir.glob('*.sql')])
-            
-            # Apply each migration that hasn't been applied yet
-            for migration_file in migration_files:
-                name = migration_file.name
-                if name not in applied_names:
-                    logger.info(f"Applying migration: {name}")
-                    
-                    # Read and execute migration
-                    with open(migration_file) as f:
-                        sql = f.read()
-                        await conn.execute(sql)
-                    
-                    # Record migration as applied
-                    await conn.execute(
-                        "INSERT INTO migrations (name) VALUES ($1)",
-                        name
-                    )
-                    logger.info(f"Successfully applied migration: {name}")
-            
-            logger.info("All migrations applied successfully")
-            
-        finally:
-            await conn.close()
+            logger.info(f"Applied migration: {migration_file.name}")
             
     except Exception as e:
         logger.error(f"Error running migrations: {str(e)}")
@@ -95,7 +77,7 @@ async def run_migrations():
 if __name__ == "__main__":
     logger.info("Starting database initialization...")
     try:
-        asyncio.run(run_migrations())
+        asyncio.run(init_db(get_db()))
         logger.info("Database initialization completed successfully")
     except Exception as e:
         logger.error(f"Database initialization failed: {str(e)}")

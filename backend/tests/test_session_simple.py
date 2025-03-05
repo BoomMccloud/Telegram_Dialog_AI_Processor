@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request
 from httpx import AsyncClient, ASGITransport
 import pytest
+from fastapi import HTTPException
 
 from app.middleware.session import SessionMiddleware
 
@@ -28,9 +29,12 @@ async def test_session_middleware_basic():
         assert response.json() == {"status": "ok"}
         
         # Test 2: Protected endpoint should fail without token
-        response = await client.get("/api/protected")
-        assert response.status_code == 401
-        assert response.json()["detail"] == "Authorization header required"
+        try:
+            await client.get("/api/protected")
+            pytest.fail("Expected 401 error")
+        except HTTPException as e:
+            assert e.status_code == 401
+            assert e.detail == "Authorization header required"
         
         # Test 3: Protected endpoint should work with valid token
         token = await session_middleware.create_session(telegram_id=123456)
@@ -68,12 +72,15 @@ async def test_expired_token():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         # Test with expired token - should fail with 401
-        response = await client.get(
-            "/api/protected",
-            headers={"Authorization": "Bearer expired.token.here"}
-        )
-        assert response.status_code == 401
-        assert response.json()["detail"] == "Invalid or expired session"
+        try:
+            await client.get(
+                "/api/protected",
+                headers={"Authorization": "Bearer expired.token.here"}
+            )
+            pytest.fail("Expected 401 error")
+        except HTTPException as e:
+            assert e.status_code == 401
+            assert e.detail == "Invalid or expired session"
 
 @pytest.mark.asyncio
 async def test_public_paths():

@@ -12,6 +12,13 @@ from typing import List, Tuple, Dict, Optional, Any
 from app.db.database import get_raw_connection
 from app.utils.logging import get_logger
 from app.services.claude_processor import ClaudeProcessor, get_available_claude_models
+from sqlalchemy import select, update
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from app.models.dialog import Dialog, Message
+from app.models.processing import ProcessingResult, ProcessingStatus
+from app.services.base import BaseProcessor
 
 logger = get_logger(__name__)
 
@@ -725,4 +732,166 @@ async def get_user_model(user_id: int) -> Dict:
         }
     
     finally:
-        await conn.close() 
+        await conn.close()
+
+
+class ModelProcessor(BaseProcessor):
+    def __init__(self, db: AsyncSession, model_name: str):
+        self.db = db
+        self.model_name = model_name
+        
+    async def get_pending_messages(self, limit: int = 10) -> List[Message]:
+        """Get messages that need processing"""
+        # Get messages that don't have a processing result for this model
+        # or have a pending/error status
+        subquery = (
+            select(ProcessingResult.message_id)
+            .where(
+                ProcessingResult.model_name == self.model_name,
+                ProcessingResult.status == ProcessingStatus.COMPLETED
+            )
+            .scalar_subquery()
+        )
+        
+        stmt = (
+            select(Message)
+            .outerjoin(ProcessingResult)
+            .where(Message.id.notin_(subquery))
+            .options(selectinload(Message.dialog))
+            .limit(limit)
+        )
+        
+        result = await self.db.execute(stmt)
+        return result.scalars().all()
+        
+    async def get_processing_result(self, message_id: str) -> Optional[ProcessingResult]:
+        """Get processing result for a message"""
+        stmt = (
+            select(ProcessingResult)
+            .where(
+                ProcessingResult.message_id == message_id,
+                ProcessingResult.model_name == self.model_name
+            )
+        )
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()
+        
+    async def create_processing_result(self, message_id: str) -> ProcessingResult:
+        """Create a new processing result entry"""
+        result = ProcessingResult(
+            message_id=message_id,
+            model_name=self.model_name,
+            status=ProcessingStatus.PENDING
+        )
+        self.db.add(result)
+        await self.db.commit()
+        await self.db.refresh(result)
+        return result
+        
+    async def update_processing_result(
+        self,
+        result_id: str,
+        status: ProcessingStatus,
+        result_data: Optional[Dict[str, Any]] = None,
+        error: Optional[str] = None
+    ) -> ProcessingResult:
+        """Update processing result status and data"""
+        stmt = (
+            select(ProcessingResult)
+            .where(ProcessingResult.id == result_id)
+        )
+        result = await self.db.execute(stmt)
+        processing_result = result.scalar_one_or_none()
+        
+        if not processing_result:
+            raise ValueError(f"Processing result {result_id} not found")
+            
+        processing_result.status = status
+        if result_data is not None:
+            processing_result.result = result_data
+        if error is not None:
+            processing_result.error = error
+        if status == ProcessingStatus.COMPLETED:
+            processing_result.completed_at = datetime.utcnow()
+            
+        await self.db.commit()
+        await self.db.refresh(processing_result)
+        return processing_result
+        
+    async def get_dialog_messages(self, dialog_id: str, limit: int = 100) -> List[Message]:
+        """Get messages from a dialog with their processing results"""
+        stmt = (
+            select(Message)
+            .where(Message.dialog_id == dialog_id)
+            .options(
+                selectinload(Message.processing_results)
+            )
+            .order_by(Message.date.desc())
+            .limit(limit)
+        )
+        result = await self.db.execute(stmt)
+        return result.scalars().all()
+        
+    async def get_dialog_by_telegram_id(self, telegram_dialog_id: str) -> Optional[Dialog]:
+        """Get dialog by Telegram ID"""
+        stmt = (
+            select(Dialog)
+            .where(Dialog.telegram_dialog_id == telegram_dialog_id)
+        )
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()
+        
+    async def create_or_update_dialog(
+        self,
+        telegram_dialog_id: str,
+        name: str,
+        type: str,
+        unread_count: int = 0,
+        last_message: Optional[Dict[str, Any]] = None
+    ) -> Dialog:
+        """Create or update a dialog"""
+        dialog = await self.get_dialog_by_telegram_id(telegram_dialog_id)
+        
+        if dialog:
+            dialog.name = name
+            dialog.type = type
+            dialog.unread_count = unread_count
+            dialog.last_message = last_message
+        else:
+            dialog = Dialog(
+                telegram_dialog_id=telegram_dialog_id,
+                name=name,
+                type=type,
+                unread_count=unread_count,
+                last_message=last_message
+            )
+            self.db.add(dialog)
+            
+        await self.db.commit()
+        await self.db.refresh(dialog)
+        return dialog
+        
+    async def create_message(
+        self,
+        dialog_id: str,
+        telegram_message_id: str,
+        text: str,
+        sender_id: str,
+        sender_name: str,
+        date: datetime,
+        is_outgoing: bool = False
+    ) -> Message:
+        """Create a new message"""
+        message = Message(
+            dialog_id=dialog_id,
+            telegram_message_id=telegram_message_id,
+            text=text,
+            sender_id=sender_id,
+            sender_name=sender_name,
+            date=date,
+            is_outgoing=is_outgoing
+        )
+        self.db.add(message)
+        await self.db.commit()
+        await self.db.refresh(message)
+        return message 

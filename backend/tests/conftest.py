@@ -8,11 +8,10 @@ import pytest_asyncio
 # Test database configuration
 TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/test_telegram_dialog")
 
-@pytest_asyncio.fixture(scope="session")
+@pytest.fixture(scope="session")
 def event_loop():
     """Create an instance of the default event loop for each test case."""
-    policy = asyncio.get_event_loop_policy()
-    loop = policy.new_event_loop()
+    loop = asyncio.get_event_loop_policy().new_event_loop()
     yield loop
     loop.close()
 

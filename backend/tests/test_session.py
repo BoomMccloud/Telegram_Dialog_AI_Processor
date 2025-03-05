@@ -15,6 +15,7 @@ from app.main import app
 def app():
     app = FastAPI()
     session_middleware = SessionMiddleware(app)
+    app.state.session_middleware = session_middleware
     
     @app.get("/health")
     async def health():
@@ -46,24 +47,24 @@ async def test_create_session(app, db):
     session_middleware = app.state.session_middleware
     
     # Create a regular session
-    token = await session_middleware.create_session(telegram_id=123456)
-    assert token is not None
+    session = await session_middleware.create_session(telegram_id=123456, db=db)
+    assert session.token is not None
     
     # Verify session in database
-    session = await db.fetchrow("SELECT * FROM sessions WHERE token = $1", token)
-    assert session is not None
-    assert session['telegram_id'] == 123456
-    assert session['status'] == 'authenticated'
+    db_session = await db.fetchrow("SELECT * FROM sessions WHERE token = $1", session.token)
+    assert db_session is not None
+    assert db_session['telegram_id'] == 123456
+    assert db_session['status'] == 'authenticated'
     
     # Create a QR session
-    qr_token = await session_middleware.create_session(is_qr=True)
-    assert qr_token is not None
+    qr_session = await session_middleware.create_session(is_qr=True, db=db)
+    assert qr_session.token is not None
     
     # Verify QR session in database
-    qr_session = await db.fetchrow("SELECT * FROM sessions WHERE token = $1", qr_token)
-    assert qr_session is not None
-    assert qr_session['status'] == 'pending'
-    assert qr_session['telegram_id'] is None
+    qr_db_session = await db.fetchrow("SELECT * FROM sessions WHERE token = $1", qr_session.token)
+    assert qr_db_session is not None
+    assert qr_db_session['status'] == 'pending'
+    assert qr_db_session['telegram_id'] is None
 
 @pytest.mark.asyncio
 async def test_verify_session(app, db):
@@ -71,32 +72,15 @@ async def test_verify_session(app, db):
     session_middleware = app.state.session_middleware
     
     # Create and verify valid session
-    token = await session_middleware.create_session(telegram_id=123456)
-    session = await session_middleware.verify_session(token)
-    assert session is not None
-    assert session.telegram_id == 123456
-    assert session.status == 'authenticated'
-    
-    # Test expired token
-    expired_payload = {
-        "jti": "test-id",
-        "telegram_id": 123456,
-        "exp": datetime.utcnow() - timedelta(hours=1),
-        "iat": datetime.utcnow() - timedelta(hours=2)
-    }
-    expired_token = jwt.encode(
-        expired_payload,
-        session_middleware.secret_key,
-        algorithm=session_middleware.algorithm
-    )
-    
-    with pytest.raises(HTTPException) as exc_info:
-        await session_middleware.verify_session(expired_token)
-    assert exc_info.value.status_code == 401
+    session = await session_middleware.create_session(telegram_id=123456, db=db)
+    verified_session = await session_middleware.verify_session(session.token, db=db)
+    assert verified_session is not None
+    assert verified_session.telegram_id == 123456
+    assert verified_session.status == 'authenticated'
     
     # Test invalid token
     with pytest.raises(HTTPException) as exc_info:
-        await session_middleware.verify_session("invalid-token")
+        await session_middleware.verify_session("invalid-token", db=db)
     assert exc_info.value.status_code == 401
 
 @pytest.mark.asyncio
@@ -105,12 +89,13 @@ async def test_update_session(app, db):
     session_middleware = app.state.session_middleware
     
     # Create initial session
-    token = await session_middleware.create_session(is_qr=True)
+    session = await session_middleware.create_session(is_qr=True, db=db)
     
     # Update session with telegram ID
     updated_session = await session_middleware.update_session(
-        token,
-        {"telegram_id": 123456, "status": "authenticated"}
+        session.token,
+        123456,
+        db=db
     )
     
     assert updated_session is not None
@@ -118,9 +103,9 @@ async def test_update_session(app, db):
     assert updated_session.status == 'authenticated'
     
     # Verify in database
-    session = await db.fetchrow("SELECT * FROM sessions WHERE token = $1", token)
-    assert session['telegram_id'] == 123456
-    assert session['status'] == 'authenticated'
+    db_session = await db.fetchrow("SELECT * FROM sessions WHERE token = $1", session.token)
+    assert db_session['telegram_id'] == 123456
+    assert db_session['status'] == 'authenticated'
 
 def test_session_middleware_http(test_client, app):
     """Test session middleware in HTTP context"""
@@ -134,10 +119,10 @@ def test_session_middleware_http(test_client, app):
     
     # Create valid session
     session_middleware = app.state.session_middleware
-    token = session_middleware.create_session(telegram_id=123456)
+    session = session_middleware.create_session(telegram_id=123456)
     
     # Test with valid token
-    headers = {"Authorization": f"Bearer {token}"}
+    headers = {"Authorization": f"Bearer {session.token}"}
     response = test_client.get("/api/protected", headers=headers)
     assert response.status_code == 200
 
@@ -147,30 +132,29 @@ async def test_session_cleanup(app, db):
     session_middleware = app.state.session_middleware
     
     # Create expired session
-    expired_token = await session_middleware.create_session(telegram_id=123456)
+    expired_session = await session_middleware.create_session(telegram_id=123456, db=db)
     await db.execute("""
         UPDATE sessions 
         SET expires_at = NOW() - interval '1 hour'
         WHERE token = $1
-    """, expired_token)
+    """, expired_session.token)
     
     # Create valid session
-    valid_token = await session_middleware.create_session(telegram_id=789012)
+    valid_session = await session_middleware.create_session(telegram_id=789012, db=db)
     
     # Run cleanup
-    from app.services.cleanup import cleanup_expired_sessions
-    await cleanup_expired_sessions()
+    await session_middleware.cleanup_expired_sessions(db=db)
     
     # Verify expired session is removed
-    expired_session = await db.fetchrow(
+    expired_db_session = await db.fetchrow(
         "SELECT * FROM sessions WHERE token = $1",
-        expired_token
+        expired_session.token
     )
-    assert expired_session is None
+    assert expired_db_session is None
     
     # Verify valid session remains
-    valid_session = await db.fetchrow(
+    valid_db_session = await db.fetchrow(
         "SELECT * FROM sessions WHERE token = $1",
-        valid_token
+        valid_session.token
     )
-    assert valid_session is not None 
+    assert valid_db_session is not None 

@@ -9,13 +9,15 @@ Telegram messages.
 import os
 import json
 import aiohttp
-import re
-import asyncio
 from typing import List, Dict, Optional, Any
-from datetime import datetime, timedelta
+from datetime import datetime
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
-# Import the raw database connection
-from app.db.database import get_raw_connection
+from app.models.dialog import Dialog, Message
+from app.models.processing import ProcessingResult, ProcessingStatus
+from app.services.model_processor import ModelProcessor
 from app.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -59,43 +61,27 @@ You are a helpful assistant analyzing Telegram messages. Your job is to:
 5. Keep your responses under 150 words unless more detail is explicitly needed
 """
 
-
 async def get_available_claude_models() -> List[Dict]:
-    """
-    Get list of available Claude models
-    
-    Returns:
-        List of Claude model configurations
-    """
+    """Get list of available Claude models"""
     if not CLAUDE_API_KEY:
         logger.warning("CLAUDE_API_KEY is not set. Claude models will not be available.")
         return []
     
-    models = []
-    for model_id, model_config in CLAUDE_MODELS.items():
-        models.append(model_config)
-    
-    return models
+    return list(CLAUDE_MODELS.values())
 
-
-class ClaudeProcessor:
-    """
-    Processor for Telegram dialogs using Claude API
+class ClaudeProcessor(ModelProcessor):
+    """Processor for Telegram dialogs using Claude API"""
     
-    This class handles the processing of Telegram messages using Anthropic's
-    Claude API, managing the entire pipeline from fetching messages to
-    generating responses and storing results.
-    """
-    
-    def __init__(self, model_name: str = "claude-3-sonnet", system_prompt: Optional[str] = None):
+    def __init__(self, db: AsyncSession, model_name: str = "claude-3-sonnet", system_prompt: Optional[str] = None):
         """
         Initialize the Claude processor
         
         Args:
+            db: SQLAlchemy AsyncSession
             model_name: Claude model to use
             system_prompt: Optional system prompt override
         """
-        self.model_name = model_name
+        super().__init__(db, model_name)
         self.system_prompt = system_prompt or DEFAULT_SYSTEM_PROMPT
         
         # Validate model name
@@ -107,32 +93,28 @@ class ClaudeProcessor:
         if not CLAUDE_API_KEY:
             logger.error("CLAUDE_API_KEY is not set. Claude processor will not work.")
     
-    async def process_dialog(self, dialog_id: int, user_id: int, session_id: str) -> Dict[str, Any]:
+    async def process_dialog(self, dialog_id: str) -> Dict[str, Any]:
         """
         Process messages from a dialog and store results
         
         Args:
             dialog_id: ID of the dialog to process
-            user_id: ID of the user
-            session_id: User session ID
             
         Returns:
             Dictionary with processing results
         """
         try:
-            # Get messages for this dialog
-            messages = await self._fetch_messages_for_dialog(dialog_id)
+            # Get unprocessed messages for this dialog
+            messages = await self.get_pending_messages(dialog_id)
             if not messages:
                 return {"success": False, "error": "No messages found for this dialog"}
             
-            # Process recent unprocessed messages
+            # Process messages
             results = []
             for message in messages:
-                if not message.get("is_processed", False):
-                    # Process the message
-                    result = await self._process_message(message, dialog_id, user_id)
-                    if result:
-                        results.append(result)
+                result = await self.process_message(message.id)
+                if result:
+                    results.append(result)
             
             return {
                 "success": True,
@@ -145,126 +127,68 @@ class ClaudeProcessor:
             logger.error(f"Error processing dialog {dialog_id}: {str(e)}")
             return {"success": False, "error": str(e)}
     
-    async def _fetch_messages_for_dialog(self, dialog_id: int) -> List[Dict]:
+    async def process_message(self, message_id: str) -> Optional[Dict[str, Any]]:
         """
-        Fetch messages for a specific dialog from the database
+        Process a single message using Claude API
         
         Args:
-            dialog_id: ID of the dialog to fetch messages for
-            
-        Returns:
-            List of message dictionaries
-        """
-        conn = await get_raw_connection()
-        try:
-            # Get the most recent messages for this dialog
-            rows = await conn.fetch(
-                """
-                SELECT * FROM message_history
-                WHERE dialog_id = $1
-                ORDER BY message_date DESC
-                LIMIT 20
-                """,
-                dialog_id
-            )
-            
-            # Convert to list of dictionaries
-            messages = [dict(row) for row in rows]
-            
-            # Convert datetime objects to strings
-            for message in messages:
-                if "message_date" in message and isinstance(message["message_date"], datetime):
-                    message["message_date"] = message["message_date"].isoformat()
-            
-            # Reverse to get chronological order
-            return list(reversed(messages))
-            
-        finally:
-            await conn.close()
-    
-    async def _process_message(self, message: Dict, dialog_id: int, user_id: int) -> Optional[Dict]:
-        """
-        Process a single message
-        
-        Args:
-            message: Message data
-            dialog_id: Dialog ID
-            user_id: User ID
+            message_id: ID of the message to process
             
         Returns:
             Processing result or None if message should be skipped
         """
+        # Get message with context
+        stmt = (
+            select(Message)
+            .where(Message.id == message_id)
+            .options(selectinload(Message.dialog))
+        )
+        result = await self.db.execute(stmt)
+        message = result.scalar_one_or_none()
+        
+        if not message:
+            logger.error(f"Message {message_id} not found")
+            return None
+            
         # Skip if missing text
-        if not message.get("message_text"):
-            await self._mark_message_processed(message["message_id"])
+        if not message.text:
             return None
         
         # Skip processing of very short messages or typical chat noise
-        text = message.get("message_text", "").strip()
+        text = message.text.strip()
         if len(text) < 3 or text.lower() in ["ok", "yes", "no", "hi", "hello", "thanks", "thank you"]:
-            await self._mark_message_processed(message["message_id"])
             return None
         
         try:
-            # Get context messages for this dialog
-            context_messages = await self._get_context_messages(dialog_id, message["message_id"])
+            # Get context messages
+            context_messages = await self.get_dialog_messages(message.dialog_id)
             
             # Generate prompt and get response
             response = await self._generate_response(message, context_messages)
             
             # Store the result
-            result = await self._store_processing_result(
-                message, response, context_messages, dialog_id, user_id
+            result = await self.create_processing_result(
+                message_id=message.id,
+                result_data=response,
+                status=ProcessingStatus.COMPLETED
             )
             
-            # Mark message as processed
-            await self._mark_message_processed(message["message_id"])
-            
-            return result
+            return {
+                "message_id": message.id,
+                "response": response,
+                "result_id": result.id
+            }
             
         except Exception as e:
-            logger.error(f"Error processing message {message['message_id']}: {str(e)}")
+            logger.error(f"Error processing message {message_id}: {str(e)}")
+            await self.create_processing_result(
+                message_id=message.id,
+                error=str(e),
+                status=ProcessingStatus.ERROR
+            )
             return None
     
-    async def _get_context_messages(self, dialog_id: int, current_message_id: str) -> List[Dict]:
-        """
-        Get context messages for a specific message
-        
-        Args:
-            dialog_id: Dialog ID
-            current_message_id: Current message ID
-            
-        Returns:
-            List of context messages
-        """
-        conn = await get_raw_connection()
-        try:
-            # Get previous messages as context
-            rows = await conn.fetch(
-                """
-                SELECT * FROM message_history
-                WHERE dialog_id = $1 AND message_id != $2
-                ORDER BY message_date DESC
-                LIMIT 10
-                """,
-                dialog_id, current_message_id
-            )
-            
-            # Convert to list of dictionaries
-            context = [dict(row) for row in rows]
-            
-            # Convert datetime objects to strings
-            for message in context:
-                if "message_date" in message and isinstance(message["message_date"], datetime):
-                    message["message_date"] = message["message_date"].isoformat()
-            
-            # Reverse to get chronological order for context
-            return list(reversed(context))
-            
-        finally:
-            await conn.close()
-    
-    async def _generate_response(self, message: Dict, context_messages: List[Dict]) -> str:
+    async def _generate_response(self, message: Message, context_messages: List[Message]) -> str:
         """
         Generate a response using Claude API
         
@@ -290,17 +214,16 @@ class ClaudeProcessor:
         
         # Add context messages
         for ctx in context_messages:
-            sender = ctx.get("from_user_name") or ctx.get("from_user_id") or "User"
+            sender = ctx.sender_name
             claude_messages.append({
-                "role": "user" if ctx.get("is_outgoing") else "assistant", 
-                "content": f"{sender}: {ctx.get('message_text', '')}"
+                "role": "user" if ctx.is_outgoing else "assistant", 
+                "content": f"{sender}: {ctx.text}"
             })
         
         # Add current message
-        current_sender = message.get("from_user_name") or message.get("from_user_id") or "User"
         claude_messages.append({
             "role": "user",
-            "content": f"{current_sender}: {message.get('message_text', '')}"
+            "content": f"{message.sender_name}: {message.text}"
         })
         
         # Prepare payload
@@ -325,86 +248,4 @@ class ClaudeProcessor:
                     
         except Exception as e:
             logger.error(f"Error calling Claude API: {str(e)}")
-            return f"Error generating response: {str(e)}"
-    
-    async def _store_processing_result(self, message: Dict, response_text: str, 
-                                      context_messages: List[Dict], dialog_id: int, 
-                                      user_id: int) -> Dict:
-        """
-        Store the processing result in the database
-        
-        Args:
-            message: Message that was processed
-            response_text: Generated response text
-            context_messages: Context messages used
-            dialog_id: Dialog ID
-            user_id: User ID
-            
-        Returns:
-            Dictionary with stored result details
-        """
-        conn = await get_raw_connection()
-        try:
-            # Insert into processed_responses table
-            row = await conn.fetchrow(
-                """
-                INSERT INTO processed_responses
-                (message_id, dialog_id, user_id, response_text, model_name, 
-                system_prompt, context_messages, status, created_at, updated_at)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
-                RETURNING id, created_at, status
-                """,
-                message["message_id"],
-                dialog_id,
-                user_id,
-                response_text,
-                self.model_name,
-                self.system_prompt,
-                json.dumps(context_messages),
-                "pending"  # Initial status is pending review
-            )
-            
-            # Create result dict with IDs and timestamps
-            result = {
-                "message_id": message["message_id"],
-                "message_text": message.get("message_text", ""),
-                "response_id": row["id"],
-                "response_text": response_text,
-                "created_at": row["created_at"].isoformat() if hasattr(row["created_at"], "isoformat") else row["created_at"],
-                "status": row["status"]
-            }
-            
-            return result
-            
-        finally:
-            await conn.close()
-    
-    async def _mark_message_processed(self, message_id: str) -> bool:
-        """
-        Mark a message as processed
-        
-        Args:
-            message_id: ID of the message to mark
-            
-        Returns:
-            True if successful, False otherwise
-        """
-        conn = await get_raw_connection()
-        try:
-            # Update the is_processed flag
-            await conn.execute(
-                """
-                UPDATE message_history
-                SET is_processed = true, updated_at = NOW()
-                WHERE message_id = $1
-                """,
-                message_id
-            )
-            return True
-        
-        except Exception as e:
-            logger.error(f"Error marking message as processed: {str(e)}")
-            return False
-            
-        finally:
-            await conn.close() 
+            return f"Error generating response: {str(e)}" 
