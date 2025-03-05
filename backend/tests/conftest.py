@@ -1,12 +1,32 @@
+"""
+Test configuration and fixtures
+"""
+
 import os
 import pytest
 import asyncio
 from typing import AsyncGenerator
 import asyncpg
 import pytest_asyncio
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.orm import sessionmaker
+from fastapi import FastAPI
+from httpx import AsyncClient
 
-# Test database configuration
-TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/test_telegram_dialog")
+from app.main import app
+from app.db.base import Base
+from app.services.session_manager import SessionManager
+from app.services.background_tasks import BackgroundTaskManager
+
+# Test database URL
+TEST_DATABASE_URL = "postgresql+asyncpg://postgres:postgres@localhost:5432/telegram_processor_test"
+
+# Test settings
+test_settings = {
+    "jwt_secret": "test-secret-key-for-testing-only",
+    "access_token_expire_minutes": 60,
+    "refresh_token_expire_minutes": 10080
+}
 
 @pytest.fixture(scope="session")
 def event_loop():
@@ -16,6 +36,61 @@ def event_loop():
     loop.close()
 
 @pytest_asyncio.fixture(scope="session")
+async def engine():
+    """Create test database engine"""
+    engine = create_async_engine(TEST_DATABASE_URL)
+    
+    # Create tables
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)  # Clean up old tables
+        await conn.run_sync(Base.metadata.create_all)
+    
+    yield engine
+    
+    # Clean up
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+    await engine.dispose()
+
+@pytest_asyncio.fixture
+async def db_session(engine):
+    """Create database session for testing"""
+    TestingSessionLocal = sessionmaker(
+        engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+        autocommit=False,
+        autoflush=False
+    )
+    
+    async with TestingSessionLocal() as session:
+        yield session
+        await session.rollback()
+
+@pytest_asyncio.fixture
+def session_manager():
+    """Create session manager for testing"""
+    return SessionManager(test_settings)
+
+@pytest_asyncio.fixture
+def background_tasks():
+    """Create background task manager for testing"""
+    return BackgroundTaskManager()
+
+@pytest_asyncio.fixture
+async def test_app(db_session, session_manager, background_tasks):
+    """Create test application with dependencies"""
+    app.state.db_pool = lambda: db_session
+    app.state.background_tasks = background_tasks
+    return app
+
+@pytest_asyncio.fixture
+async def client(test_app):
+    """Create test client"""
+    async with AsyncClient(app=test_app, base_url="http://test") as client:
+        yield client
+
+@pytest_asyncio.fixture
 async def db_pool(event_loop):
     """Create a test database and pool."""
     # Create test database

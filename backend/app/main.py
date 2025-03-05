@@ -12,10 +12,11 @@ from sqlalchemy.orm import sessionmaker
 from .api.auth import router as auth_router
 from .api.dialogs import router as dialogs_router
 from .api.messages import router as messages_router
-from .middleware.session import SessionMiddleware
+from .utils.logging import get_logger
 from .db.database import get_db, DATABASE_URL
 from .db.base import Base
-from .utils.logging import get_logger
+from .services.background_tasks import BackgroundTaskManager
+from .services.cleanup import run_periodic_cleanup
 
 logger = get_logger(__name__)
 
@@ -32,8 +33,8 @@ async def lifespan(app: FastAPI):
     # Create database pool
     app.state.db_pool = async_session
     
-    # Initialize session middleware
-    app.state.session_middleware = SessionMiddleware(app)
+    # Initialize background task manager
+    app.state.background_tasks = BackgroundTaskManager()
     
     # Create database tables
     try:
@@ -43,21 +44,24 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Failed to create database tables: {str(e)}", exc_info=True)
         raise
+        
+    # Start periodic cleanup task
+    cleanup_interval = int(os.getenv("CLEANUP_INTERVAL_SECONDS", "3600"))
+    app.state.background_tasks.add_task(
+        run_periodic_cleanup(app.state.db_pool, cleanup_interval)
+    )
+    logger.info(f"Started periodic cleanup task with interval {cleanup_interval} seconds")
     
     yield
     
-    # Clean up
+    # Clean up background tasks
+    await app.state.background_tasks.cleanup()
+    
+    # Clean up database
     await engine.dispose()
     logger.info("Shutting down FastAPI application...")
 
 app = FastAPI(lifespan=lifespan)
-
-# Add session middleware to the app
-@app.middleware("http")
-async def session_middleware_handler(request, call_next):
-    path = request.url.path
-    logger.debug(f"Processing request to {path}")
-    return await app.state.session_middleware(request, call_next)
 
 # Configure CORS
 app.add_middleware(

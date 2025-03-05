@@ -3,29 +3,82 @@ Database initialization and migration management.
 """
 
 import os
+import sys
+import asyncio
 import logging
+import re
 from pathlib import Path
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+from dotenv import load_dotenv
 
-from app.db.database import get_db
+from app.db.database import engine, async_session
 from app.db.base import Base
 from app.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
-async def init_db(db: AsyncSession) -> None:
+# Load environment variables from .env file
+env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env")
+load_dotenv(env_path)
+
+# Log database configuration
+logger.info("Database configuration for initialization:")
+logger.info(f"Host: {os.getenv('POSTGRES_HOST', 'localhost')}")
+logger.info(f"Port: {os.getenv('POSTGRES_PORT', '5432')}")
+logger.info(f"Database: {os.getenv('POSTGRES_DB', 'telegram_dialog_dev')}")
+logger.info(f"User: {os.getenv('POSTGRES_USER', 'postgres')}")
+
+def split_sql_statements(sql: str) -> list[str]:
+    """Split SQL into individual statements, preserving DO blocks"""
+    statements = []
+    current_stmt = []
+    in_do_block = False
+    
+    for line in sql.split('\n'):
+        stripped = line.strip()
+        
+        # Skip empty lines and comments
+        if not stripped or stripped.startswith('--'):
+            continue
+            
+        # Check for DO block start
+        if 'DO $$' in stripped:
+            in_do_block = True
+            
+        current_stmt.append(line)
+        
+        # Check for DO block end
+        if in_do_block and '$$;' in stripped:
+            in_do_block = False
+            statements.append('\n'.join(current_stmt))
+            current_stmt = []
+            continue
+            
+        # Normal statement end
+        if not in_do_block and stripped.endswith(';'):
+            statements.append('\n'.join(current_stmt))
+            current_stmt = []
+            
+    # Add any remaining statement
+    if current_stmt:
+        statements.append('\n'.join(current_stmt))
+        
+    return [stmt.strip() for stmt in statements if stmt.strip()]
+
+async def init_db() -> None:
     """Initialize database with all models and run migrations"""
     try:
-        # Create all tables
-        async with db.begin():
-            await db.execute(text("CREATE EXTENSION IF NOT EXISTS pgcrypto;"))
-            await db.run_sync(Base.metadata.create_all)
+        # Create all tables using the engine
+        async with engine.begin() as conn:
+            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS pgcrypto;"))
+            await conn.run_sync(Base.metadata.create_all)
             
-        # Run migrations
-        await run_migrations(db)
-        logger.info("Database initialized successfully")
-        
+        # Run migrations using a session
+        async with async_session() as db:
+            await run_migrations(db)
+            logger.info("Database initialized successfully")
+            
     except Exception as e:
         logger.error(f"Error initializing database: {str(e)}")
         raise
@@ -39,9 +92,19 @@ async def run_migrations(db: AsyncSession) -> None:
             logger.warning("No migrations directory found")
             return
             
+        # Create migrations table if it doesn't exist
+        async with db.begin():
+            await db.execute(text("""
+                CREATE TABLE IF NOT EXISTS migrations (
+                    name VARCHAR(255) PRIMARY KEY,
+                    applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+            """))
+            
         # Get applied migrations
-        result = await db.execute(text("SELECT name FROM migrations"))
-        applied = {row[0] for row in result.fetchall()}
+        async with db.begin():
+            result = await db.execute(text("SELECT name FROM migrations"))
+            applied = {row[0] for row in result.fetchall()}
         
         # Get migration files
         migration_files = sorted([
@@ -57,12 +120,20 @@ async def run_migrations(db: AsyncSession) -> None:
         for migration_file in migration_files:
             logger.info(f"Applying migration: {migration_file.name}")
             
-            # Read and execute migration
+            # Read migration file
             sql = migration_file.read_text()
+            
+            # Split into individual statements
+            statements = split_sql_statements(sql)
+            
+            # Execute each statement in a separate transaction
+            for stmt in statements:
+                logger.debug(f"Executing statement:\n{stmt}")
+                async with db.begin():
+                    await db.execute(text(stmt))
+            
+            # Record migration
             async with db.begin():
-                await db.execute(text(sql))
-                
-                # Record migration
                 await db.execute(
                     text("INSERT INTO migrations (name) VALUES (:name)"),
                     {"name": migration_file.stem}
@@ -77,7 +148,7 @@ async def run_migrations(db: AsyncSession) -> None:
 if __name__ == "__main__":
     logger.info("Starting database initialization...")
     try:
-        asyncio.run(init_db(get_db()))
+        asyncio.run(init_db())
         logger.info("Database initialization completed successfully")
     except Exception as e:
         logger.error(f"Database initialization failed: {str(e)}")

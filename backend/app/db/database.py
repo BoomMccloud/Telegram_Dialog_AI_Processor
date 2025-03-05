@@ -5,13 +5,27 @@ from typing import AsyncGenerator
 import asyncpg
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
+from dotenv import load_dotenv
 
 from ..utils.logging import get_logger
 
 logger = get_logger(__name__)
 
+# Load environment variables from .env file
+env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env")
+load_dotenv(env_path)
+
+# Log database configuration
+logger.info("Database configuration:")
+logger.info(f"Host: {os.getenv('POSTGRES_HOST', 'localhost')}")
+logger.info(f"Port: {os.getenv('POSTGRES_PORT', '5432')}")
+logger.info(f"Database: {os.getenv('POSTGRES_DB', 'telegram_dialog_dev')}")
+logger.info(f"User: {os.getenv('POSTGRES_USER', 'postgres')}")
+
 # Use environment variables with defaults
-DATABASE_URL = os.getenv("DATABASE_URL", f"postgresql+asyncpg://{os.getenv('POSTGRES_USER', 'postgres')}:{os.getenv('POSTGRES_PASSWORD', 'postgres')}@{os.getenv('POSTGRES_HOST', 'localhost')}:{os.getenv('POSTGRES_PORT', '5432')}/{os.getenv('POSTGRES_DB', 'postgres')}")
+DATABASE_URL = os.getenv("DATABASE_URL", f"postgresql+asyncpg://{os.getenv('POSTGRES_USER', 'postgres')}:{os.getenv('POSTGRES_PASSWORD', 'postgres')}@{os.getenv('POSTGRES_HOST', 'localhost')}:{os.getenv('POSTGRES_PORT', '5432')}/{os.getenv('POSTGRES_DB', 'telegram_dialog_dev')}")
+
+logger.info(f"Database URL: {DATABASE_URL}")
 
 # Create async engine
 engine = create_async_engine(DATABASE_URL)
@@ -38,7 +52,7 @@ async def get_raw_connection() -> asyncpg.Connection:
         password=os.getenv("POSTGRES_PASSWORD", "postgres"),
         host=os.getenv("POSTGRES_HOST", "localhost"),
         port=int(os.getenv("POSTGRES_PORT", "5432")),
-        database=os.getenv("POSTGRES_DB", "postgres")
+        database=os.getenv("POSTGRES_DB", "telegram_dialog_dev")
     )
     return conn
 
@@ -49,7 +63,7 @@ async def get_raw_pool() -> asyncpg.Pool:
         password=os.getenv("POSTGRES_PASSWORD", "postgres"),
         host=os.getenv("POSTGRES_HOST", "localhost"),
         port=int(os.getenv("POSTGRES_PORT", "5432")),
-        database=os.getenv("POSTGRES_DB", "postgres"),
+        database=os.getenv("POSTGRES_DB", "telegram_dialog_dev"),
         min_size=1,
         max_size=10
     )
@@ -67,7 +81,7 @@ async def get_db_pool():
             _pool = await asyncpg.create_pool(
                 user=os.getenv("POSTGRES_USER", "postgres"),
                 password=os.getenv("POSTGRES_PASSWORD", "postgres"),
-                database=os.getenv("POSTGRES_DB", "telegram_dialog"),
+                database=os.getenv("POSTGRES_DB", "telegram_dialog_dev"),
                 host=os.getenv("POSTGRES_HOST", "localhost"),
                 port=int(os.getenv("POSTGRES_PORT", "5432")),
                 min_size=1,
