@@ -19,6 +19,45 @@ async def create_qr_auth():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/auth/session/verify")
+async def verify_session(session_id: Optional[str] = None):
+    """
+    Verify a session's validity and status
+    
+    Args:
+        session_id: Optional session ID to verify
+        
+    Returns:
+        Session status information
+    """
+    try:
+        if not session_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Session ID is required"
+            )
+            
+        # Get session status
+        status_info = await get_session_status(session_id)
+        if status_info:
+            logger.debug(f"Session {session_id} status: {status_info}")
+            return status_info
+        
+        # If no valid session found, return unauthorized
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired session"
+        )
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        logger.error(f"Error verifying session: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired session"
+        )
+
 @router.get("/auth/session/{session_id}")
 async def check_session_status(session_id: str):
     """Check the status of an authentication session"""
@@ -86,51 +125,28 @@ async def force_create_session(session_id: str) -> Dict:
     print(f"DEBUG: Force creating session {session_id}")
     print(f"DEBUG: APP_ENV={os.getenv('APP_ENV', 'development')}")
     
-    # Create a mock session
-    new_session = {
-        "created_at": datetime.utcnow(),
-        "expires_at": datetime.utcnow() + timedelta(hours=24),
-        "status": "pending",  # Start as pending, require explicit authentication
-        "user_id": None,  # No user ID until authenticated
+    # Create a mock session with JWT token
+    from ..middleware.session import SessionMiddleware
+    session_middleware = SessionMiddleware()
+    
+    # Create a JWT token for a mock user
+    token = session_middleware.create_session(
+        user_id=12345678,  # Mock user ID
+        is_qr=False  # This is an authenticated session
+    )
+    
+    # Store in client sessions
+    client_sessions[session_id] = {
+        "token": token,
+        "user_id": 12345678,
         "client": None
     }
     
-    # Ensure we're not overwriting an existing valid session
-    existing_session = get_or_load_session(session_id)
-    if existing_session and existing_session.get("status") == "authenticated":
-        print(f"DEBUG: Session {session_id} already exists, overwriting it")
-    
-    # Save both in memory and to file
-    client_sessions[session_id] = new_session
-    
-    # Explicitly save to file with detailed logging
-    try:
-        print(f"DEBUG: Attempting to save session {session_id} to file")
-        save_session_to_file(session_id, new_session)
-        print(f"DEBUG: Save to file completed")
-        
-        # Verify file was created
-        file_path = os.path.join(SESSIONS_DIR, f"{session_id}.json")
-        if os.path.exists(file_path):
-            print(f"DEBUG: Session file verification successful: {file_path}")
-        else:
-            print(f"ERROR: Session file not created despite no exceptions: {file_path}")
-    except Exception as e:
-        print(f"ERROR: Failed to save session {session_id} to file: {str(e)}")
-    
-    print(f"DEV MODE: Created forced session with ID: {session_id}")
-    
     return {
-        "status": "success",
-        "message": f"Development session created with ID: {session_id}",
         "session_id": session_id,
-        "expires_at": new_session["expires_at"].isoformat(),
-        "debug_info": {
-            "in_memory": session_id in client_sessions,
-            "file_created": os.path.exists(os.path.join(SESSIONS_DIR, f"{session_id}.json")),
-            "sessions_dir": SESSIONS_DIR,
-            "app_env": os.getenv("APP_ENV", "development")
-        }
+        "token": token,
+        "status": "authenticated",
+        "user_id": 12345678
     }
 
 @router.post("/auth/force-session/{session_id}/authenticate")
@@ -155,35 +171,37 @@ async def force_authenticate_session(session_id: str) -> Dict:
         )
     
     # Get the existing session
-    session = get_or_load_session(session_id)
+    session = client_sessions.get(session_id)
     if not session:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Session not found"
         )
     
-    # Update session to authenticated state
-    session.update({
-        "status": "authenticated",
-        "user_id": 12345678,  # Mock user ID for development
-        "expires_at": datetime.utcnow() + timedelta(hours=24)
-    })
+    # Create a new authenticated JWT token
+    from ..middleware.session import SessionMiddleware
+    session_middleware = SessionMiddleware()
     
-    # Save updated session
-    client_sessions[session_id] = session
-    save_session_to_file(session_id, session)
+    token = session_middleware.create_session(
+        user_id=12345678,  # Mock user ID
+        is_qr=False  # This is an authenticated session
+    )
+    
+    # Update session
+    session["token"] = token
+    session["user_id"] = 12345678
     
     return {
         "status": "success",
         "message": "Session authenticated successfully",
         "session_id": session_id,
-        "expires_at": session["expires_at"].isoformat()
+        "token": token
     }
 
 @router.get("/auth/sessions")
 async def list_all_sessions() -> Dict:
     """
-    FOR DEVELOPMENT USE ONLY: List all sessions in memory and on disk.
+    FOR DEVELOPMENT USE ONLY: List all sessions in memory.
     This helps diagnose issues with session management.
     
     Returns:
@@ -199,45 +217,21 @@ async def list_all_sessions() -> Dict:
     # Get in-memory sessions
     memory_sessions = {}
     for session_id, session in client_sessions.items():
-        memory_sessions[session_id] = {
-            "status": session.get("status"),
-            "user_id": session.get("user_id"),
-            "created_at": session.get("created_at").isoformat() if isinstance(session.get("created_at"), datetime) else session.get("created_at"),
-            "expires_at": session.get("expires_at").isoformat() if isinstance(session.get("expires_at"), datetime) else session.get("expires_at")
-        }
-    
-    # Get file-based sessions
-    file_sessions = {}
-    if os.path.exists(SESSIONS_DIR):
-        for filename in os.listdir(SESSIONS_DIR):
-            if filename.endswith('.json'):
-                session_id = filename[:-5]  # Remove .json extension
-                try:
-                    with open(os.path.join(SESSIONS_DIR, filename), 'r') as f:
-                        session_data = json.load(f)
-                        file_sessions[session_id] = {
-                            "status": session_data.get("status"),
-                            "user_id": session_data.get("user_id"),
-                            "created_at": session_data.get("created_at"),
-                            "expires_at": session_data.get("expires_at")
-                        }
-                except Exception as e:
-                    file_sessions[session_id] = {"error": str(e)}
+        try:
+            # Try to verify the token
+            session_data = get_or_load_session(session["token"])
+            memory_sessions[session_id] = {
+                "status": "authenticated" if session_data["is_authenticated"] else "pending",
+                "user_id": session_data["user_id"],
+                "expires_at": session_data["exp"].isoformat()
+            }
+        except Exception as e:
+            memory_sessions[session_id] = {"error": str(e)}
     
     return {
         "in_memory_sessions": memory_sessions,
-        "file_sessions": file_sessions,
-        "sessions_dir": SESSIONS_DIR,
-        "environment": os.getenv("APP_ENV", "development"),
-        "session_count": {
-            "in_memory": len(memory_sessions),
-            "file_based": len(file_sessions)
-        },
+        "session_count": len(memory_sessions),
         "debug_info": {
-            "cwd": os.getcwd(),
-            "sessions_dir_exists": os.path.exists(SESSIONS_DIR),
-            "sessions_dir_is_dir": os.path.isdir(SESSIONS_DIR) if os.path.exists(SESSIONS_DIR) else False,
-            "sessions_dir_writable": os.access(SESSIONS_DIR, os.W_OK) if os.path.exists(SESSIONS_DIR) else False,
             "app_env": os.getenv("APP_ENV", "development")
         }
     }
@@ -258,50 +252,27 @@ async def debug_session(session_id: str) -> Dict:
         )
     
     # Check in-memory session
-    memory_session = client_sessions.get(session_id)
-    memory_session_info = None
-    if memory_session:
-        memory_session_info = {
-            "status": memory_session.get("status"),
-            "user_id": memory_session.get("user_id"),
-            "created_at": memory_session.get("created_at").isoformat() if isinstance(memory_session.get("created_at"), datetime) else memory_session.get("created_at"),
-            "expires_at": memory_session.get("expires_at").isoformat() if isinstance(memory_session.get("expires_at"), datetime) else memory_session.get("expires_at"),
-            "has_client": memory_session.get("client") is not None
-        }
+    session = client_sessions.get(session_id)
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found"
+        )
     
-    # Check file session
-    file_path = os.path.join(SESSIONS_DIR, f"{session_id}.json")
-    file_session_info = None
-    if os.path.exists(file_path):
-        try:
-            with open(file_path, 'r') as f:
-                file_data = json.load(f)
-                file_session_info = {
-                    "status": file_data.get("status"),
-                    "user_id": file_data.get("user_id"),
-                    "created_at": file_data.get("created_at"),
-                    "expires_at": file_data.get("expires_at"),
-                    "file_size": os.path.getsize(file_path),
-                    "file_permissions": oct(os.stat(file_path).st_mode)[-3:],
-                    "last_modified": datetime.fromtimestamp(os.path.getmtime(file_path)).isoformat()
-                }
-        except Exception as e:
-            file_session_info = {"error": str(e)}
-    
-    return {
-        "session_id": session_id,
-        "in_memory": memory_session_info is not None,
-        "in_file": file_session_info is not None,
-        "memory_session": memory_session_info,
-        "file_session": file_session_info,
-        "backend_session_lookup_path": file_path,
-        "consistency_check": {
-            "status_match": (memory_session_info is None or file_session_info is None) or 
-                            (memory_session_info.get("status") == file_session_info.get("status")),
-            "user_id_match": (memory_session_info is None or file_session_info is None) or 
-                             (memory_session_info.get("user_id") == file_session_info.get("user_id"))
+    try:
+        # Try to verify the token
+        session_data = get_or_load_session(session["token"])
+        return {
+            "session_id": session_id,
+            "token": session["token"],
+            "session_data": session_data,
+            "has_client": session.get("client") is not None
         }
-    }
+    except Exception as e:
+        return {
+            "session_id": session_id,
+            "error": str(e)
+        }
 
 @router.get("/auth/session-ids")
 async def list_session_ids():

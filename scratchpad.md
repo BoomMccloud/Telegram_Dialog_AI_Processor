@@ -7,3 +7,5 @@
 - When using Jest, a test suite can fail even if all individual tests pass, typically due to issues in suite-level setup code or lifecycle hooks
 
 # Scratchpad
+
+Backend: PYTHONPATH=. uvicorn backend.app.main:app --reload --port 8000

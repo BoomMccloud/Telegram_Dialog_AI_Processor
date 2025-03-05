@@ -2,71 +2,79 @@
  * Session management utilities for the Telegram Dialog Processor
  */
 
-// Key used for storing the session ID in localStorage
-const SESSION_KEY = 'sessionId';
+// Key used for storing the JWT token in localStorage
+const TOKEN_KEY = 'jwt_token';
 
 /**
- * Get the current session ID from localStorage
- * @returns The session ID or null if not set
+ * Interface for JWT token payload
  */
-export function getSessionId(): string | null {
+interface JwtPayload {
+  user_id: number;
+  exp: number;
+  iat: number;
+  is_authenticated: boolean;
+  telegram_id?: number;
+}
+
+/**
+ * Get the current JWT token from localStorage
+ * @returns The JWT token or null if not set
+ */
+export function getToken(): string | null {
   if (typeof window === 'undefined') return null;
-  return localStorage.getItem(SESSION_KEY);
+  return localStorage.getItem(TOKEN_KEY);
 }
 
 /**
- * Set a session ID in localStorage
- * @param sessionId The session ID to store
+ * Set a JWT token in localStorage
+ * @param token The JWT token to store
  */
-export function setSessionId(sessionId: string): void {
+export function setToken(token: string): void {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(SESSION_KEY, sessionId);
+  localStorage.setItem(TOKEN_KEY, token);
 }
 
 /**
- * Clear the session ID from localStorage
+ * Clear the JWT token from localStorage
  */
-export function clearSessionId(): void {
+export function clearToken(): void {
   if (typeof window === 'undefined') return;
-  localStorage.removeItem(SESSION_KEY);
+  localStorage.removeItem(TOKEN_KEY);
 }
 
 /**
- * Check if there is a valid session ID stored
- * @returns True if a session ID is stored
+ * Check if there is a valid JWT token stored
+ * @returns True if a JWT token is stored
  */
-export function hasSession(): boolean {
-  return !!getSessionId();
+export function hasToken(): boolean {
+  return !!getToken();
 }
 
 /**
- * Create API URL with session ID
- * @param endpoint The API endpoint path (without session ID)
- * @returns Full API URL with session ID included
+ * Create API URL with authorization header
+ * @param endpoint The API endpoint path
+ * @returns Full API URL
  */
 export function createApiUrl(endpoint: string): string {
-  const sessionId = getSessionId();
-  if (!sessionId) {
-    throw new Error('No session ID available');
-  }
-  
-  // Replace any {session_id} placeholder with the actual session ID
-  if (endpoint.includes('{session_id}')) {
-    return endpoint.replace('{session_id}', sessionId);
-  }
-  
-  // Otherwise, just ensure the URL is properly formatted
+  // Just ensure the URL is properly formatted
   return endpoint;
 }
 
 /**
- * Create headers for API requests
- * @returns Headers object with content type set to JSON
+ * Create headers for API requests with JWT token
+ * @returns Headers object with content type and authorization token
  */
 export function createApiHeaders(): HeadersInit {
-  return {
+  const token = getToken();
+  const headers: HeadersInit = {
     'Content-Type': 'application/json',
   };
+  
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  
+  return headers;
 }
 
 /**
@@ -75,4 +83,39 @@ export function createApiHeaders(): HeadersInit {
  */
 export function isDevelopmentMode(): boolean {
   return process.env.NODE_ENV === 'development';
+}
+
+/**
+ * Parse JWT token to get payload data
+ * @param token The JWT token to parse
+ * @returns The decoded payload or null if invalid
+ */
+export function parseJwtToken(token: string): JwtPayload | null {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(''));
+
+    return JSON.parse(jsonPayload) as JwtPayload;
+  } catch (e) {
+    console.error('Error parsing JWT token:', e);
+    return null;
+  }
+}
+
+/**
+ * Check if a JWT token is expired
+ * @param token The JWT token to check
+ * @returns True if the token is expired or invalid
+ */
+export function isTokenExpired(token: string): boolean {
+  const payload = parseJwtToken(token);
+  if (!payload || !payload.exp) return true;
+  
+  const expirationTime = payload.exp * 1000; // Convert to milliseconds
+  const currentTime = Date.now();
+  
+  return currentTime >= expirationTime;
 } 

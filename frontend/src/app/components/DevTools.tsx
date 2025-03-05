@@ -7,9 +7,9 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
 
 export default function DevTools() {
   const [isVisible, setIsVisible] = useState(false);
-  const [mockSessionId, setMockSessionId] = useState('');
+  const [mockToken, setMockToken] = useState('');
   const [isAuthenticating, setIsAuthenticating] = useState(false);
-  const { sessionId, login, logout } = useSession();
+  const { token, login, logout } = useSession();
   
   // Only show in development mode
   useEffect(() => {
@@ -21,8 +21,8 @@ export default function DevTools() {
   }
 
   const setMockSession = () => {
-    if (mockSessionId && mockSessionId.trim() !== '') {
-      login(mockSessionId);
+    if (mockToken && mockToken.trim() !== '') {
+      login(mockToken);
     }
   };
 
@@ -31,9 +31,9 @@ export default function DevTools() {
   };
 
   const copyToClipboard = () => {
-    if (sessionId) {
-      navigator.clipboard.writeText(sessionId);
-      alert('Session ID copied to clipboard!');
+    if (token) {
+      navigator.clipboard.writeText(token);
+      alert('JWT token copied to clipboard!');
     }
   };
 
@@ -48,18 +48,19 @@ export default function DevTools() {
   };
 
   const authenticateSession = async () => {
-    if (!sessionId) {
+    if (!token) {
       alert('No active session to authenticate');
       return;
     }
 
     setIsAuthenticating(true);
     try {
-      // Call the force-session/authenticate endpoint to authenticate the current session
-      const response = await fetch(`${API_URL}/auth/force-session/${sessionId}/authenticate`, {
+      // Call the force-authenticate endpoint to authenticate the current session
+      const response = await fetch(`${API_URL}/auth/force-authenticate`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         }
       });
 
@@ -71,8 +72,8 @@ export default function DevTools() {
       const data = await response.json();
       if (data.status === 'success') {
         alert('Session authenticated successfully!');
-        // Re-login with the same session ID to refresh the frontend state
-        login(sessionId);
+        // Re-login with the same token to refresh the frontend state
+        login(token);
       } else {
         throw new Error('Failed to authenticate session');
       }
@@ -86,63 +87,64 @@ export default function DevTools() {
   };
 
   return (
-    <div className="fixed bottom-4 right-4 p-4 bg-gray-800 text-white rounded-lg shadow-lg z-50 text-sm">
-      <h3 className="font-bold text-yellow-300 mb-2">Dev Tools</h3>
-      <div className="mb-2">
-        <div className="text-xs text-gray-400">Current Session:</div>
-        <div className="font-mono text-xs break-all max-w-xs">{sessionId || '(none)'}</div>
-      </div>
+    <div className="fixed bottom-4 right-4 p-4 bg-gray-800 text-white rounded-lg shadow-lg">
+      <h3 className="text-lg font-bold mb-4">Development Tools</h3>
       
-      <div className="flex flex-col space-y-2 mt-3">
-        <input
-          type="text"
-          value={mockSessionId}
-          onChange={(e) => setMockSessionId(e.target.value)}
-          placeholder="Enter mock session ID"
-          className="px-2 py-1 text-black text-sm rounded"
-        />
-        
-        <div className="grid grid-cols-2 gap-2">
+      <div className="space-y-4">
+        <div>
+          <label className="block mb-2">Mock JWT Token:</label>
+          <input
+            type="text"
+            value={mockToken}
+            onChange={(e) => setMockToken(e.target.value)}
+            className="w-full p-2 text-black rounded"
+            placeholder="Enter JWT token"
+          />
           <button
             onClick={setMockSession}
-            className="bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded text-xs"
+            className="mt-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
           >
-            Set Session
+            Set Mock Session
           </button>
-          
+        </div>
+
+        <div className="space-y-2">
           <button
             onClick={clearSession}
-            className="bg-red-600 hover:bg-red-700 px-2 py-1 rounded text-xs"
+            className="w-full px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
           >
             Clear Session
           </button>
           
           <button
             onClick={copyToClipboard}
-            className="bg-gray-600 hover:bg-gray-700 px-2 py-1 rounded text-xs"
-            disabled={!sessionId}
+            className="w-full px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+            disabled={!token}
           >
-            Copy ID
+            Copy JWT Token
+          </button>
+          
+          <button
+            onClick={authenticateSession}
+            className="w-full px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600"
+            disabled={!token || isAuthenticating}
+          >
+            {isAuthenticating ? 'Authenticating...' : 'Force Authenticate'}
           </button>
           
           <button
             onClick={testApi}
-            className="bg-green-600 hover:bg-green-700 px-2 py-1 rounded text-xs"
+            className="w-full px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600"
           >
             Test API
           </button>
+        </div>
 
-          <button
-            onClick={authenticateSession}
-            disabled={!sessionId || isAuthenticating}
-            className={`col-span-2 ${
-              isAuthenticating 
-                ? 'bg-yellow-600 cursor-wait' 
-                : 'bg-purple-600 hover:bg-purple-700'
-            } px-2 py-1 rounded text-xs`}
-          >
-            {isAuthenticating ? 'Authenticating...' : 'Authenticate Session'}
-          </button>
+        <div className="mt-4 text-sm">
+          <p>Current Token:</p>
+          <pre className="mt-1 p-2 bg-gray-700 rounded overflow-x-auto">
+            {token || 'No token'}
+          </pre>
         </div>
       </div>
     </div>

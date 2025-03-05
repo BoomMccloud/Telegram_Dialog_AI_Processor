@@ -14,15 +14,16 @@ from .api.responses import router as responses_router
 from .db.migrations import check_and_migrate_database, init_db
 from .db.migrate_model_data import migrate_model_data
 from .api import auth, dialogs, messages, models
+from .middleware.session import SessionMiddleware
 
 # Import session functions
-from .services.auth import load_all_sessions, cleanup_sessions, periodic_cleanup, ensure_sessions_dir
+from .services.auth import load_all_sessions, cleanup_sessions, periodic_cleanup, ensure_sessions_dir, init_session_middleware
 
 # Load environment variables
 load_dotenv()
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 # Check if we're in development mode
@@ -115,6 +116,16 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Initialize session middleware for token management
+session_middleware = SessionMiddleware()
+init_session_middleware(session_middleware)
+
+# Add session middleware to the app
+app.add_middleware(SessionMiddleware)
+
+# Ensure sessions directory exists
+ensure_sessions_dir()
+
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
@@ -170,6 +181,18 @@ async def health_check():
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Health check failed: {str(e)}"
         )
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize any resources needed on startup"""
+    logger.info("Starting up FastAPI application")
+    # Additional startup tasks can be added here
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Clean up resources on shutdown"""
+    logger.info("Shutting down FastAPI application")
+    # Additional cleanup tasks can be added here
 
 if __name__ == "__main__":
     import uvicorn

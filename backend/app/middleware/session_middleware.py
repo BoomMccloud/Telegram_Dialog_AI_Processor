@@ -9,14 +9,12 @@ from fastapi import Request, HTTPException, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Dict, Optional
 
-from app.services.auth import get_or_load_session
 from app.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
 # Security scheme for session headers
 security = HTTPBearer(auto_error=False)
-
 
 async def verify_session(
     request: Request,
@@ -63,10 +61,20 @@ async def verify_session(
             detail="Session ID required for authentication",
         )
     
+    # Get the session middleware instance from app state
+    session_middleware = request.app.state.session_middleware
+    if not session_middleware:
+        logger.error("Session middleware not initialized")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Session middleware not initialized",
+        )
+    
     # Validate the session
-    session = get_or_load_session(session_id)
-    if not session:
-        logger.warning(f"Invalid session ID: {session_id}")
+    try:
+        session = session_middleware.verify_session(session_id)
+    except Exception as e:
+        logger.warning(f"Invalid session ID: {session_id} - {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired session",

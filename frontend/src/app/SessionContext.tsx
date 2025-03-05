@@ -6,10 +6,10 @@ import { useRouter } from 'next/navigation';
 type SessionStatus = 'authenticated' | 'pending' | 'error' | 'unauthenticated';
 
 interface SessionContextType {
-  sessionId: string | null;
+  token: string | null;
   status: SessionStatus;
   isAuthenticated: boolean;
-  login: (sessionId: string, initialStatus?: SessionStatus) => void;
+  login: (token: string, initialStatus?: SessionStatus) => void;
   logout: () => void;
   refreshSession: () => Promise<boolean>;
   getSessionHeaders: () => HeadersInit;
@@ -21,13 +21,13 @@ interface SessionContextType {
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
 
 // Key used for storing the session ID in localStorage
-const SESSION_KEY = 'sessionId';
+const SESSION_KEY = 'jwt_token';
 
 // API URL from environment
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
 
 export function SessionProvider({ children }: { children: React.ReactNode }) {
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [status, setStatus] = useState<SessionStatus>('unauthenticated');
   const router = useRouter();
   
@@ -57,12 +57,12 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // Login function
-  const login = useCallback((newSessionId: string, initialStatus?: SessionStatus) => {
+  const login = useCallback((newToken: string, initialStatus?: SessionStatus) => {
     // Clear any existing intervals before setting the new session
     clearAllIntervals();
     
-    localStorage.setItem(SESSION_KEY, newSessionId);
-    setSessionId(newSessionId);
+    localStorage.setItem(SESSION_KEY, newToken);
+    setToken(newToken);
     
     if (initialStatus) {
       setStatus(initialStatus);
@@ -70,11 +70,15 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     }
     
     // Check the session status
-    fetch(`${API_URL}/auth/session/${newSessionId}`)
+    fetch(`${API_URL}/auth/session/verify`, {
+      headers: {
+        'Authorization': `Bearer ${newToken}`
+      }
+    })
       .then(response => response.json())
       .then(data => {
         setStatus(data.status);
-        console.log('Session login successful:', newSessionId, 'status:', data.status);
+        console.log('Session login successful:', 'status:', data.status);
         
         // If authenticated and no initial status was provided, redirect to home
         if (data.status === 'authenticated' && !initialStatus) {
@@ -91,14 +95,14 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(async () => {
     clearAllIntervals();
     
-    // If we have a session ID, call the logout endpoint
-    if (sessionId) {
+    // If we have a token, call the logout endpoint
+    if (token) {
       try {
         // Call the explicit logout endpoint first
-        const response = await fetch(`${API_URL}/auth/logout/${sessionId}`, {
+        const response = await fetch(`${API_URL}/auth/logout`, {
           method: 'POST',
           headers: {
-            'X-Session-ID': sessionId
+            'Authorization': `Bearer ${token}`
           }
         });
         
@@ -114,29 +118,33 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem(SESSION_KEY);
     
     // Clear the session state
-    setSessionId(null);
+    setToken(null);
     setStatus('unauthenticated');
     
     // Navigate to login page
     router.push('/');
     
     console.log('Session logged out');
-  }, [clearAllIntervals, router, sessionId]);
+  }, [clearAllIntervals, router, token]);
 
   // Load session from localStorage on mount
   useEffect(() => {
     const loadStoredSession = async () => {
-      const storedSessionId = localStorage.getItem(SESSION_KEY);
+      const storedToken = localStorage.getItem(SESSION_KEY);
       
-      if (storedSessionId) {
-        // Don't set the session ID until we verify it's valid
+      if (storedToken) {
+        // Don't set the token until we verify it's valid
         try {
-          const response = await fetch(`${API_URL}/auth/session/${storedSessionId}`);
+          const response = await fetch(`${API_URL}/auth/session/verify`, {
+            headers: {
+              'Authorization': `Bearer ${storedToken}`
+            }
+          });
           
           if (response.ok) {
             const data = await response.json();
             if (data.status === 'authenticated') {
-              setSessionId(storedSessionId);
+              setToken(storedToken);
               setStatus('authenticated');
             } else {
               // Session exists but is not authenticated
@@ -165,8 +173,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
   // Create a managed fetch function that can be aborted when the session changes
   const managedFetch = useCallback(async (url: string, options: RequestInit = {}) => {
-    if (!sessionId) {
-      console.error('Attempting fetch without a valid session ID');
+    if (!token) {
+      console.error('Attempting fetch without a valid token');
       return null;
     }
     
@@ -176,10 +184,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     activeRequests.current.push(controller);
     
     try {
-      // Ensure headers are properly merged with session ID
+      // Ensure headers are properly merged with Authorization token
       const headers = {
         ...options.headers,
-        'X-Session-ID': sessionId
+        'Authorization': `Bearer ${token}`
       };
       
       const response = await fetch(url, { 
@@ -208,18 +216,21 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         activeRequests.current.splice(index, 1);
       }
     }
-  }, [sessionId, logout]);
+  }, [token, logout]);
 
   // Refresh the session - returns true if successful
   const refreshSession = useCallback(async (): Promise<boolean> => {
-    if (!sessionId) return false;
+    if (!token) return false;
     
     try {
       const controller = new AbortController();
       activeRequests.current.push(controller);
       
-      const response = await fetch(`${API_URL}/auth/session/${sessionId}/refresh`, {
+      const response = await fetch(`${API_URL}/auth/session/refresh`, {
         method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
         signal: controller.signal
       });
       
@@ -229,6 +240,12 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       }
       
       if (response.ok) {
+        const data = await response.json();
+        // Update token with new refreshed token
+        if (data.token) {
+          localStorage.setItem(SESSION_KEY, data.token);
+          setToken(data.token);
+        }
         console.log('Session refreshed successfully');
         return true;
       } else {
@@ -242,19 +259,19 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       console.error('Error refreshing session:', error);
       return false;
     }
-  }, [sessionId, logout]);
+  }, [token, logout]);
 
-  // Get headers with the session ID
+  // Get headers with the Authorization token
   const getSessionHeaders = useCallback((): HeadersInit => {
     return {
       'Content-Type': 'application/json',
-      'X-Session-ID': sessionId || ''
+      'Authorization': `Bearer ${token || ''}`
     };
-  }, [sessionId]);
+  }, [token]);
 
   // Context value
   const value = {
-    sessionId,
+    token,
     status,
     isAuthenticated: status === 'authenticated',
     login,

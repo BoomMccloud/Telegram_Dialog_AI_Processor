@@ -8,9 +8,11 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
 
 export default function Home() {
   const [qrCode, setQrCode] = useState<string>('');
-  const [tempSessionId, setTempSessionId] = useState<string>('');
+  const [sessionId, setSessionId] = useState<string>('');
+  const [sessionToken, setSessionToken] = useState<string>('');
   const [authStatus, setAuthStatus] = useState<string>('pending');
   const [isLoading, setIsLoading] = useState(false);
+  const [lastRefresh, setLastRefresh] = useState<number>(Date.now());
   const router = useRouter();
   const { login, isAuthenticated } = useSession();
 
@@ -22,9 +24,11 @@ export default function Home() {
       });
       const data = await response.json();
       setQrCode(data.qr_code);
-      setTempSessionId(data.session_id);
+      setSessionId(data.session_id);
+      setSessionToken(data.token);
       setAuthStatus('pending');
-      login(data.session_id, 'pending');
+      setLastRefresh(Date.now());
+      login(data.token, 'pending');
     } catch (error) {
       console.error('Error creating QR session:', error);
       setAuthStatus('error');
@@ -34,11 +38,26 @@ export default function Home() {
   };
 
   const checkSessionStatus = async () => {
-    if (!tempSessionId) return;
+    if (!sessionId || !sessionToken) return;
 
     try {
-      console.log('Checking session status for:', tempSessionId);
-      const response = await fetch(`${API_URL}/auth/session/${tempSessionId}`);
+      console.log('Checking session status...');
+      const response = await fetch(`${API_URL}/auth/session/verify?session_id=${sessionId}`, {
+        headers: {
+          'Authorization': `Bearer ${sessionToken}`
+        }
+      });
+      
+      // Handle 401 (Unauthorized)
+      if (response.status === 401) {
+        const errorData = await response.json();
+        // Only refresh QR code if the session is actually expired
+        if (errorData.detail === "Session expired") {
+          console.log('Session expired, refreshing QR code...');
+          await createQrSession();
+        }
+        return;
+      }
       
       // Only handle 404 as a true "not found" error
       if (response.status === 404) {
@@ -63,6 +82,9 @@ export default function Home() {
 
       if (data.status === 'authenticated') {
         console.log('Authentication successful, storing session and redirecting...');
+        // If we get a new token in the response, use that instead
+        const finalToken = data.token || sessionToken;
+        login(finalToken, 'authenticated');
         router.push('/home');
       }
     } catch (error) {
@@ -71,13 +93,26 @@ export default function Home() {
     }
   };
 
-  // Only create QR session on initial load or manual regeneration
+  // Create QR session on initial load or when needed
   useEffect(() => {
-    const shouldCreateSession = !qrCode && !isLoading && !tempSessionId;
+    const shouldCreateSession = !qrCode && !isLoading && !sessionId && !sessionToken;
     if (shouldCreateSession) {
       createQrSession();
     }
-  }, []); // Empty dependency array, only run on mount
+  }, [qrCode, isLoading, sessionId, sessionToken]); // Add dependencies to re-run when needed
+
+  // Refresh QR code every 9 minutes (before the 10-minute expiration)
+  useEffect(() => {
+    const refreshInterval = 9 * 60 * 1000; // 9 minutes in milliseconds
+    const timeoutId = setTimeout(() => {
+      if (authStatus === 'pending') {
+        console.log('QR code about to expire, refreshing...');
+        createQrSession();
+      }
+    }, refreshInterval);
+
+    return () => clearTimeout(timeoutId);
+  }, [lastRefresh, authStatus]);
 
   // Only redirect if authenticated
   useEffect(() => {
@@ -86,10 +121,11 @@ export default function Home() {
     }
   }, [isAuthenticated, router]);
 
+  // Poll for session status
   useEffect(() => {
     let intervalId: NodeJS.Timeout | null = null;
     
-    if (tempSessionId && authStatus === 'pending') {
+    if (sessionId && sessionToken && authStatus === 'pending') {
       intervalId = setInterval(checkSessionStatus, 2000);
     }
     
@@ -98,73 +134,45 @@ export default function Home() {
         clearInterval(intervalId);
       }
     };
-  }, [tempSessionId, authStatus]);
+  }, [sessionId, sessionToken, authStatus]);
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-24">
-      <div className="z-10 max-w-5xl w-full items-center justify-center font-mono text-sm">
-        <h1 className="text-4xl font-bold mb-8 text-center">
-          Telegram Dialog Processor
-        </h1>
-        
-        <div className="bg-white rounded-lg p-8 shadow-lg max-w-md mx-auto dark:bg-gray-800">
-          <h2 className="text-2xl font-semibold mb-4 text-center">
-            Telegram Login
-          </h2>
+    <main className="flex min-h-screen flex-col items-center justify-between p-24">
+      <div className="z-10 max-w-5xl w-full items-center justify-between font-mono text-sm lg:flex">
+        <div className="flex flex-col items-center justify-center">
+          <h1 className="text-4xl font-bold mb-8">Telegram Dialog AI Processor</h1>
           
-          {!qrCode && !isLoading && (
-            <div className="flex flex-col items-center">
-              <p className="text-gray-600 dark:text-gray-300 mb-4">
-                Click the button below to start the login process
+          {isLoading ? (
+            <div className="text-center">
+              <p>Loading QR code...</p>
+            </div>
+          ) : qrCode ? (
+            <div className="text-center">
+              <img 
+                src={`data:image/png;base64,${qrCode}`} 
+                alt="QR Code for Telegram Login" 
+                className="mb-4"
+              />
+              <p className="mb-2">Scan this QR code with your Telegram mobile app</p>
+              <p className="text-sm text-gray-500">
+                Status: {authStatus === 'pending' ? 'Waiting for scan...' : authStatus}
               </p>
               <button
                 onClick={createQrSession}
-                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
+                className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
               >
-                Login with Telegram
+                Generate New QR Code
               </button>
             </div>
-          )}
-          
-          {isLoading && (
-            <div className="flex justify-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 dark:border-gray-100"></div>
-            </div>
-          )}
-          
-          {qrCode && !isLoading && (
-            <div className="flex flex-col items-center">
-              <img
-                src={qrCode}
-                alt="QR Code"
-                className="w-64 h-64 mb-4"
-              />
-              <p className="text-gray-600 dark:text-gray-300">
-                Open Telegram and scan this QR code to log in
-              </p>
-              {authStatus === 'pending' && (
-                <p className="text-blue-600 mt-2">
-                  Waiting for authentication...
-                </p>
-              )}
-              {authStatus === 'authenticated' && (
-                <p className="text-green-600 mt-2">
-                  Authentication successful!
-                </p>
-              )}
-              {authStatus === 'error' && (
-                <div className="flex flex-col items-center mt-4">
-                  <p className="text-red-600 mb-2">
-                    QR code expired. Please try again.
-                  </p>
-                  <button
-                    onClick={createQrSession}
-                    className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
-                  >
-                    Generate New QR Code
-                  </button>
-                </div>
-              )}
+          ) : (
+            <div className="text-center">
+              <p className="text-red-500">Error loading QR code</p>
+              <button
+                onClick={createQrSession}
+                className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+              >
+                Try Again
+              </button>
             </div>
           )}
         </div>
