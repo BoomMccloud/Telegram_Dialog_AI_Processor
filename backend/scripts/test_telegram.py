@@ -1,6 +1,11 @@
 import os
 from telethon import TelegramClient
 import asyncio
+from pathlib import Path
+
+# Create sessions directory if it doesn't exist
+SESSIONS_DIR = Path("sessions")
+SESSIONS_DIR.mkdir(exist_ok=True)
 
 async def test():
     try:
@@ -13,8 +18,9 @@ async def test():
             
         print(f'Using API ID: {api_id}')
         
-        # Create a new client instance
-        client = TelegramClient('sessions/test', int(api_id), api_hash)
+        # Create a new client instance with session file in sessions directory
+        session_file = str(SESSIONS_DIR / 'test')
+        client = TelegramClient(session_file, int(api_id), api_hash)
         
         print('Connecting to Telegram...')
         await client.connect()

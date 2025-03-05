@@ -16,9 +16,14 @@ import logging
 from fastapi import Request
 from telethon.tl.custom import QRLogin
 import io
+from pathlib import Path
 
 # Configure logging
 logger = logging.getLogger(__name__)
+
+# Create sessions directory if it doesn't exist
+SESSIONS_DIR = Path("sessions")
+SESSIONS_DIR.mkdir(exist_ok=True)
 
 # Global storage for client sessions
 client_sessions: Dict[str, Dict] = {}
@@ -34,8 +39,9 @@ async def create_telegram_client() -> tuple[TelegramClient, str]:
     # Generate a unique session ID
     session_id = str(uuid.uuid4())
     
-    # Create a new client instance
-    client = TelegramClient(f'sessions/{session_id}', int(api_id), api_hash)
+    # Create a new client instance with session file in sessions directory
+    session_file = str(SESSIONS_DIR / f'session_{session_id}')
+    client = TelegramClient(session_file, int(api_id), api_hash)
     
     # Connect to Telegram
     await client.connect()
@@ -54,9 +60,10 @@ async def create_auth_session() -> Dict:
             session = await session_middleware.create_session(db=db, is_qr=True)
             token = session.token
         
-        # Create Telegram client
+        # Create Telegram client with session file in sessions directory
+        session_file = str(SESSIONS_DIR / 'anon')
         client = TelegramClient(
-            'anon',
+            session_file,
             api_id=int(os.getenv("TELEGRAM_API_ID")),
             api_hash=os.getenv("TELEGRAM_API_HASH")
         )

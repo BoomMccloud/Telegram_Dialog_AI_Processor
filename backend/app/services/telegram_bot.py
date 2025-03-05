@@ -5,6 +5,11 @@ import json
 from datetime import datetime
 from .auth import qr_sessions
 from app.db.database import get_raw_connection
+from pathlib import Path
+
+# Create sessions directory if it doesn't exist
+SESSIONS_DIR = Path("sessions")
+SESSIONS_DIR.mkdir(exist_ok=True)
 
 class TelegramBot:
     def __init__(self):
@@ -15,7 +20,9 @@ class TelegramBot:
         if not all([self.api_id, self.api_hash, self.bot_token]):
             raise ValueError("Missing Telegram credentials in environment variables")
         
-        self.client = TelegramClient('bot', self.api_id, self.api_hash)
+        # Create Telegram client with session file in sessions directory
+        session_file = str(SESSIONS_DIR / 'bot')
+        self.client = TelegramClient(session_file, self.api_id, self.api_hash)
         
     async def start(self):
         """Start the bot and register event handlers"""

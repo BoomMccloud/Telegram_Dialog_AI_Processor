@@ -10,6 +10,7 @@ from typing import Dict, Optional, Any
 from fastapi import APIRouter, HTTPException, status, Depends, Request
 from pydantic import BaseModel
 from telethon import TelegramClient
+from pathlib import Path
 
 from ..dependencies.auth import get_session_manager, get_current_session, get_refresh_session
 from ..utils.logging import get_logger
@@ -22,6 +23,10 @@ from sqlalchemy import select
 
 router = APIRouter(prefix="/api/auth")
 logger = get_logger(__name__)
+
+# Create sessions directory if it doesn't exist
+SESSIONS_DIR = Path("sessions")
+SESSIONS_DIR.mkdir(exist_ok=True)
 
 class DevLoginRequest(BaseModel):
     """Request model for development login"""
@@ -54,9 +59,10 @@ async def create_qr_auth(
             device_info={"user_agent": request.headers.get("user-agent")}
         )
         
-        # Create Telegram client
+        # Create Telegram client with session file in sessions directory
+        session_file = str(SESSIONS_DIR / f'session_{session.id}')
         client = TelegramClient(
-            f'session_{session.id}',
+            session_file,
             api_id=int(os.getenv("TELEGRAM_API_ID")),
             api_hash=os.getenv("TELEGRAM_API_HASH")
         )
