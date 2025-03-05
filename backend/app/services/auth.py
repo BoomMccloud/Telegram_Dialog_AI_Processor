@@ -1,3 +1,7 @@
+"""
+Authentication service module for Telegram integration
+"""
+
 import qrcode
 from io import BytesIO
 import base64
@@ -198,7 +202,7 @@ async def create_auth_session() -> dict:
             
             # Create a JWT token for the QR session
             logger.info("Creating JWT token for QR session...")
-            token = session_middleware.create_session(0, is_qr=True)
+            token = await session_middleware.create_session(is_qr=True)
             
             # Store client info in memory
             logger.info("Storing session in memory...")
@@ -248,77 +252,67 @@ async def monitor_login(client, qr_login, session_id):
         # Wait for the login result
         login_result = await qr_login.wait()
         if login_result:
-            logger.info(f"QR login successful for session {session_id}")
             # Get user info
             me = await client.get_me()
+            telegram_id = me.id
             
-            # Create an authenticated JWT token
-            auth_token = session_middleware.create_session(
-                me.id,
-                is_qr=False  # This is now an authenticated session
-            )
-            
-            # Update client sessions
-            if session_id in client_sessions:
-                client_sessions[session_id]["token"] = auth_token
-                client_sessions[session_id]["user_id"] = me.id
-                
-                # Save the Telethon session
-                await client.session.save()
-                
-                logger.info(f"Session {session_id} authenticated for user {me.id}")
+            # Update session with user info
+            session_data = client_sessions.get(session_id)
+            if session_data:
+                token = session_data["token"]
+                # Update session in database
+                await session_middleware.update_session(token, {
+                    "telegram_id": telegram_id,
+                    "status": "authenticated",
+                    "metadata": {
+                        "telegram_id": telegram_id,
+                        "username": me.username,
+                        "first_name": me.first_name,
+                        "last_name": me.last_name
+                    }
+                })
+                logger.info(f"Session {session_id} authenticated for user {telegram_id}")
         else:
             logger.warning(f"QR login failed for session {session_id}")
-            
+            # Mark session as error in database
+            session_data = client_sessions.get(session_id)
+            if session_data:
+                token = session_data["token"]
+                await session_middleware.update_session(token, {
+                    "status": "error"
+                })
     except Exception as e:
-        logger.error(f"Error in QR login monitoring for session {session_id}: {str(e)}")
+        logger.error(f"Error in QR login monitoring: {str(e)}")
+        # Mark session as error in database
+        session_data = client_sessions.get(session_id)
+        if session_data:
+            token = session_data["token"]
+            await session_middleware.update_session(token, {
+                "status": "error"
+            })
+    finally:
+        # Clean up client session from memory
+        if session_id in client_sessions:
+            await client_sessions[session_id]["client"].disconnect()
+            del client_sessions[session_id]
 
 async def get_session_status(session_id: str) -> Optional[dict]:
-    """Get the status of an authentication session"""
-    try:
-        session = client_sessions.get(session_id)
-        if not session:
-            logger.debug(f"Session {session_id} not found")
-            return None
+    """Get the current status of a session"""
+    session_data = client_sessions.get(session_id)
+    if not session_data:
+        return None
         
-        # Try to decode the current token
-        if "token" not in session:
-            logger.debug(f"No token in session {session_id}")
-            return {
-                "status": "pending",
-                "message": "Session initialized"
-            }
-            
-        token = session["token"]
-        try:
-            session_data = session_middleware.verify_session(token)
-            
-            # Check if this is a QR session that's been authenticated
-            is_authenticated = session_data.get("is_authenticated", False)
-            user_id = session_data.get("user_id", 0)
-            
-            if is_authenticated and user_id != 0:
-                return {
-                    "status": "authenticated",
-                    "user_id": user_id,
-                    "token": token,  # Return the token for the frontend to use
-                    "expires_at": session_data.get("exp").isoformat()
-                }
-            else:
-                return {
-                    "status": "pending",
-                    "message": "Waiting for QR code scan"
-                }
-        except Exception as e:
-            logger.error(f"Error verifying session token: {str(e)}")
-            # If token verification fails, return pending status
-            return {
-                "status": "pending",
-                "message": "Session token verification failed"
-            }
-            
+    token = session_data["token"]
+    try:
+        # Get session from database
+        session = await session_middleware.verify_session(token)
+        return {
+            "status": session.status,
+            "telegram_id": session.telegram_id,
+            "metadata": session.metadata
+        }
     except Exception as e:
-        logger.error(f"Error in get_session_status: {str(e)}")
+        logger.error(f"Error getting session status: {str(e)}")
         return None
 
 async def cleanup_sessions():

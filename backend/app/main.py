@@ -1,10 +1,16 @@
+"""
+Main FastAPI application module
+"""
+
+import os
+from contextlib import asynccontextmanager
+import asyncio
+from typing import AsyncGenerator
+import logging
+
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
-import os
-import logging
-import asyncio
-from contextlib import asynccontextmanager
 
 from .api.auth import router as auth_router
 from .api.messages import router as messages_router
@@ -13,11 +19,8 @@ from .api.models import router as models_router
 from .api.responses import router as responses_router
 from .db.migrations import check_and_migrate_database, init_db
 from .db.migrate_model_data import migrate_model_data
-from .api import auth, dialogs, messages, models
 from .middleware.session import SessionMiddleware
-
-# Import session functions
-from .services.auth import load_all_sessions, cleanup_sessions, periodic_cleanup, ensure_sessions_dir, init_session_middleware
+from .services.auth import init_session_middleware
 
 # Load environment variables
 load_dotenv()
@@ -39,43 +42,28 @@ if DEV_MODE:
 # Configure CORS origins
 allowed_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
 
-# Background task for periodic cleanup
-cleanup_task = None
+# Session cleanup interval in seconds
+SESSION_CLEANUP_INTERVAL = int(os.getenv("SESSION_CLEANUP_INTERVAL", "300"))  # 5 minutes default
 
-async def start_periodic_cleanup():
-    """Start periodic cleanup of stale sessions"""
+async def cleanup_sessions_task(app: FastAPI):
+    """Background task to clean up expired sessions"""
     while True:
         try:
-            # Run cleanup every 30 minutes
-            await asyncio.sleep(30 * 60)  # 30 minutes
-            await periodic_cleanup()
-        except asyncio.CancelledError:
-            logger.info("Periodic cleanup task cancelled")
-            break
+            await app.state.session_middleware.cleanup_expired_sessions()
         except Exception as e:
-            logger.error(f"Error in periodic cleanup: {str(e)}")
-            # Wait a bit before retrying
-            await asyncio.sleep(60)
+            logger.error(f"Error in session cleanup task: {str(e)}")
+        await asyncio.sleep(SESSION_CLEANUP_INTERVAL)
 
 # Define lifespan manager
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Handle application startup and shutdown events"""
-    global cleanup_task
-    
     current_env = os.getenv("APP_ENV", "development")
     print(f"Starting application in {current_env} environment")
     
-    # Create sessions directory if it doesn't exist
-    ensure_sessions_dir()
-    
-    # Load existing sessions at startup
-    loaded_count = load_all_sessions()
-    print(f"Loaded {loaded_count} sessions at startup")
-    
-    # Start periodic cleanup
-    cleanup_task = asyncio.create_task(start_periodic_cleanup())
-    print("Started periodic session cleanup task")
+    # Start session cleanup task
+    cleanup_task = asyncio.create_task(cleanup_sessions_task(app))
+    print("Started session cleanup task")
     
     # Startup: initialize database
     try:
@@ -88,25 +76,18 @@ async def lifespan(app: FastAPI):
         await migrate_model_data()
         logger.info("Model data migration complete.")
         
-        # Run an initial cleanup to remove any stale sessions
-        cleanup_count = await periodic_cleanup()
-        logger.info(f"Initial cleanup complete: removed {cleanup_count} stale sessions")
-        
     except Exception as e:
         logger.error(f"Error during startup: {str(e)}")
     
     yield
     
-    # Cancel the periodic cleanup task
-    if cleanup_task:
-        cleanup_task.cancel()
-        try:
-            await cleanup_task
-        except asyncio.CancelledError:
-            pass
+    # Cancel cleanup task on shutdown
+    cleanup_task.cancel()
+    try:
+        await cleanup_task
+    except asyncio.CancelledError:
+        pass
     
-    # Cleanup at shutdown
-    await cleanup_sessions()
     print("Application shutdown complete")
 
 app = FastAPI(
@@ -116,15 +97,10 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Initialize session middleware for token management
-session_middleware = SessionMiddleware()
-init_session_middleware(session_middleware)
-
-# Add session middleware to the app
+# Initialize session middleware and share it with auth service
+session_middleware = SessionMiddleware(app)
+init_session_middleware(session_middleware)  # Share with auth service
 app.add_middleware(SessionMiddleware)
-
-# Ensure sessions directory exists
-ensure_sessions_dir()
 
 # Configure CORS
 app.add_middleware(

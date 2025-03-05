@@ -178,6 +178,28 @@ EXPECTED_TABLES = {
             "idx_processed_responses_dialog",
             "idx_processed_responses_user"
         ]
+    },
+    "sessions": {
+        "columns": {
+            "id": "uuid",
+            "telegram_id": "bigint",
+            "status": "character varying",
+            "token": "character varying",
+            "created_at": "timestamp with time zone",
+            "expires_at": "timestamp with time zone",
+            "metadata": "jsonb"
+        },
+        "constraints": [
+            "sessions_pkey",  # Primary key constraint
+            "idx_sessions_token",  # Unique token constraint
+            "idx_sessions_telegram_id"  # Index on telegram_id
+        ],
+        "indexes": [
+            "sessions_pkey",
+            "idx_sessions_status",
+            "idx_sessions_expires_at",
+            "idx_sessions_telegram_id"
+        ]
     }
 }
 
@@ -291,6 +313,23 @@ CREATE_TABLE_STATEMENTS = {
         reviewed_at TIMESTAMP WITH TIME ZONE,
         FOREIGN KEY (message_id) REFERENCES message_history(message_id)
     )
+    """,
+    "sessions": """
+    CREATE TABLE IF NOT EXISTS sessions (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        telegram_id BIGINT,
+        status VARCHAR(20) NOT NULL CHECK (status IN ('pending', 'authenticated', 'error', 'expired')),
+        token VARCHAR(500) NOT NULL UNIQUE,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        expires_at TIMESTAMPTZ NOT NULL,
+        metadata JSONB DEFAULT '{}'::jsonb,
+        
+        CONSTRAINT idx_sessions_token UNIQUE (token)
+    );
+    
+    CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status);
+    CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);
+    CREATE INDEX IF NOT EXISTS idx_sessions_telegram_id ON sessions(telegram_id);
     """
 }
 
