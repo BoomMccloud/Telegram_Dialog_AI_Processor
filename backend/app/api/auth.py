@@ -262,6 +262,22 @@ if os.getenv("APP_ENV") == "development":
     ):
         """Development-only endpoint to create an authenticated session"""
         try:
+            # Check if user exists, create if not
+            stmt = select(User).where(User.telegram_id == login_data.telegram_id)
+            result = await db.execute(stmt)
+            user = result.scalar_one_or_none()
+            
+            if not user:
+                user = User(
+                    telegram_id=login_data.telegram_id,
+                    username=f"dev_user_{login_data.telegram_id}",
+                    first_name="Dev",
+                    last_name="User"
+                )
+                db.add(user)
+                await db.commit()
+                logger.info(f"Created development user with telegram_id={login_data.telegram_id}")
+            
             # Create authenticated session
             session = await session_manager.create_session(
                 db=db,
