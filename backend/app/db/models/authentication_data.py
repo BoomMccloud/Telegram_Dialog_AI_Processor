@@ -2,24 +2,24 @@
 Model for storing user authentication data
 """
 
-from sqlalchemy import Column, DateTime, ForeignKey, LargeBinary, Boolean, BigInteger
+from sqlalchemy import Column, TIMESTAMP, ForeignKey, LargeBinary, Boolean, BigInteger
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID, JSONB
-import uuid
+from uuid import uuid4
 
 from .base import Base
 
 class AuthenticationData(Base):
     __tablename__ = "authentication_data"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     telegram_id = Column(BigInteger, unique=True, nullable=False)
-    session_data = Column(JSONB)
+    session_data = Column(JSONB, default=dict)
     encrypted_credentials = Column(LargeBinary)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    last_active_at = Column(DateTime(timezone=True))
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
+    last_active_at = Column(TIMESTAMP(timezone=True))
     is_active = Column(Boolean, default=True)
 
     # Relationships

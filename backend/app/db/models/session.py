@@ -1,8 +1,12 @@
-from sqlalchemy import Column, String, DateTime, ForeignKey, Enum as SQLEnum
+"""
+Session model for the application
+"""
+
+from sqlalchemy import Column, String, TIMESTAMP, ForeignKey, Enum as SQLEnum
 from sqlalchemy.sql import func
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
-import uuid
+from uuid import uuid4
 from datetime import datetime, timedelta
 
 from .base import Base
@@ -11,17 +15,17 @@ from .types import SessionStatus, TokenType
 class Session(Base):
     __tablename__ = "sessions"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     status = Column(SQLEnum(SessionStatus), nullable=False, default=SessionStatus.PENDING)
     token = Column(String(500), unique=True, nullable=False)
     refresh_token = Column(String(500), unique=True, nullable=True)
     token_type = Column(SQLEnum(TokenType), nullable=False, default=TokenType.ACCESS)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    expires_at = Column(DateTime(timezone=True), nullable=False)
-    last_activity = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    session_metadata = Column(JSONB, server_default='{}', nullable=False)
-    device_info = Column(JSONB, server_default='{}', nullable=False)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
+    expires_at = Column(TIMESTAMP(timezone=True), nullable=False)
+    last_activity = Column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
+    session_metadata = Column(JSONB, default=dict, nullable=False)
+    device_info = Column(JSONB, default=dict, nullable=False)
 
     # Relationships
     user = relationship("User", back_populates="sessions")
