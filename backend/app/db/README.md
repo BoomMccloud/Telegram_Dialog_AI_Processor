@@ -4,9 +4,106 @@
 
 This directory contains the database models, migrations, and utilities for the Telegram Dialog AI Processor. The system uses PostgreSQL with SQLAlchemy ORM for database management.
 
-## Schema Structure
+## Data Flow
 
-### Enums
+### 1. User Registration and Authentication
+1. New user initiates registration
+   ```
+   users table: Create new user entry
+   → authentication_data table: Store encrypted Telegram credentials
+   → sessions table: Create initial web session
+   ```
+
+2. Authentication flow
+   ```
+   sessions table: JWT tokens managed here
+   ↔ authentication_data table: Telegram credentials retrieved for API access
+   ```
+
+### 2. Dialog Selection and Configuration
+1. User selects dialogs to process
+   ```
+   dialogs table: Create entries for selected Telegram chats
+   → Set is_processing_enabled = true for chosen dialogs
+   → Set auto_send_enabled based on user preference
+   ```
+
+2. User configures AI preferences
+   ```
+   user_selected_models table: Store model choice and custom prompts
+   ```
+
+### 3. Message Processing (Message-less Architecture)
+1. Processing trigger
+   ```
+   dialogs table: Check is_processing_enabled and last_processed_message_id
+   → Fetch messages directly from Telegram API (not stored in database)
+   → Process all new messages in single batch
+   → processed_responses table: Store only the final suggested response
+   ```
+
+2. Key aspects of message-less processing:
+   - No message content stored in database
+   - Messages fetched and processed in real-time
+   - Only final AI responses stored
+   - Previous context reconstructed from Telegram when needed
+   - Reduces storage requirements and simplifies privacy compliance
+
+### 4. Response Management
+1. User reviews pending responses
+   ```
+   processed_responses table:
+   → status = PENDING_APPROVAL: Shown in UI for review
+   → User can:
+     - Approve: status → APPROVED
+     - Edit: edited_response updated, status → APPROVED
+     - Reject: status → REJECTED
+   ```
+
+2. Response sending
+   ```
+   processed_responses table:
+   → Find APPROVED responses
+   → Send via Telegram API
+   → Update status → SENT (success) or FAILED (error)
+   ```
+
+### 5. Session Management
+- Active sessions tracked in sessions table
+- Automatic cleanup of expired sessions
+- Refresh tokens handled for longer sessions
+
+### Data Lifecycle Example
+```
+1. New User Registration
+   users.create() → authentication_data.store() → sessions.create()
+   
+2. Dialog Selection
+   dialogs.create(is_processing_enabled=true)
+   
+3. Processing Cycle
+   a. Check for new messages (Telegram API)
+   b. Process in memory (no storage)
+   c. Store only final response:
+      processed_responses.create(
+          dialog_id=X,
+          suggested_response="AI response",
+          status=PENDING_APPROVAL
+      )
+   
+4. User Review
+   processed_responses.update(
+       status=APPROVED,
+       edited_response="Modified response"  # if edited
+   )
+   
+5. Send Response
+   processed_responses.update(status=SENT)
+```
+
+## Current Implementation
+
+### Existing Enums
 
 - **SessionStatus**
   - Values: `PENDING`, `AUTHENTICATED`, `ERROR`, `EXPIRED`
@@ -36,19 +133,7 @@ This directory contains the database models, migrations, and utilities for the T
   - `SENT`: Successfully sent to Telegram
   - `FAILED`: Failed to send to Telegram
 
-- **TaskStatus** (Queue System)
-  - Values: `PENDING`, `PROCESSING`, `COMPLETED`, `FAILED`, `CANCELLED`
-  - Tracks background task status
-
-- **TaskPriority** (Queue System)
-  - Values: `LOW`, `NORMAL`, `HIGH`
-  - Defines priority levels for tasks
-
-- **TaskType** (Queue System)
-  - Values: `DIALOG`, `USER`, `SYSTEM`
-  - Categorizes different types of background tasks
-
-### Tables and Usage
+### Existing Tables and Usage
 
 #### Core Tables
 
@@ -75,7 +160,6 @@ This directory contains the database models, migrations, and utilities for the T
    last_processed_message_id          -- Track processing progress
    ```
    - Used by:
-     - Background worker to determine which chats to process
      - Frontend for dialog selection and configuration
      - Processing system for tracking progress
 
@@ -90,7 +174,6 @@ This directory contains the database models, migrations, and utilities for the T
    status processingstatus          -- Current state of response
    ```
    - Used by:
-     - Background worker to store generated responses
      - Frontend for displaying/editing responses
      - Sending system for approved messages
 
@@ -119,7 +202,6 @@ This directory contains the database models, migrations, and utilities for the T
    is_active BOOLEAN                -- Whether these credentials are valid
    ```
    - Used by:
-     - Background worker for Telegram access
      - Authentication system for credential management
 
 #### AI Configuration
@@ -132,66 +214,68 @@ This directory contains the database models, migrations, and utilities for the T
    system_prompt TEXT                -- Custom system prompt
    ```
    - Used by:
-     - Background worker for processing configuration
      - Frontend for model selection
 
-### Processing Workflow
+### Current Features
 
-1. **Background Worker (Every 30 minutes)**
-   ```python
-   for dialog in Dialogs.get_active():
-       if dialog.is_processing_enabled:
-           messages = telegram.get_recent_messages(dialog.telegram_dialog_id)
-           if messages[-1].id != dialog.last_processed_message_id:
-               response = generate_response(messages)
-               store_processed_response(dialog, response)
-   ```
-
-2. **User Review Process**
-   ```python
-   # Frontend fetches pending responses
-   responses = ProcessedResponses.get_pending()
-   
-   # User approves/edits
-   response.approve(edited_text)
-   
-   # Background worker sends approved responses
-   for response in ProcessedResponses.get_approved():
-       telegram.send_message(response.dialog_id, response.text)
-   ```
-
-### Key Features
-
-- Minimal data storage: No message content stored
-- Real-time processing: Messages fetched from Telegram when needed
-- Single active response per dialog
+- JWT-based session management
+- User authentication and authorization
+- Dialog configuration and management
+- AI model preferences
+- Secure credential storage
 - Support for message editing before sending
-- Automatic invalidation of old responses when new messages arrive
+- Single active response per dialog
 
-## Extensions
+### Extensions
 
 The database uses:
 - `pgcrypto`: For UUID generation
 - `vector`: For potential future vector operations
 
-## Initialization
+## Planned Implementations
 
-To initialize the database:
+### Background Worker System (In Development)
 
-```bash
-# From project root
-python backend/scripts/init_db.py
+#### Queue System Enums (Coming in next migration)
+- **TaskStatus**
+  - Values: `PENDING`, `PROCESSING`, `COMPLETED`, `FAILED`, `CANCELLED`
+  - For tracking background task states
+
+- **TaskPriority**
+  - Values: `LOW`, `NORMAL`, `HIGH`
+  - For task scheduling and execution order
+
+- **TaskType**
+  - Values: `DIALOG`, `USER`, `SYSTEM`
+  - For categorizing different types of background tasks
+
+#### Planned Processing Workflow
+```python
+# Background Worker (Every 30 minutes)
+for dialog in Dialogs.get_active():
+    if dialog.is_processing_enabled:
+        messages = telegram.get_recent_messages(dialog.telegram_dialog_id)
+        if messages[-1].id != dialog.last_processed_message_id:
+            response = generate_response(messages)
+            store_processed_response(dialog, response)
+
+# User Review Process
+responses = ProcessedResponses.get_pending()
+response.approve(edited_text)
+
+# Background worker sends approved responses
+for response in ProcessedResponses.get_approved():
+    telegram.send_message(response.dialog_id, response.text)
 ```
 
-## Environment Configuration
-Required environment variables:
-```
-POSTGRES_HOST=localhost
-POSTGRES_PORT=5432
-POSTGRES_DB=telegram_dialog_dev
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=postgres
-```
+#### Planned Features
+- Real-time message processing
+- Automatic message fetching from Telegram
+- Task queue management
+- Worker process implementation
+- Task monitoring and recovery
+- Error handling and retry logic
+- Automatic response invalidation when new messages arrive
 
 ## Development
 
@@ -212,4 +296,13 @@ POSTGRES_PORT=5432
 POSTGRES_DB=telegram_dialog_dev
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=postgres
+```
+
+## Initialization
+
+To initialize the database:
+
+```bash
+# From project root
+python backend/scripts/init_db.py
 ``` 
