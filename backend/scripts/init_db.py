@@ -16,6 +16,13 @@ import logging
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 import asyncpg
+from dotenv import load_dotenv
+
+# Add the backend directory to Python path
+backend_dir = Path(__file__).parent.parent
+sys.path.append(str(backend_dir))
+root_dir = backend_dir.parent
+load_dotenv(root_dir / '.env')
 
 # Configure logging
 logging.basicConfig(
@@ -36,12 +43,45 @@ DB_CONFIG = {
 # SQLAlchemy async engine URL
 DATABASE_URL = f"postgresql+asyncpg://{DB_CONFIG['user']}:{DB_CONFIG['password']}@{DB_CONFIG['host']}:{DB_CONFIG['port']}/{DB_CONFIG['database']}"
 
-# Add the backend directory to Python path
-backend_dir = Path(__file__).parent.parent
-sys.path.append(str(backend_dir))
+from app.db.models.base import Base
+# Import all models so they are registered with SQLAlchemy
+from app.db.models.dialog import Dialog
+from app.db.models.user import User
+from app.db.models.session import Session
+from app.db.models.processed_response import ProcessedResponse
+from app.db.models.user_selected_model import UserSelectedModel
+from app.db.models.authentication_data import AuthenticationData
+from app.db.models.queue import QueueTask
 
-from app.db.base import Base
-from app.models import *  # This imports all our models
+async def create_database():
+    """Create the database if it doesn't exist"""
+    # Connect to default database to create new database
+    conn = await asyncpg.connect(
+        host=DB_CONFIG['host'],
+        port=DB_CONFIG['port'],
+        user=DB_CONFIG['user'],
+        password=DB_CONFIG['password'],
+        database='postgres'
+    )
+    
+    try:
+        # Check if database exists
+        result = await conn.fetchrow(
+            """
+            SELECT 1 FROM pg_database WHERE datname = $1
+            """,
+            DB_CONFIG['database']
+        )
+        
+        if not result:
+            # Create database
+            await conn.execute(f"CREATE DATABASE {DB_CONFIG['database']}")
+            logger.info(f"Created database: {DB_CONFIG['database']}")
+        else:
+            logger.info(f"Database {DB_CONFIG['database']} already exists")
+    
+    finally:
+        await conn.close()
 
 async def create_extensions():
     """Create required PostgreSQL extensions"""
@@ -94,30 +134,37 @@ async def init_database():
     """Initialize the complete database"""
     logger.info(f"Initializing database: {DB_CONFIG['database']}")
     
-    # Create extensions
-    await create_extensions()
-    
-    # Create tables
-    await create_tables()
-    
-    # Add initial data
-    # await add_initial_data()  # Uncomment if needed
-    
-    logger.info("Database initialization completed successfully")
+    try:
+        # Create database
+        await create_database()
+        
+        # Create extensions
+        await create_extensions()
+        
+        # Create tables
+        await create_tables()
+        
+        # Add initial data
+        # await add_initial_data()  # Uncomment if needed
+        
+        logger.info("Database initialization completed successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize database: {str(e)}")
+        raise
 
 async def main():
     """Main entry point"""
-    # Ask for confirmation
-    response = input("This will initialize the database. Are you sure? (y/N): ")
-    if response.lower() != 'y':
-        logger.info("Operation cancelled")
-        return
-    
-    await init_database()
-
-if __name__ == "__main__":
     try:
-        asyncio.run(main())
+        # Ask for confirmation
+        response = input(f"This will initialize the database '{DB_CONFIG['database']}' on {DB_CONFIG['host']}:{DB_CONFIG['port']}. Are you sure? (y/N): ")
+        if response.lower() != 'y':
+            logger.info("Operation cancelled")
+            return
+        
+        await init_database()
     except Exception as e:
         logger.error(f"Error: {e}")
-        sys.exit(1) 
+        sys.exit(1)
+
+if __name__ == "__main__":
+    asyncio.run(main()) 

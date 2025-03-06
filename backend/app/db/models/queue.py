@@ -12,7 +12,7 @@ from enum import Enum as PyEnum
 import uuid
 from datetime import datetime
 
-from app.db.base import Base
+from .base import Base
 
 
 class TaskPriority(PyEnum):
