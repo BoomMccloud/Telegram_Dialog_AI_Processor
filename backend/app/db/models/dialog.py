@@ -1,8 +1,8 @@
 """
-Data models for dialogs and messages.
+Data models for dialogs.
 """
 
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Boolean, Enum as SQLEnum
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Boolean, Enum as SQLEnum, UniqueConstraint
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID, JSONB
@@ -48,30 +48,8 @@ class Dialog(Base):
     processed_responses = relationship("ProcessedResponse", back_populates="dialog", cascade="all, delete-orphan")
 
     __table_args__ = (
-        # Unique constraint on user_id and telegram_dialog_id
-        {'unique_together': ('user_id', 'telegram_dialog_id')}
+        UniqueConstraint('user_id', 'telegram_dialog_id', name='uq_dialog_user_telegram'),
     )
 
     def __repr__(self):
-        return f"<Dialog(id={self.id}, name={self.name}, type={self.type})>"
-
-class Message(Base):
-    """A message in a dialog/chat"""
-    __tablename__ = "messages"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    telegram_message_id = Column(String, nullable=False)
-    dialog_id = Column(UUID(as_uuid=True), ForeignKey("dialogs.id"), nullable=False)
-    text = Column(String, nullable=False)
-    sender_id = Column(String, nullable=False)
-    sender_name = Column(String, nullable=False)
-    date = Column(DateTime(timezone=True), nullable=False)
-    is_outgoing = Column(Boolean, default=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-    # Relationships
-    dialog = relationship("Dialog", back_populates="messages")
-    processing_results = relationship("ProcessingResult", back_populates="message", cascade="all, delete-orphan")
-
-    def __repr__(self):
-        return f"<Message(id={self.id}, dialog_id={self.dialog_id}, sender={self.sender_name})>" 
+        return f"<Dialog(id={self.id}, name={self.name}, type={self.type})>" 

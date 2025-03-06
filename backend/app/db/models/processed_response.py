@@ -2,7 +2,7 @@
 Model for processed responses from AI
 """
 
-from sqlalchemy import Column, String, DateTime, ForeignKey, Text, Enum as SQLEnum
+from sqlalchemy import Column, String, DateTime, ForeignKey, Text, Enum as SQLEnum, UniqueConstraint
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID
@@ -33,8 +33,7 @@ class ProcessedResponse(Base):
     dialog = relationship("Dialog", back_populates="processed_responses")
 
     __table_args__ = (
-        # Unique constraint on dialog_id
-        {'unique_together': ('dialog_id',)}
+        UniqueConstraint('dialog_id', name='uq_processed_response_dialog'),
     )
 
     def __repr__(self):

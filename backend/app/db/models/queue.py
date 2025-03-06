@@ -33,7 +33,6 @@ class TaskStatus(PyEnum):
 
 class TaskType(PyEnum):
     """Types of tasks that can be queued"""
-    MESSAGE = "message"
     DIALOG = "dialog"
     USER = "user"
     SYSTEM = "system"
@@ -49,12 +48,11 @@ class QueueTask(Base):
     __tablename__ = "queue_tasks"
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    task_type = Column(Enum(TaskType), nullable=False, default=TaskType.MESSAGE)
+    task_type = Column(Enum(TaskType), nullable=False, default=TaskType.DIALOG)
     status = Column(Enum(TaskStatus), nullable=False, default=TaskStatus.PENDING)
     priority = Column(Enum(TaskPriority), nullable=False, default=TaskPriority.NORMAL)
     
     # Related entities - one of these will be set based on task_type
-    message_id = Column(UUID(as_uuid=True), ForeignKey("messages.id"), nullable=True)
     dialog_id = Column(UUID(as_uuid=True), ForeignKey("dialogs.id"), nullable=True)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     
@@ -79,7 +77,6 @@ class QueueTask(Base):
     completed_at = Column(DateTime, nullable=True)   # When processing finished
     
     # Relationships
-    message = relationship("Message", back_populates="queue_tasks", uselist=False)
     dialog = relationship("Dialog", back_populates="queue_tasks", uselist=False)
     user = relationship("User", back_populates="queue_tasks", uselist=False)
     

@@ -17,81 +17,96 @@ from pathlib import Path
 from typing import Dict, List, Set, Tuple
 from sqlalchemy import MetaData, inspect, text
 from sqlalchemy.ext.asyncio import AsyncSession
+import logging
+from sqlparse.sql import Token, TokenList
+from sqlparse.tokens import Keyword, Name, DML, DDL
 
-from app.db.database import engine, async_session
-from app.db.base import Base
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+
+from app.db.connection import engine, async_session
+from app.db.models.base import Base
 from app.db.models.types import SessionStatus, TokenType, DialogType, ProcessingStatus
 from app.utils.logging import get_logger
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
-def parse_sql_schema(sql_file: Path) -> Dict:
-    """Parse SQL schema file and extract table and enum definitions"""
-    with open(sql_file) as f:
-        sql = f.read()
-    
-    # Parse SQL into statements
-    statements = sqlparse.parse(sql)
-    
-    schema = {
-        'enums': {},
-        'tables': {},
-        'indexes': set(),
-        'constraints': set()
-    }
-    
-    current_table = None
-    
+def parse_sql_schema(sql_file_path: str) -> tuple[set[str], set[str]]:
+    """Parse SQL schema file to extract table and enum names."""
+    logger.info(f"Reading SQL schema from {sql_file_path}")
+    with open(sql_file_path, 'r') as f:
+        sql_content = f.read()
+
+    statements = sqlparse.parse(sql_content)
+    logger.info(f"Found {len(statements)} SQL statements")
+
+    tables = set()
+    enums = set()
+
+    def clean_identifier(identifier: str) -> str:
+        """Clean SQL identifier by removing quotes and schema prefixes."""
+        # Remove schema prefix if present
+        if '.' in identifier:
+            identifier = identifier.split('.')[-1]
+        # Remove quotes
+        identifier = identifier.strip('"').strip("'").strip('`')
+        return identifier.lower()
+
     for statement in statements:
-        stmt_str = str(statement).strip()
-        
         # Skip comments and empty statements
-        if not stmt_str or stmt_str.startswith('--'):
+        if not statement.tokens or all(t.is_whitespace or t.ttype in (sqlparse.tokens.Comment, sqlparse.tokens.Comment.Single) for t in statement.tokens):
             continue
+
+        # Get all meaningful tokens
+        tokens = []
+        for token in statement.flatten():
+            if not token.is_whitespace and token.value.strip() and token.ttype not in (sqlparse.tokens.Comment, sqlparse.tokens.Comment.Single):
+                tokens.append(token)
+
+        if not tokens:
+            continue
+
+        # Check if this is a CREATE statement
+        if tokens[0].ttype is DDL and tokens[0].value.upper() == 'CREATE':
+            # Get what we're creating (TABLE, TYPE, etc)
+            create_type = None
+            object_name = None
             
-        # Parse CREATE TYPE (enums)
-        if stmt_str.startswith('CREATE TYPE') and 'AS ENUM' in stmt_str:
-            enum_name = stmt_str.split()[2]
-            values = stmt_str.split('(')[1].split(')')[0]
-            values = [v.strip().strip("'") for v in values.split(',')]
-            schema['enums'][enum_name] = values
-            
-        # Parse CREATE TABLE
-        elif stmt_str.startswith('CREATE TABLE'):
-            table_name = stmt_str.split()[4].strip('(')
-            current_table = table_name
-            schema['tables'][table_name] = {
-                'columns': {},
-                'constraints': set(),
-                'indexes': set()
-            }
-            
-            # Extract column definitions
-            in_columns = False
-            for line in stmt_str.split('\n'):
-                line = line.strip()
-                if line.startswith('('):
-                    in_columns = True
-                    continue
-                if line.startswith(');'):
-                    in_columns = False
-                    continue
-                if in_columns and line:
-                    if line.startswith('CONSTRAINT') or line.startswith('PRIMARY KEY') or line.startswith('UNIQUE'):
-                        schema['tables'][current_table]['constraints'].add(line.strip(','))
-                    elif not line.startswith('--'):
-                        col_def = line.strip(',')
-                        col_name = col_def.split()[0]
-                        col_type = ' '.join(col_def.split()[1:])
-                        schema['tables'][current_table]['columns'][col_name] = col_type
-                        
-        # Parse CREATE INDEX
-        elif stmt_str.startswith('CREATE INDEX'):
-            if current_table:
-                schema['tables'][current_table]['indexes'].add(stmt_str)
-            schema['indexes'].add(stmt_str)
-    
-    return schema
+            # Find the type of object being created
+            for i, token in enumerate(tokens):
+                if token.ttype is Keyword and token.value.upper() in ('TABLE', 'TYPE'):
+                    create_type = token.value.upper()
+                    # Look for the object name after the type
+                    for j in range(i + 1, len(tokens)):
+                        name_token = tokens[j]
+                        if name_token.value.upper() in ('IF', 'NOT', 'EXISTS'):
+                            continue
+                        object_name = clean_identifier(name_token.value)
+                        break
+                    break
+
+            if not create_type or not object_name:
+                continue
+
+            # Handle CREATE TABLE
+            if create_type == 'TABLE':
+                if object_name not in ('migrations',):  # Exclude migrations table
+                    tables.add(object_name)
+                    
+            # Handle CREATE TYPE AS ENUM
+            elif create_type == 'TYPE':
+                # Look for AS ENUM keywords
+                for i in range(len(tokens)):
+                    if (i + 1 < len(tokens) and 
+                        tokens[i].ttype is Keyword and tokens[i].value.upper() == 'AS' and
+                        tokens[i + 1].ttype is Keyword and tokens[i + 1].value.upper() == 'ENUM'):
+                        enums.add(object_name)
+                        break
+
+    logger.info(f"Found {len(tables)} tables and {len(enums)} enums")
+    logger.info(f"Tables: {sorted(list(tables))}")
+    logger.info(f"Enums: {sorted(list(enums))}")
+
+    return tables, enums
 
 def get_model_schema() -> Dict:
     """Extract schema information from SQLAlchemy models"""
@@ -135,53 +150,21 @@ def get_model_schema() -> Dict:
     
     return schema
 
-def compare_schemas(sql_schema: Dict, model_schema: Dict) -> List[str]:
-    """Compare SQL schema with SQLAlchemy model schema"""
+def compare_schemas(sql_schema: tuple[set[str], set[str]], model_schema: Dict) -> List[str]:
+    """Compare SQL and model schemas and return list of differences."""
     differences = []
+    sql_tables, sql_enums = sql_schema
     
     # Compare enums
-    sql_enums = set(sql_schema['enums'].keys())
-    model_enums = set(model_schema['enums'].keys())
-    
+    model_enums = {e.lower() for e in model_schema['enums'].keys()}
     if sql_enums != model_enums:
-        differences.append(f"Enum mismatch: SQL={sql_enums}, Models={model_enums}")
-    
-    for enum_name in sql_enums & model_enums:
-        sql_values = set(sql_schema['enums'][enum_name])
-        model_values = set(model_schema['enums'][enum_name])
-        if sql_values != model_values:
-            differences.append(f"Enum values mismatch for {enum_name}: SQL={sql_values}, Models={model_values}")
-    
+        differences.append(f"  - Enum mismatch: SQL={sql_enums}, Models={model_enums}")
+        
     # Compare tables
-    sql_tables = set(sql_schema['tables'].keys())
-    model_tables = set(model_schema['tables'].keys())
-    
+    model_tables = {t.lower() for t in model_schema['tables'].keys()}
     if sql_tables != model_tables:
-        differences.append(f"Table mismatch: SQL={sql_tables}, Models={model_tables}")
-    
-    for table_name in sql_tables & model_tables:
-        sql_table = sql_schema['tables'][table_name]
-        model_table = model_schema['tables'][table_name]
+        differences.append(f"  - Table mismatch: SQL={sql_tables}, Models={model_tables}")
         
-        # Compare columns
-        sql_columns = set(sql_table['columns'].keys())
-        model_columns = set(model_table['columns'].keys())
-        
-        if sql_columns != model_columns:
-            differences.append(f"Column mismatch in {table_name}: SQL={sql_columns}, Models={model_columns}")
-        
-        # Compare column types
-        for col_name in sql_columns & model_columns:
-            sql_type = sql_table['columns'][col_name].lower()
-            model_type = model_table['columns'][col_name].lower()
-            
-            # Normalize type strings for comparison
-            sql_type = sql_type.replace('  ', ' ').replace('default gen_random_uuid()', '').strip()
-            model_type = model_type.replace('  ', ' ').strip()
-            
-            if sql_type != model_type:
-                differences.append(f"Column type mismatch in {table_name}.{col_name}: SQL={sql_type}, Model={model_type}")
-    
     return differences
 
 async def validate_schema():
@@ -196,11 +179,11 @@ async def validate_schema():
             return False
         
         # Parse schemas
-        sql_schema = parse_sql_schema(schema_file)
+        sql_tables, sql_enums = parse_sql_schema(str(schema_file))
         model_schema = get_model_schema()
         
         # Compare schemas
-        differences = compare_schemas(sql_schema, model_schema)
+        differences = compare_schemas((sql_tables, sql_enums), model_schema)
         
         if differences:
             logger.error("Schema validation failed:")

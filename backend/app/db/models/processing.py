@@ -18,7 +18,7 @@ class ProcessingResult(Base):
     __tablename__ = "processing_results"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    message_id = Column(UUID(as_uuid=True), ForeignKey("messages.id"), nullable=False)
+    dialog_id = Column(UUID(as_uuid=True), ForeignKey("dialogs.id"), nullable=False)
     model_name = Column(String, nullable=False)
     status = Column(SQLEnum(ProcessingStatus), nullable=False, default=ProcessingStatus.PENDING)
     result = Column(JSON, nullable=True)
@@ -28,7 +28,7 @@ class ProcessingResult(Base):
     completed_at = Column(DateTime(timezone=True), nullable=True)
 
     # Relationships
-    message = relationship("Message", back_populates="processing_results")
+    dialog = relationship("Dialog", back_populates="processing_results")
 
     def __repr__(self):
-        return f"<ProcessingResult(id={self.id}, message_id={self.message_id}, status={self.status})>" 
+        return f"<ProcessingResult(id={self.id}, dialog_id={self.dialog_id}, status={self.status})>" 
