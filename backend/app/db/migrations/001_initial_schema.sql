@@ -6,11 +6,11 @@ CREATE EXTENSION IF NOT EXISTS vector;
 CREATE TYPE sessionstatus AS ENUM ('PENDING', 'AUTHENTICATED', 'ERROR', 'EXPIRED');
 CREATE TYPE tokentype AS ENUM ('access', 'refresh');
 CREATE TYPE dialogtype AS ENUM ('private', 'group', 'channel');
-CREATE TYPE processingstatus AS ENUM ('pending', 'processing', 'completed', 'error');
+CREATE TYPE processingstatus AS ENUM ('pending_approval', 'approved', 'rejected', 'sent', 'failed');
 
 -- Create users table
 CREATE TABLE IF NOT EXISTS users (
-    id SERIAL PRIMARY KEY,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     telegram_id BIGINT UNIQUE NOT NULL,
     username VARCHAR(255),
     first_name VARCHAR(255),
@@ -22,50 +22,45 @@ CREATE TABLE IF NOT EXISTS users (
 -- Create dialogs table
 CREATE TABLE IF NOT EXISTS dialogs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    telegram_dialog_id VARCHAR(255) NOT NULL UNIQUE,
+    telegram_dialog_id VARCHAR(255) NOT NULL,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
     type dialogtype NOT NULL,
     unread_count INTEGER DEFAULT 0,
     last_message JSONB DEFAULT '{}'::jsonb,
+    is_processing_enabled BOOLEAN NOT NULL DEFAULT false,
+    auto_send_enabled BOOLEAN NOT NULL DEFAULT false,
+    last_processed_message_id VARCHAR(255),
+    last_processed_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(user_id, telegram_dialog_id)
 );
 
--- Create messages table
-CREATE TABLE IF NOT EXISTS messages (
+-- Create processed_responses table
+CREATE TABLE IF NOT EXISTS processed_responses (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    telegram_message_id VARCHAR(255) NOT NULL,
     dialog_id UUID NOT NULL REFERENCES dialogs(id) ON DELETE CASCADE,
-    text TEXT NOT NULL,
-    sender_id VARCHAR(255) NOT NULL,
-    sender_name VARCHAR(255) NOT NULL,
-    date TIMESTAMPTZ NOT NULL,
-    is_outgoing BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    embedding_vector vector(1536),
-    metadata JSONB DEFAULT '{}'::jsonb,
-    UNIQUE(dialog_id, telegram_message_id)
-);
-
--- Create processing_results table
-CREATE TABLE IF NOT EXISTS processing_results (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    message_id UUID NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+    last_message_id VARCHAR(255) NOT NULL,
+    last_message_timestamp TIMESTAMPTZ NOT NULL,
+    suggested_response TEXT NOT NULL,
+    edited_response TEXT,
+    status processingstatus NOT NULL DEFAULT 'pending_approval',
     model_name VARCHAR(255) NOT NULL,
-    status processingstatus NOT NULL DEFAULT 'pending',
-    result JSONB,
+    processed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    approved_at TIMESTAMPTZ,
+    sent_at TIMESTAMPTZ,
     error TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    completed_at TIMESTAMPTZ,
-    metadata JSONB DEFAULT '{}'::jsonb
+    UNIQUE(dialog_id)
 );
 
 -- Create sessions table
 CREATE TABLE IF NOT EXISTS sessions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    telegram_id BIGINT REFERENCES users(telegram_id),
-    status sessionstatus NOT NULL DEFAULT 'pending',
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    status sessionstatus NOT NULL DEFAULT 'PENDING',
     token VARCHAR(500) NOT NULL UNIQUE,
     refresh_token VARCHAR(500) UNIQUE,
     token_type tokentype NOT NULL DEFAULT 'access',
@@ -79,7 +74,7 @@ CREATE TABLE IF NOT EXISTS sessions (
 -- Create user_selected_models table
 CREATE TABLE IF NOT EXISTS user_selected_models (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id BIGINT NOT NULL REFERENCES users(telegram_id),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     model_name VARCHAR(255) NOT NULL,
     system_prompt TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -89,6 +84,7 @@ CREATE TABLE IF NOT EXISTS user_selected_models (
 -- Create authentication_data table
 CREATE TABLE IF NOT EXISTS authentication_data (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     telegram_id BIGINT UNIQUE NOT NULL,
     session_data JSONB,
     encrypted_credentials BYTEA,
@@ -99,13 +95,15 @@ CREATE TABLE IF NOT EXISTS authentication_data (
 
 -- Create indexes
 CREATE INDEX IF NOT EXISTS idx_users_telegram_id ON users(telegram_id);
-CREATE INDEX IF NOT EXISTS idx_messages_dialog_id ON messages(dialog_id);
-CREATE INDEX IF NOT EXISTS idx_messages_date ON messages(date);
-CREATE INDEX IF NOT EXISTS idx_processing_results_message_id ON processing_results(message_id);
-CREATE INDEX IF NOT EXISTS idx_processing_results_status ON processing_results(status);
-CREATE INDEX IF NOT EXISTS idx_sessions_telegram_id ON sessions(telegram_id);
+CREATE INDEX IF NOT EXISTS idx_dialogs_user_id ON dialogs(user_id);
+CREATE INDEX IF NOT EXISTS idx_dialogs_processing ON dialogs(is_processing_enabled);
+CREATE INDEX IF NOT EXISTS idx_processed_responses_status ON processed_responses(status);
+CREATE INDEX IF NOT EXISTS idx_processed_responses_dialog_id ON processed_responses(dialog_id);
+CREATE INDEX IF NOT EXISTS idx_processed_responses_created_at ON processed_responses(created_at);
+CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token);
 CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status);
+CREATE INDEX IF NOT EXISTS idx_auth_data_user_id ON authentication_data(user_id);
 CREATE INDEX IF NOT EXISTS idx_auth_data_telegram_id ON authentication_data(telegram_id);
 CREATE INDEX IF NOT EXISTS idx_user_selected_models_user_id ON user_selected_models(user_id);
 
