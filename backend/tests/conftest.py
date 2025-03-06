@@ -15,11 +15,14 @@ from httpx import AsyncClient
 from fastapi.testclient import TestClient
 from dotenv import load_dotenv
 from sqlalchemy.pool import NullPool
+import time
+from sqlalchemy import text
 
 from app.main import app
 from app.db.base import Base
 from app.middleware.session import SessionMiddleware, verify_session_dependency, SessionData
 from app.services.background_tasks import BackgroundTaskManager
+from app.db.utils import check_database_connection
 
 # Load environment variables
 load_dotenv()
@@ -119,7 +122,42 @@ async def test_app(db_session, session_middleware, background_tasks):
     # Add test routes
     @app.get("/health")
     async def health_check():
-        return {"status": "ok"}
+        """Health check endpoint with database verification"""
+        try:
+            # Get database session from pool
+            async with app.state.db_pool() as session:
+                # Check database connection
+                is_healthy, error = await check_database_connection(session)
+                
+                if not is_healthy:
+                    return {
+                        "status": "unhealthy",
+                        "database": {
+                            "status": "error",
+                            "error": error
+                        }
+                    }
+                
+                # Get database latency
+                start_time = time.time()
+                await session.execute(text("SELECT 1"))
+                latency = round((time.time() - start_time) * 1000, 2)  # Convert to milliseconds
+                
+                return {
+                    "status": "healthy",
+                    "database": {
+                        "status": "connected",
+                        "latency": latency
+                    }
+                }
+        except Exception as e:
+            return {
+                "status": "unhealthy",
+                "database": {
+                    "status": "error",
+                    "error": str(e)
+                }
+            }
         
     @app.get("/api/protected")
     async def protected_route(session: SessionData = Depends(verify_session_dependency)):
@@ -131,6 +169,7 @@ async def test_app(db_session, session_middleware, background_tasks):
 async def client(test_app):
     """Create test client"""
     async with AsyncClient(app=test_app, base_url="http://test") as client:
+        client.app = test_app  # Ensure the app is properly set
         yield client
 
 @pytest.fixture
