@@ -10,13 +10,18 @@ from typing import Dict, List, Any, Optional
 from pydantic import BaseModel, UUID4
 import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
+from uuid import UUID
 
 from app.middleware.session import verify_session_dependency, SessionData
-from app.services.dialog_processor import DialogProcessorService
+from app.services.dialog_processor import DialogProcessorService, DialogProcessor
 from app.services.queue_manager import add_task_to_queue, get_queue_status, clear_queue
 from app.db.models.processed_response import ProcessingStatus
 from app.db.database import get_session
 from app.utils.logging import get_logger
+from app.db.session import get_session
+from app.db.models.dialog import Dialog
+from app.core.auth import get_current_user
+from app.db.models.user import User
 
 logger = get_logger(__name__)
 
@@ -250,4 +255,31 @@ async def clear_processing_queue(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error clearing queue: {str(e)}"
-        ) 
+        )
+
+@router.post("/dialogs/{dialog_id}/process")
+async def process_dialog(
+    dialog_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Process a specific dialog"""
+    processor = DialogProcessor(session)
+    result = await processor.process_dialog(dialog_id, current_user.id)
+    return result
+
+@router.get("/dialogs/{dialog_id}/status")
+async def get_processing_status(
+    dialog_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Get the processing status for a dialog"""
+    response = await session.get(ProcessedResponse, dialog_id)
+    if not response:
+        raise HTTPException(status_code=404, detail="No processing result found")
+    return {
+        "status": response.status,
+        "suggested_response": response.suggested_response if response.status != ProcessingStatus.FAILED else None,
+        "error": response.error if response.status == ProcessingStatus.FAILED else None
+    } 

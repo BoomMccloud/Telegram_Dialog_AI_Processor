@@ -25,16 +25,4 @@ class ProcessingStatus(str, enum.Enum):
     APPROVED = 'approved'
     REJECTED = 'rejected'
     SENT = 'sent'
-    FAILED = 'failed'
-
-class TaskStatus(str, enum.Enum):
-    QUEUED = 'queued'
-    PROCESSING = 'processing'
-    COMPLETED = 'completed'
-    FAILED = 'failed'
-    CANCELLED = 'cancelled'
-
-class TaskType(str, enum.Enum):
-    MESSAGE = 'message'
-    DIALOG = 'dialog'
-    BATCH = 'batch' 
+    FAILED = 'failed' 

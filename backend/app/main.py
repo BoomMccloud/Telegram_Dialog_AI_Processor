@@ -18,7 +18,6 @@ from .db.database import get_db, DATABASE_URL
 from .db.base import Base
 from .services.background_tasks import BackgroundTaskManager
 from .services.cleanup import run_periodic_cleanup
-from .services.queue_manager import start_queue_processor
 from .middleware.session import SessionMiddleware
 from .core.exceptions import ValidationError, TelegramError, DatabaseError
 from .core.error_handlers import (
@@ -30,6 +29,7 @@ from .core.error_handlers import (
 from sqlalchemy.exc import SQLAlchemyError
 from telethon.errors import RPCError as TelethonError
 from .db.utils import check_database_connection
+from .core.config import settings
 
 logger = get_logger(__name__)
 
@@ -84,10 +84,6 @@ async def lifespan(app: FastAPI):
     )
     logger.info(f"Started periodic cleanup task with interval {cleanup_interval} seconds")
     
-    # Start dialog processing queue
-    app.state.background_tasks.add_task(start_queue_processor())
-    logger.info("Started dialog processing queue")
-    
     # Initialize session middleware
     session_middleware = SessionMiddleware(app)
     
@@ -103,7 +99,7 @@ async def lifespan(app: FastAPI):
     await engine.dispose()
     logger.info("Shutting down FastAPI application...")
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(title="Telegram Dialog AI Processor", lifespan=lifespan)
 
 # Configure CORS with secure defaults
 allowed_origins = get_allowed_origins()
@@ -134,9 +130,9 @@ app.add_exception_handler(DatabaseError, database_error_handler)
 app.add_exception_handler(TelethonError, telethon_error_handler)
 
 # Register routers
-app.include_router(auth.router)
-app.include_router(messages.router)
-app.include_router(processing.router)
+app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
+app.include_router(messages.router, prefix="/api/messages", tags=["messages"])
+app.include_router(processing.router, prefix="/api/processing", tags=["processing"])
 
 @app.on_event("startup")
 async def startup_event():
@@ -189,3 +185,7 @@ async def get_db_latency(session: AsyncSession) -> float:
     start_time = time.time()
     await session.execute(text("SELECT 1"))
     return round((time.time() - start_time) * 1000, 2)  # Convert to milliseconds 
+
+@app.get("/")
+async def root():
+    return {"message": "Welcome to Telegram Dialog AI Processor"} 

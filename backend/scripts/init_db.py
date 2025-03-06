@@ -51,7 +51,6 @@ from app.db.models.session import Session
 from app.db.models.processed_response import ProcessedResponse
 from app.db.models.user_selected_model import UserSelectedModel
 from app.db.models.authentication_data import AuthenticationData
-from app.db.models.queue import QueueTask
 
 async def create_database():
     """Create the database if it doesn't exist"""
