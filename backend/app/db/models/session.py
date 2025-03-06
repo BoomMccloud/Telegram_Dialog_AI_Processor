@@ -1,28 +1,18 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, JSON, Enum as SQLEnum
+from sqlalchemy import Column, String, DateTime, ForeignKey, Enum as SQLEnum
 from sqlalchemy.sql import func
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 import uuid
-import enum
 from datetime import datetime, timedelta
 
-from app.db.base import Base
-
-class SessionStatus(str, enum.Enum):
-    PENDING = "PENDING"
-    AUTHENTICATED = "AUTHENTICATED"
-    ERROR = "ERROR"
-    EXPIRED = "EXPIRED"
-
-class TokenType(str, enum.Enum):
-    ACCESS = "access"
-    REFRESH = "refresh"
+from .base import Base
+from .types import SessionStatus, TokenType
 
 class Session(Base):
     __tablename__ = "sessions"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    telegram_id = Column(Integer, ForeignKey("users.telegram_id"), nullable=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     status = Column(SQLEnum(SessionStatus), nullable=False, default=SessionStatus.PENDING)
     token = Column(String(500), unique=True, nullable=False)
     refresh_token = Column(String(500), unique=True, nullable=True)
@@ -30,11 +20,11 @@ class Session(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     expires_at = Column(DateTime(timezone=True), nullable=False)
     last_activity = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    session_metadata = Column("metadata", JSONB, default=dict, nullable=False)
-    device_info = Column(JSONB, default=dict, nullable=False)
+    session_metadata = Column(JSONB, server_default='{}', nullable=False)
+    device_info = Column(JSONB, server_default='{}', nullable=False)
 
     # Relationships
-    user = relationship("User", foreign_keys=[telegram_id], primaryjoin="Session.telegram_id == User.telegram_id")
+    user = relationship("User", back_populates="sessions")
 
     @property
     def is_expired(self) -> bool:
@@ -55,4 +45,4 @@ class Session(Base):
         self.last_activity = datetime.utcnow()
 
     def __repr__(self):
-        return f"<Session(id={self.id}, telegram_id={self.telegram_id}, status={self.status}, type={self.token_type})>" 
+        return f"<Session(id={self.id}, user_id={self.user_id}, status={self.status})>" 

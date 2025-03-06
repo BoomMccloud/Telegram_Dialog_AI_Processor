@@ -1,8 +1,7 @@
 from fastapi import APIRouter, Depends
 from typing import List, Optional
 
-from app.models.message import Message, MessageSend, MessageResponse
-from app.models.dialog import DialogListResponse
+from app.db.models.dialog import Message, MessageSend, MessageResponse, DialogListResponse
 from app.middleware.session import verify_session_dependency, SessionData
 from app.services.telegram import get_dialogs, get_recent_messages, send_message
 from app.core.exceptions import ValidationError, TelegramError, DatabaseError

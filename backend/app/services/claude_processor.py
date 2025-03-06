@@ -15,8 +15,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.dialog import Dialog, Message
-from app.models.processing import ProcessingResult, ProcessingStatus
+from app.db.models.dialog import Dialog, Message
+from app.db.models.processed_response import ProcessedResponse, ProcessingStatus
 from app.services.model_processor import ModelProcessor
 from app.utils.logging import get_logger
 from app.core.exceptions import AIModelError

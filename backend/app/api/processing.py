@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.middleware.session import verify_session_dependency, SessionData
 from app.services.dialog_processor import DialogProcessorService
 from app.services.queue_manager import add_task_to_queue, get_queue_status, clear_queue
-from app.models.processing import ProcessingStatus
+from app.db.models.processed_response import ProcessingStatus
 from app.db.database import get_session
 from app.utils.logging import get_logger
 

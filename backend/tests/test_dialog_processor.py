@@ -18,9 +18,9 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from app.models.dialog import Dialog, Message
-from app.models.processing import ProcessingResult, ProcessingStatus
-from app.models.user import User
+from app.db.models.dialog import Dialog, Message
+from app.db.models.processed_response import ProcessedResponse, ProcessingStatus
+from app.db.models.user import User
 from app.services.background_tasks import BackgroundTaskManager
 from app.services.queue_manager import add_task_to_queue
 
@@ -210,7 +210,7 @@ class TestDialogProcessor:
         message = test_messages[0]
         
         # Create a processing result
-        result = ProcessingResult(
+        result = ProcessedResponse(
             message_id=message.id,
             model_name="claude-3-sonnet",
             status=ProcessingStatus.COMPLETED,
@@ -236,7 +236,7 @@ class TestDialogProcessor:
         message = test_messages[0]
         
         # Create and store a processing result
-        result = ProcessingResult(
+        result = ProcessedResponse(
             message_id=message.id,
             model_name="claude-3-sonnet",
             status=ProcessingStatus.COMPLETED,
@@ -248,7 +248,7 @@ class TestDialogProcessor:
         await db_session.commit()
         
         # Query for the result
-        stmt = select(ProcessingResult).where(ProcessingResult.message_id == message.id)
+        stmt = select(ProcessedResponse).where(ProcessedResponse.message_id == message.id)
         query_result = await db_session.execute(stmt)
         retrieved_result = query_result.scalar_one_or_none()
         

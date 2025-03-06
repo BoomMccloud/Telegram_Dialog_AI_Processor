@@ -16,8 +16,8 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.dialog import Dialog, Message
-from app.models.processing import ProcessingResult, ProcessingStatus
+from app.db.models.dialog import Dialog, Message
+from app.db.models.processed_response import ProcessedResponse, ProcessingStatus
 from app.services.base import BaseProcessor
 
 logger = get_logger(__name__)
@@ -675,17 +675,17 @@ class ModelProcessor(BaseProcessor):
         # Get messages that don't have a processing result for this model
         # or have a pending/error status
         subquery = (
-            select(ProcessingResult.message_id)
+            select(ProcessedResponse.message_id)
             .where(
-                ProcessingResult.model_name == self.model_name,
-                ProcessingResult.status == ProcessingStatus.COMPLETED
+                ProcessedResponse.model_name == self.model_name,
+                ProcessedResponse.status == ProcessingStatus.COMPLETED
             )
             .scalar_subquery()
         )
         
         stmt = (
             select(Message)
-            .outerjoin(ProcessingResult)
+            .outerjoin(ProcessedResponse)
             .where(Message.id.notin_(subquery))
             .options(selectinload(Message.dialog))
             .limit(limit)
@@ -694,21 +694,21 @@ class ModelProcessor(BaseProcessor):
         result = await self.db.execute(stmt)
         return result.scalars().all()
         
-    async def get_processing_result(self, message_id: str) -> Optional[ProcessingResult]:
+    async def get_processing_result(self, message_id: str) -> Optional[ProcessedResponse]:
         """Get processing result for a message"""
         stmt = (
-            select(ProcessingResult)
+            select(ProcessedResponse)
             .where(
-                ProcessingResult.message_id == message_id,
-                ProcessingResult.model_name == self.model_name
+                ProcessedResponse.message_id == message_id,
+                ProcessedResponse.model_name == self.model_name
             )
         )
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
         
-    async def create_processing_result(self, message_id: str) -> ProcessingResult:
+    async def create_processing_result(self, message_id: str) -> ProcessedResponse:
         """Create a new processing result entry"""
-        result = ProcessingResult(
+        result = ProcessedResponse(
             message_id=message_id,
             model_name=self.model_name,
             status=ProcessingStatus.PENDING
@@ -724,11 +724,11 @@ class ModelProcessor(BaseProcessor):
         status: ProcessingStatus,
         result_data: Optional[Dict[str, Any]] = None,
         error: Optional[str] = None
-    ) -> ProcessingResult:
+    ) -> ProcessedResponse:
         """Update processing result status and data"""
         stmt = (
-            select(ProcessingResult)
-            .where(ProcessingResult.id == result_id)
+            select(ProcessedResponse)
+            .where(ProcessedResponse.id == result_id)
         )
         result = await self.db.execute(stmt)
         processing_result = result.scalar_one_or_none()
@@ -754,7 +754,7 @@ class ModelProcessor(BaseProcessor):
             select(Message)
             .where(Message.dialog_id == dialog_id)
             .options(
-                selectinload(Message.processing_results)
+                selectinload(Message.processed_responses)
             )
             .order_by(Message.date.desc())
             .limit(limit)

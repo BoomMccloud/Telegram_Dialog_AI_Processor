@@ -20,8 +20,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.utils.logging import get_logger
 from app.db.database import get_db
-from app.models.session import Session, SessionStatus
-from app.models.user import User
+from app.db.models.session import Session, SessionStatus
+from app.db.models.user import User
 from app.core.exceptions import SessionError, AuthenticationError, DatabaseError
 
 logger = get_logger(__name__)

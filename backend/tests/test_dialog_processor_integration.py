@@ -14,9 +14,9 @@ import json
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.dialog import Dialog, Message
-from app.models.processing import ProcessingResult, ProcessingStatus
-from app.models.user import User
+from app.db.models.dialog import Dialog, Message
+from app.db.models.processed_response import ProcessedResponse, ProcessingStatus
+from app.db.models.user import User
 from app.middleware.session import create_session
 from app.services.dialog_processor import DialogProcessorService
 from app.api.processing import router as processing_router

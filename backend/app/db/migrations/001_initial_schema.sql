@@ -67,7 +67,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     expires_at TIMESTAMPTZ NOT NULL,
     last_activity TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    metadata JSONB DEFAULT '{}'::jsonb,
+    session_metadata JSONB DEFAULT '{}'::jsonb,
     device_info JSONB DEFAULT '{}'::jsonb
 );
 

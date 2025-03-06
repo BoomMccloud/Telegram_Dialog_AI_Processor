@@ -19,9 +19,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_, desc
 from sqlalchemy.orm import selectinload
 
-from app.models.dialog import Dialog, Message
-from app.models.processing import ProcessingResult, ProcessingStatus
-from app.models.user import User
+from app.db.models.dialog import Dialog, Message
+from app.db.models.processed_response import ProcessedResponse, ProcessingStatus
+from app.db.models.user import User
 from app.services.model_processor import DialogProcessor
 from app.services.claude_processor import ClaudeProcessor
 from app.utils.logging import get_logger
@@ -125,7 +125,7 @@ class DialogProcessorService:
         self, 
         messages: List[Message], 
         model_name: str
-    ) -> List[ProcessingResult]:
+    ) -> List[ProcessedResponse]:
         """Process messages with the specified LLM.
         
         Args:
@@ -145,7 +145,7 @@ class DialogProcessorService:
                     continue
                 
                 # Create processing result record
-                result = ProcessingResult(
+                result = ProcessedResponse(
                     message_id=message.id,
                     model_name=model_name,
                     status=ProcessingStatus.PROCESSING
@@ -256,24 +256,24 @@ class DialogProcessorService:
         try:
             # Build query
             query = (
-                select(ProcessingResult)
-                .options(selectinload(ProcessingResult.message))
+                select(ProcessedResponse)
+                .options(selectinload(ProcessedResponse.message))
             )
             
             # Add filters
             filters = []
             if dialog_id:
                 # Join with Message to filter by dialog_id
-                filters.append(ProcessingResult.message.has(Message.dialog_id == uuid.UUID(dialog_id)))
+                filters.append(ProcessedResponse.message.has(Message.dialog_id == uuid.UUID(dialog_id)))
                 
             if status:
-                filters.append(ProcessingResult.status == status)
+                filters.append(ProcessedResponse.status == status)
                 
             if filters:
                 query = query.where(and_(*filters))
                 
             # Add limit and order
-            query = query.order_by(desc(ProcessingResult.created_at)).limit(limit)
+            query = query.order_by(desc(ProcessedResponse.created_at)).limit(limit)
             
             # Execute query
             result = await self.db.execute(query)
@@ -320,7 +320,7 @@ class DialogProcessorService:
         """
         try:
             # Fetch the processing result
-            stmt = select(ProcessingResult).where(ProcessingResult.id == uuid.UUID(result_id))
+            stmt = select(ProcessedResponse).where(ProcessedResponse.id == uuid.UUID(result_id))
             query_result = await self.db.execute(stmt)
             processing_result = query_result.scalar_one_or_none()
             

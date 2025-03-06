@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import delete, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.session import Session, SessionStatus
+from app.db.models.session import Session, SessionStatus
 from app.utils.logging import get_logger
 
 logger = get_logger(__name__)

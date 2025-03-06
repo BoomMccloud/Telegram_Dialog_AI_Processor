@@ -1,6 +1,23 @@
 """
-Database package initialization
+Database package initialization.
+Exposes models and database utilities.
 """
-from .init_db import run_migrations
 
-__all__ = ['run_migrations'] 
+from .models.base import Base
+from .models import *
+from .connection import (
+    get_db,
+    get_raw_connection,
+    get_db_pool,
+    engine,
+    async_session
+)
+
+__all__ = [
+    'Base',
+    'get_db',
+    'get_raw_connection',
+    'get_db_pool',
+    'engine',
+    'async_session'
+] 

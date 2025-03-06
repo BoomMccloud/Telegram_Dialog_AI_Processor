@@ -9,8 +9,8 @@ from app.main import app, DATABASE_URL
 from app.db.base import Base
 from app.db.database import get_db
 from app.middleware.session import SessionMiddleware
-from app.models.user import User
-from app.models.session import Session
+from app.db.models.user import User
+from app.db.models.session import Session
 
 # Create test engine using the main database URL
 test_engine = create_async_engine(DATABASE_URL)
