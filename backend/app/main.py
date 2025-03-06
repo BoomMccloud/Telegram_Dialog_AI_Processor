@@ -9,15 +9,22 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-from .api.auth import router as auth_router
-from .api.dialogs import router as dialogs_router
-from .api.messages import router as messages_router
+from .api import auth, messages
 from .utils.logging import get_logger
 from .db.database import get_db, DATABASE_URL
 from .db.base import Base
 from .services.background_tasks import BackgroundTaskManager
 from .services.cleanup import run_periodic_cleanup
 from .middleware.session import SessionMiddleware
+from .core.exceptions import ValidationError, TelegramError, DatabaseError
+from .core.error_handlers import (
+    validation_error_handler,
+    telegram_error_handler,
+    database_error_handler,
+    telethon_error_handler
+)
+from sqlalchemy.exc import SQLAlchemyError
+from telethon.errors import RPCError as TelethonError
 
 logger = get_logger(__name__)
 
@@ -73,19 +80,34 @@ app = FastAPI(lifespan=lifespan)
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins
+    allow_origins=["*"],  # TODO: Configure this for production
     allow_credentials=True,
-    allow_methods=["*"],  # Allows all methods
-    allow_headers=["*"],  # Allows all headers
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Add session middleware
 app.add_middleware(SessionMiddleware)
 
-# Include routers
-app.include_router(auth_router)
-app.include_router(dialogs_router)
-app.include_router(messages_router)
+# Register error handlers
+app.add_exception_handler(ValidationError, validation_error_handler)
+app.add_exception_handler(TelegramError, telegram_error_handler)
+app.add_exception_handler(DatabaseError, database_error_handler)
+app.add_exception_handler(TelethonError, telethon_error_handler)
+
+# Register routers
+app.include_router(auth.router)
+app.include_router(messages.router)
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize database on startup"""
+    try:
+        await init_db()
+        logger.info("Database initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize database: {e}", exc_info=True)
+        raise
 
 @app.get("/health")
 async def health_check():

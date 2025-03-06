@@ -11,7 +11,7 @@ from typing import Dict, Optional
 import uuid
 
 import jwt
-from fastapi import FastAPI, Request, Response, HTTPException, status, Depends
+from fastapi import FastAPI, Request, Response, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from starlette.middleware.base import BaseHTTPMiddleware
 from pydantic import BaseModel, Field, model_validator
@@ -22,6 +22,7 @@ from app.utils.logging import get_logger
 from app.db.database import get_db
 from app.models.session import Session, SessionStatus
 from app.models.user import User
+from app.core.exceptions import SessionError, AuthenticationError, DatabaseError
 
 logger = get_logger(__name__)
 
@@ -82,15 +83,17 @@ class SessionMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next) -> Response:
         """Process each request through the session middleware"""
+        # Always allow OPTIONS requests for CORS
+        if request.method == "OPTIONS":
+            return await call_next(request)
+            
+        # Allow public paths without authentication
         if request.url.path in PUBLIC_PATHS:
             return await call_next(request)
 
         auth: Optional[HTTPAuthorizationCredentials] = await security(request)
         if not auth:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authorization header required"
-            )
+            raise AuthenticationError("Authorization header required")
 
         try:
             token = auth.credentials
@@ -108,113 +111,111 @@ class SessionMiddleware(BaseHTTPMiddleware):
                         
                 response = await call_next(request)
                 return response
-        except HTTPException:
+        except (SessionError, AuthenticationError):
             raise
         except Exception as e:
-            logger.error(f"Session middleware error: {str(e)}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Internal server error"
-            )
+            logger.error(f"Session middleware error: {str(e)}", exc_info=True)
+            raise DatabaseError("Database operation failed", details={"error": str(e)})
 
     async def create_session(self, db: AsyncSession, telegram_id: Optional[int] = None, is_qr: bool = False, metadata: Dict = None) -> Session:
-        """Create and store session in database using ORM
-        
-        Args:
-            db: SQLAlchemy AsyncSession
-            telegram_id: Optional Telegram user ID for pre-authenticated sessions
-            is_qr: Whether this is a QR code authentication session
-            metadata: Optional session metadata
+        """Create and store session in database using ORM"""
+        try:
+            # If telegram_id is provided, verify user exists
+            if telegram_id:
+                stmt = select(User).where(User.telegram_id == telegram_id)
+                result = await db.execute(stmt)
+                user = result.scalar_one_or_none()
+                if not user:
+                    raise SessionError(f"User with telegram_id {telegram_id} not found")
             
-        Returns:
-            The created session object
+            # Generate JWT token
+            token_data = {
+                "jti": str(uuid.uuid4()),
+                "exp": utcnow() + timedelta(
+                    minutes=self.qr_token_expire_minutes if is_qr else self.access_token_expire_minutes
+                )
+            }
+            token = jwt.encode(token_data, self.jwt_secret, algorithm="HS256")
             
-        Raises:
-            HTTPException: If telegram_id is provided but user doesn't exist
-        """
-        # If telegram_id is provided, verify user exists
-        if telegram_id:
+            # Create session
+            session = Session(
+                token=token,
+                telegram_id=telegram_id,
+                status=SessionStatus.PENDING if not telegram_id else SessionStatus.AUTHENTICATED,
+                expires_at=token_data["exp"],
+                metadata=metadata or {}
+            )
+            db.add(session)
+            await db.commit()
+            await db.refresh(session)
+            return session
+        except Exception as e:
+            logger.error(f"Failed to create session: {str(e)}", exc_info=True)
+            raise DatabaseError("Failed to create session", details={"error": str(e)})
+               
+    async def verify_session(self, token: str, db: AsyncSession) -> Session:
+        """Verify and return session data using ORM"""
+        try:
+            stmt = select(Session).where(
+                Session.token == token,
+                Session.expires_at > utcnow()
+            )
+            result = await db.execute(stmt)
+            session = result.scalar_one_or_none()
+            
+            if not session:
+                raise SessionError("Invalid or expired session")
+            
+            return session
+        except SessionError:
+            raise
+        except Exception as e:
+            logger.error(f"Session verification failed: {str(e)}", exc_info=True)
+            raise DatabaseError("Failed to verify session", details={"error": str(e)})
+           
+    async def update_session(self, token: str, telegram_id: int, db: AsyncSession) -> Session:
+        """Update session after successful authentication using ORM"""
+        try:
+            # Verify user exists
             stmt = select(User).where(User.telegram_id == telegram_id)
             result = await db.execute(stmt)
             user = result.scalar_one_or_none()
             if not user:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"User with telegram_id {telegram_id} not found"
-                )
-        
-        # Generate JWT token
-        token_data = {
-            "jti": str(uuid.uuid4()),
-            "exp": utcnow() + timedelta(
-                minutes=self.qr_token_expire_minutes if is_qr else self.access_token_expire_minutes
-            )
-        }
-        token = jwt.encode(token_data, self.jwt_secret, algorithm="HS256")
-        
-        # Create session
-        session = Session(
-            token=token,
-            telegram_id=telegram_id,
-            status=SessionStatus.PENDING if not telegram_id else SessionStatus.AUTHENTICATED,
-            expires_at=token_data["exp"],
-            metadata=metadata or {}
-        )
-        db.add(session)
-        await db.commit()
-        await db.refresh(session)
-        return session
-               
-    async def verify_session(self, token: str, db: AsyncSession) -> Session:
-        """Verify and return session data using ORM"""
-        stmt = select(Session).where(
-            Session.token == token,
-            Session.expires_at > utcnow()
-        )
-        result = await db.execute(stmt)
-        session = result.scalar_one_or_none()
-        
-        if not session:
-            raise HTTPException(401, "Invalid or expired session")
+                raise SessionError(f"User with telegram_id {telegram_id} not found")
             
-        return session
-           
-    async def update_session(self, token: str, telegram_id: int, db: AsyncSession) -> Session:
-        """Update session after successful authentication using ORM"""
-        # Verify user exists
-        stmt = select(User).where(User.telegram_id == telegram_id)
-        result = await db.execute(stmt)
-        user = result.scalar_one_or_none()
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"User with telegram_id {telegram_id} not found"
+            # Get session
+            stmt = select(Session).where(
+                Session.token == token,
+                Session.expires_at > utcnow()
             )
-        
-        # Get session
-        stmt = select(Session).where(
-            Session.token == token,
-            Session.expires_at > utcnow()
-        )
-        result = await db.execute(stmt)
-        session = result.scalar_one_or_none()
-        
-        if not session:
-            raise HTTPException(401, "Session not found or expired")
+            result = await db.execute(stmt)
+            session = result.scalar_one_or_none()
             
-        session.telegram_id = telegram_id
-        session.status = SessionStatus.AUTHENTICATED
-        session.expires_at = utcnow() + timedelta(days=7)
-        
-        await db.commit()
-        await db.refresh(session)
-        return session
+            if not session:
+                raise SessionError("Session not found or expired")
+            
+            session.telegram_id = telegram_id
+            session.status = SessionStatus.AUTHENTICATED
+            session.expires_at = utcnow() + timedelta(days=7)
+            
+            await db.commit()
+            await db.refresh(session)
+            return session
+        except SessionError:
+            raise
+        except Exception as e:
+            logger.error(f"Failed to update session: {str(e)}", exc_info=True)
+            raise DatabaseError("Failed to update session", details={"error": str(e)})
         
     async def cleanup_expired_sessions(self, db: AsyncSession):
         """Clean up expired sessions using ORM"""
-        stmt = delete(Session).where(Session.expires_at < utcnow())
-        await db.execute(stmt)
-        await db.commit()
+        try:
+            stmt = delete(Session).where(Session.expires_at < utcnow())
+            await db.execute(stmt)
+            await db.commit()
+        except Exception as e:
+            logger.error(f"Failed to cleanup expired sessions: {str(e)}", exc_info=True)
+            raise DatabaseError("Failed to cleanup expired sessions", details={"error": str(e)})
 
 async def verify_session_dependency(
     request: Request,
@@ -234,10 +235,7 @@ async def verify_session_dependency(
         HTTPException: If session is missing or invalid
     """
     if not credentials:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authorization header required"
-        )
+        raise AuthenticationError("Authorization header required")
     
     try:
         session_middleware = request.app.state.session_middleware
@@ -246,10 +244,7 @@ async def verify_session_dependency(
             return session
     except Exception as e:
         logger.warning(f"Session verification failed: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired session"
-        )
+        raise AuthenticationError("Invalid or expired session")
 
 async def admin_only(session: SessionData = Depends(verify_session_dependency)) -> SessionData:
     """

@@ -18,7 +18,16 @@ from ..models.session import Session, SessionStatus
 from ..models.user import User
 from ..middleware.session import SessionMiddleware, verify_session_dependency
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, delete
+from telethon.client import TelegramClient
+from telethon.tl.custom import QRLogin
+
+from app.core.exceptions import (
+    AuthenticationError,
+    SessionError,
+    DatabaseError,
+    TelegramError
+)
 
 router = APIRouter(prefix="/api/auth")
 logger = get_logger(__name__)
@@ -57,8 +66,11 @@ async def create_qr_auth(
         )
         
         # Connect and get QR login data
-        await client.connect()
-        qr_login = await client.qr_login()
+        try:
+            await client.connect()
+            qr_login = await client.qr_login()
+        except Exception as e:
+            raise TelegramError("Failed to connect to Telegram", details={"error": str(e)})
         
         # Generate QR code
         qr = qrcode.QRCode()
@@ -87,12 +99,11 @@ async def create_qr_auth(
             "expires_at": session.expires_at.isoformat()
         }
         
+    except (SessionError, TelegramError):
+        raise
     except Exception as e:
         logger.error(f"QR code generation failed: {str(e)}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
+        raise DatabaseError("Failed to create QR authentication", details={"error": str(e)})
 
 @router.post("/logout")
 async def logout(
@@ -110,10 +121,7 @@ async def logout(
         
     except Exception as e:
         logger.error(f"Logout failed: {str(e)}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
+        raise DatabaseError("Failed to logout", details={"error": str(e)})
 
 @router.get("/session/verify")
 async def verify_session_status(
@@ -138,59 +146,52 @@ async def verify_session_status(
         
     except Exception as e:
         logger.error(f"Session verification failed: {str(e)}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
+        raise DatabaseError("Failed to verify session status", details={"error": str(e)})
 
 async def monitor_qr_login(
     client: TelegramClient,
-    qr_login: Any,
+    qr_login: QRLogin,
     session_id: str,
     db: AsyncSession,
     session_middleware: SessionMiddleware
 ):
     """Monitor QR login process in the background"""
     try:
-        logger.info(f"Waiting for QR login result for session {session_id}")
-        # Wait for the login result
-        login_result = await qr_login.wait()
-        if login_result:
-            # Get user info
-            me = await client.get_me()
-            telegram_id = me.id
+        # Wait for QR login completion
+        try:
+            sign_in_result = await qr_login.wait()
+            user = await client.get_me()
+        except Exception as e:
+            raise TelegramError("QR login failed", details={"error": str(e)})
             
-            # Update session with user info
-            await session_middleware.update_session(session_id, telegram_id, db)
+        # Get or create user
+        stmt = select(User).where(User.telegram_id == user.id)
+        result = await db.execute(stmt)
+        db_user = result.scalar_one_or_none()
+        
+        if not db_user:
+            db_user = User(
+                telegram_id=user.id,
+                username=user.username,
+                first_name=user.first_name,
+                last_name=user.last_name
+            )
+            db.add(db_user)
             
-            # Create or update user
-            stmt = select(User).where(User.telegram_id == telegram_id)
-            result = await db.execute(stmt)
-            user = result.scalar_one_or_none()
+        # Update session with user
+        stmt = select(Session).where(Session.id == session_id)
+        result = await db.execute(stmt)
+        session = result.scalar_one_or_none()
+        
+        if not session:
+            raise SessionError(f"Session {session_id} not found")
             
-            if not user:
-                user = User(
-                    telegram_id=telegram_id,
-                    username=me.username,
-                    first_name=me.first_name,
-                    last_name=me.last_name
-                )
-                db.add(user)
-                await db.commit()
-            
-            logger.info(f"Session {session_id} authenticated for user {telegram_id}")
-            
-        else:
-            logger.warning(f"QR login failed for session {session_id}")
-            # Mark session as error
-            stmt = select(Session).where(Session.id == session_id)
-            result = await db.execute(stmt)
-            session = result.scalar_one_or_none()
-            
-            if session:
-                session.status = SessionStatus.ERROR
-                await db.commit()
-                
+        session.telegram_id = user.id
+        session.status = SessionStatus.AUTHENTICATED
+        await db.commit()
+        
+    except (SessionError, TelegramError):
+        raise
     except Exception as e:
         logger.error(f"Error in QR login monitoring: {str(e)}", exc_info=True)
         # Mark session as error
@@ -217,10 +218,7 @@ async def dev_login(
 ):
     """Development-only endpoint for quick login"""
     if os.getenv("ENVIRONMENT") != "development":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="This endpoint is only available in development mode"
-        )
+        raise AuthenticationError("This endpoint is only available in development mode")
         
     try:
         # Check if user exists, create if not
@@ -250,7 +248,4 @@ async def dev_login(
         
     except Exception as e:
         logger.error(f"Dev login failed: {str(e)}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        ) 
+        raise DatabaseError("Failed to create development login", details={"error": str(e)}) 

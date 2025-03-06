@@ -7,8 +7,23 @@ from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
+from typing import List, Dict, Optional
+from pydantic import BaseModel
 
 from app.db.base import Base
+from app.models.processing import ProcessingResult
+
+class Dialog(BaseModel):
+    """Model for a dialog/chat"""
+    id: int
+    name: str
+    type: str
+    unread_count: Optional[int] = 0
+    last_message: Optional[Dict] = None
+
+class DialogListResponse(BaseModel):
+    """Response model for list of dialogs"""
+    dialogs: List[Dialog]
 
 class Dialog(Base):
     """A Telegram dialog (chat)"""

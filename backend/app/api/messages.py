@@ -1,39 +1,16 @@
-from fastapi import APIRouter, HTTPException, Depends
-from typing import List, Dict, Optional
-from ..services.telegram import get_recent_messages, send_message, get_dialogs
-from pydantic import BaseModel
-from ..middleware.session import verify_session_dependency, SessionData
+from fastapi import APIRouter, Depends
+from typing import List, Optional
 
-router = APIRouter(prefix="/api", tags=["messages"])
+from app.models.message import Message, MessageSend, MessageResponse
+from app.models.dialog import DialogListResponse
+from app.middleware.session import verify_session_dependency, SessionData
+from app.services.telegram import get_dialogs, get_recent_messages, send_message
+from app.core.exceptions import ValidationError, TelegramError, DatabaseError
+from app.utils.logging import get_logger
 
-# Request Models
-class MessageSend(BaseModel):
-    dialog_id: int
-    text: str
+logger = get_logger(__name__)
 
-# Response Models
-class Dialog(BaseModel):
-    id: int
-    name: str
-    type: str
-    unread_count: Optional[int] = 0
-    last_message: Optional[Dict] = None
-
-class DialogListResponse(BaseModel):
-    dialogs: List[Dialog]
-
-class Message(BaseModel):
-    id: int
-    dialog_id: int
-    text: str
-    sender_id: Optional[int]
-    sender_name: Optional[str]
-    date: str
-
-class MessageResponse(BaseModel):
-    message_id: int
-    dialog_id: int
-    status: str = "sent"
+router = APIRouter(prefix="/api/messages")
 
 @router.get("/dialogs", response_model=DialogListResponse)
 async def list_dialogs(
@@ -50,12 +27,12 @@ async def list_dialogs(
     """
     try:
         dialogs = await get_dialogs(session.token)
-        # Return dialogs wrapped in an object with a 'dialogs' key to match dev format
         return DialogListResponse(dialogs=dialogs)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise ValidationError(str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to list dialogs: {str(e)}", exc_info=True)
+        raise TelegramError("Failed to fetch dialogs", details={"error": str(e)})
 
 @router.get("/messages", response_model=List[Message])
 async def list_messages(
@@ -78,9 +55,10 @@ async def list_messages(
         messages = await get_recent_messages(session.token, limit)
         return messages
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise ValidationError(str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to list messages: {str(e)}", exc_info=True)
+        raise TelegramError("Failed to fetch messages", details={"error": str(e)})
 
 @router.post("/messages/send", response_model=MessageResponse)
 async def create_message(
@@ -103,6 +81,7 @@ async def create_message(
         result = await send_message(session.token, message.dialog_id, message.text)
         return MessageResponse(**result)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise ValidationError(str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) 
+        logger.error(f"Failed to send message: {str(e)}", exc_info=True)
+        raise TelegramError("Failed to send message", details={"error": str(e)}) 

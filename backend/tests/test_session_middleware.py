@@ -4,7 +4,7 @@ Tests for JWT-based session middleware
 
 import pytest
 import pytest_asyncio
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Request, Response
 from fastapi.testclient import TestClient
 import jwt
 from datetime import datetime, timedelta, timezone
@@ -15,6 +15,11 @@ import uuid
 from app.middleware.session import SessionMiddleware, verify_session_dependency, SessionData
 from app.models.session import Session, SessionStatus
 from app.models.user import User
+from app.core.exceptions import (
+    AuthenticationError,
+    SessionError,
+    DatabaseError
+)
 
 def utcnow():
     """Helper function to get timezone-aware UTC datetime"""
@@ -277,3 +282,141 @@ async def test_concurrent_sessions(test_app, db_session, test_user):
         assert verified is not None
         assert verified.telegram_id == test_user.telegram_id
         assert verified.status == SessionStatus.AUTHENTICATED 
+
+@pytest.fixture
+def app():
+    """Create test FastAPI application"""
+    app = FastAPI()
+    app.add_middleware(SessionMiddleware)
+    
+    @app.get("/protected")
+    async def protected_route():
+        return {"message": "success"}
+    
+    @app.get("/public")
+    async def public_route():
+        return {"message": "public"}
+        
+    return app
+
+@pytest.fixture
+def test_client(app):
+    """Create test client"""
+    return TestClient(app)
+
+def test_public_route_access(test_client):
+    """Test access to public route without authentication"""
+    response = test_client.get("/public")
+    assert response.status_code == 200
+    assert response.json() == {"message": "public"}
+
+def test_protected_route_without_auth(test_client):
+    """Test access to protected route without authentication"""
+    response = test_client.get("/protected")
+    assert response.status_code == 401
+    assert response.json() == {
+        "error": {
+            "code": "AUTH_ERROR",
+            "message": "Authorization header required",
+            "details": {}
+        }
+    }
+
+def test_protected_route_with_invalid_token(test_client):
+    """Test access to protected route with invalid token"""
+    response = test_client.get(
+        "/protected",
+        headers={"Authorization": "Bearer invalid_token"}
+    )
+    assert response.status_code == 401
+    assert response.json() == {
+        "error": {
+            "code": "SESSION_ERROR",
+            "message": "Invalid or expired session",
+            "details": {}
+        }
+    }
+
+@pytest.mark.asyncio
+async def test_session_creation(app, monkeypatch):
+    """Test session creation with valid data"""
+    async def mock_db_session():
+        class MockDB:
+            async def __aenter__(self):
+                return self
+            async def __aexit__(self, exc_type, exc_val, exc_tb):
+                pass
+            async def execute(self, stmt):
+                class Result:
+                    def scalar_one_or_none(self):
+                        return None
+                return Result()
+            async def commit(self):
+                pass
+            async def refresh(self, obj):
+                pass
+        return MockDB()
+    
+    app.state.db_pool = mock_db_session
+    
+    middleware = SessionMiddleware(app)
+    session = await middleware.create_session(await mock_db_session())
+    
+    assert session.token is not None
+    assert session.status == SessionStatus.PENDING
+
+@pytest.mark.asyncio
+async def test_session_verification_expired(app, monkeypatch):
+    """Test verification of expired session"""
+    # Create expired token
+    token = jwt.encode(
+        {
+            "exp": datetime.utcnow() - timedelta(hours=1),
+            "jti": "test"
+        },
+        "test_secret",
+        algorithm="HS256"
+    )
+    
+    async def mock_db_session():
+        class MockDB:
+            async def __aenter__(self):
+                return self
+            async def __aexit__(self, exc_type, exc_val, exc_tb):
+                pass
+            async def execute(self, stmt):
+                class Result:
+                    def scalar_one_or_none(self):
+                        return None
+                return Result()
+        return MockDB()
+    
+    app.state.db_pool = mock_db_session
+    middleware = SessionMiddleware(app)
+    
+    with pytest.raises(SessionError) as exc_info:
+        await middleware.verify_session(token, await mock_db_session())
+    
+    assert "Invalid or expired session" in str(exc_info.value)
+
+@pytest.mark.asyncio
+async def test_database_error_handling(app, monkeypatch):
+    """Test database error handling during session operations"""
+    async def mock_db_session():
+        class MockDB:
+            async def __aenter__(self):
+                return self
+            async def __aexit__(self, exc_type, exc_val, exc_tb):
+                pass
+            async def execute(self, stmt):
+                raise Exception("Database connection failed")
+        return MockDB()
+    
+    app.state.db_pool = mock_db_session
+    middleware = SessionMiddleware(app)
+    
+    with pytest.raises(DatabaseError) as exc_info:
+        await middleware.verify_session("test_token", await mock_db_session())
+    
+    assert "Failed to verify session" in str(exc_info.value)
+    assert "Database connection failed" in str(exc_info.value.details) 

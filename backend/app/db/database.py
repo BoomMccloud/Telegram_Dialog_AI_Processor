@@ -6,8 +6,8 @@ import asyncpg
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
-
-from ..utils.logging import get_logger
+from app.utils.logging import get_logger
+from app.core.exceptions import DatabaseError
 
 logger = get_logger(__name__)
 
@@ -38,12 +38,21 @@ async_session = sessionmaker(
 )
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    """Get database session"""
-    async with async_session() as session:
-        try:
+    """
+    Get database session with async context management
+    
+    Yields:
+        AsyncSession: Database session
+        
+    Raises:
+        DatabaseError: If database connection fails
+    """
+    try:
+        async with async_session() as session:
             yield session
-        finally:
-            await session.close()
+    except Exception as e:
+        logger.error(f"Database session error: {str(e)}", exc_info=True)
+        raise DatabaseError("Failed to get database session", details={"error": str(e)})
 
 async def get_raw_connection() -> asyncpg.Connection:
     """Get raw asyncpg connection for migrations and direct queries"""
@@ -73,33 +82,55 @@ async def get_raw_pool() -> asyncpg.Pool:
 _pool = None
 
 async def get_db_pool():
-    """Get or create the database connection pool"""
-    global _pool
-    if _pool is None:
-        logger.info(f"Creating database connection pool to {DATABASE_URL}")
-        try:
-            _pool = await asyncpg.create_pool(
-                user=os.getenv("POSTGRES_USER", "postgres"),
-                password=os.getenv("POSTGRES_PASSWORD", "postgres"),
-                database=os.getenv("POSTGRES_DB", "telegram_dialog_dev"),
-                host=os.getenv("POSTGRES_HOST", "localhost"),
-                port=int(os.getenv("POSTGRES_PORT", "5432")),
-                min_size=1,
-                max_size=10
-            )
-            logger.info("Database connection pool created successfully")
-        except Exception as e:
-            logger.error(f"Error creating database connection pool: {str(e)}", exc_info=True)
-            raise
-    return _pool
+    """
+    Get database connection pool
+    
+    Returns:
+        asyncpg.Pool: Database connection pool
+        
+    Raises:
+        DatabaseError: If pool creation fails
+    """
+    try:
+        # Parse connection parameters from DATABASE_URL
+        user = os.getenv("POSTGRES_USER", "postgres")
+        password = os.getenv("POSTGRES_PASSWORD", "postgres")
+        host = os.getenv("POSTGRES_HOST", "localhost")
+        port = int(os.getenv("POSTGRES_PORT", "5432"))
+        database = os.getenv("POSTGRES_DB", "telegram_dialog_dev")
+        
+        # Create connection pool
+        pool = await asyncpg.create_pool(
+            user=user,
+            password=password,
+            host=host,
+            port=port,
+            database=database,
+            min_size=5,
+            max_size=20
+        )
+        
+        if not pool:
+            raise DatabaseError("Failed to create database pool")
+            
+        return pool
+        
+    except asyncpg.PostgresError as e:
+        logger.error(f"PostgreSQL error: {str(e)}", exc_info=True)
+        raise DatabaseError("PostgreSQL connection error", details={"error": str(e)})
+    except Exception as e:
+        logger.error(f"Database pool error: {str(e)}", exc_info=True)
+        raise DatabaseError("Failed to create database pool", details={"error": str(e)})
 
 async def get_db_conn():
     """
     Get a database connection from the pool with async context management
     
-    Usage:
-        async with get_db_conn() as conn:
-            await conn.fetch("SELECT * FROM table")
+    Returns:
+        asyncpg.Connection: Database connection
+        
+    Raises:
+        DatabaseError: If connection acquisition fails
     """
     logger.debug("Acquiring connection from pool")
     try:
@@ -107,4 +138,4 @@ async def get_db_conn():
         return pool.acquire()
     except Exception as e:
         logger.error(f"Error acquiring database connection: {str(e)}", exc_info=True)
-        raise 
+        raise DatabaseError("Failed to acquire database connection", details={"error": str(e)}) 
