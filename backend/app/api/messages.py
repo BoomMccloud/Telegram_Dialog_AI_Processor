@@ -1,13 +1,33 @@
 from fastapi import APIRouter, Depends
-from typing import List, Optional
+from typing import List, Optional, Dict
+from pydantic import BaseModel
+from datetime import datetime
 
-from app.db.models.dialog import Message, MessageSend, MessageResponse, DialogListResponse
+from app.db.models.schemas import MessageResponse, DialogListResponse
+from app.db.models.message import Message
 from app.middleware.session import verify_session_dependency, SessionData
 from app.services.telegram import get_dialogs, get_recent_messages, send_message
 from app.core.exceptions import ValidationError, TelegramError, DatabaseError
 from app.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+# Define MessageSend model since it's not in schemas.py
+class MessageSend(BaseModel):
+    """Schema for sending a message"""
+    dialog_id: str
+    text: str
+
+# Define Message model for API responses
+class Message(BaseModel):
+    """Schema for message data"""
+    id: Optional[str] = None
+    text: str
+    sender_id: str
+    sender_name: str
+    date: datetime
+    is_outgoing: bool = False
+    dialog_id: Optional[str] = None
 
 router = APIRouter(prefix="/api/messages")
 

@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 # Import application modules
 from app.db.models import User, Dialog, DialogType
-from app.db.connection import get_db
+from app.db.database import get_db
 
 async def add_test_data():
     """

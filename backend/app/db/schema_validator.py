@@ -23,7 +23,7 @@ from sqlparse.tokens import Keyword, Name, DML, DDL
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
-from app.db.connection import engine, async_session
+from app.db.database import engine, async_session
 from app.db.models.base import Base
 from app.db.models.types import SessionStatus, TokenType, DialogType, ProcessingStatus
 from app.utils.logging import get_logger

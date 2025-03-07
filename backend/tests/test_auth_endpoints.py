@@ -7,8 +7,8 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy import select
 
-from app.models.session import Session, SessionStatus
-from app.models.user import User
+from app.db.models.session import Session, SessionStatus
+from app.db.models.user import User
 from app.services.session_manager import SessionManager
 
 pytestmark = pytest.mark.asyncio

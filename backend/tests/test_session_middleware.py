@@ -13,8 +13,8 @@ from sqlalchemy import select, insert
 import uuid
 
 from app.middleware.session import SessionMiddleware, verify_session_dependency, SessionData
-from app.models.session import Session, SessionStatus
-from app.models.user import User
+from app.db.models.session import Session, SessionStatus
+from app.db.models.user import User
 from app.core.exceptions import (
     AuthenticationError,
     SessionError,

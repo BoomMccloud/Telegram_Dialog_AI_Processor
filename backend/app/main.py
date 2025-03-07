@@ -12,10 +12,10 @@ from typing import List
 import time
 from sqlalchemy.sql import text
 
-from .api import auth, messages, processing
+from .api import auth, messages
 from .utils.logging import get_logger
 from .db.database import get_db, DATABASE_URL
-from .db.base import Base
+from .db.models.base import Base
 from .services.background_tasks import BackgroundTaskManager
 from .services.cleanup import run_periodic_cleanup
 from .middleware.session import SessionMiddleware
@@ -29,7 +29,6 @@ from .core.error_handlers import (
 from sqlalchemy.exc import SQLAlchemyError
 from telethon.errors import RPCError as TelethonError
 from .db.utils import check_database_connection
-from .core.config import settings
 
 logger = get_logger(__name__)
 
@@ -132,7 +131,6 @@ app.add_exception_handler(TelethonError, telethon_error_handler)
 # Register routers
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(messages.router, prefix="/api/messages", tags=["messages"])
-app.include_router(processing.router, prefix="/api/processing", tags=["processing"])
 
 @app.on_event("startup")
 async def startup_event():

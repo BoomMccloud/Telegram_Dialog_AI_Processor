@@ -14,8 +14,8 @@ from pathlib import Path
 
 from ..utils.logging import get_logger
 from ..db.database import get_db
-from ..models.session import Session, SessionStatus
-from ..models.user import User
+from ..db.models.session import Session, SessionStatus
+from ..db.models.user import User
 from ..middleware.session import SessionMiddleware, verify_session_dependency
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete

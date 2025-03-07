@@ -5,7 +5,7 @@ Exposes models and database utilities.
 
 from .models.base import Base
 from .models import *
-from .connection import (
+from .database import (
     get_db,
     get_raw_connection,
     get_db_pool,

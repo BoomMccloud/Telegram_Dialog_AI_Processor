@@ -7,7 +7,7 @@ import pytest
 from datetime import datetime, timedelta
 from sqlalchemy import select
 
-from app.models.session import Session, SessionStatus, TokenType
+from app.db.models.session import Session, SessionStatus, TokenType
 from app.services.session_manager import SessionManager
 from app.services.cleanup import cleanup_expired_sessions
 
