@@ -139,4 +139,10 @@ Based on the codebase analysis, I've identified the following existing component
 2. **DialogProcessorService**: Contains partial implementation of dialog processing
 3. **QueueManager**: Has placeholder functions for task queuing
 
-Next, I'll start implementing the test fixtures for users, dialogs, and messages, followed by unit tests for the queue management system. The plan is to follow a strict test-driven development approach to ensure code quality and reliability. 
+
+Progress:
+  - Test1 User1 (@test_user_1, Telegram ID: 281485138)
+  - Test2 User2 (@test_user_2, Telegram ID: 229338707)
+
+
+  
