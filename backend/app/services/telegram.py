@@ -4,12 +4,22 @@ import os
 import logging
 from datetime import datetime, timedelta
 from .auth import client_sessions
+from .mock_telegram import mock_telegram
 
 # Configure logging
 logger = logging.getLogger(__name__)
 
+# Check if we're in development mode
+IS_DEVELOPMENT = os.getenv("ENV", "development") == "development"
+USE_MOCK = os.getenv("USE_MOCK_TELEGRAM", "false").lower() == "true"
+
 async def get_dialogs(token: str) -> List[Dict]:
     """Get list of dialogs (chats)"""
+    # Use mock service in development mode if configured
+    if IS_DEVELOPMENT and USE_MOCK:
+        logger.info("Using mock telegram service for dialogs")
+        return await mock_telegram.get_dialogs()
+        
     logger.info(f"Getting dialogs for session {token}")
     
     # Get client from memory
@@ -63,6 +73,11 @@ async def get_dialogs(token: str) -> List[Dict]:
 
 async def get_recent_messages(token: str, limit: int = 20) -> List[Dict]:
     """Get recent messages from all dialogs"""
+    # Use mock service in development mode if configured
+    if IS_DEVELOPMENT and USE_MOCK:
+        logger.info("Using mock telegram service for messages")
+        return await mock_telegram.get_messages("all", limit)
+        
     # Get client from memory
     session = client_sessions.get(token)
     if not session or not session.get("client"):
@@ -97,6 +112,11 @@ async def get_recent_messages(token: str, limit: int = 20) -> List[Dict]:
 
 async def send_message(token: str, dialog_id: int, text: str) -> Dict:
     """Send a message to a specific dialog"""
+    # Use mock service in development mode if configured
+    if IS_DEVELOPMENT and USE_MOCK:
+        logger.info("Using mock telegram service for sending message")
+        return await mock_telegram.send_message(str(dialog_id), text)
+        
     # Get client from memory
     session = client_sessions.get(token)
     if not session or not session.get("client"):
