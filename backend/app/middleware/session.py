@@ -120,6 +120,8 @@ class SessionMiddleware(BaseHTTPMiddleware):
     async def create_session(self, db: AsyncSession, telegram_id: Optional[int] = None, is_qr: bool = False, metadata: Dict = None) -> Session:
         """Create and store session in database using ORM"""
         try:
+            user_id = None
+            
             # If telegram_id is provided, verify user exists
             if telegram_id:
                 stmt = select(User).where(User.telegram_id == telegram_id)
@@ -127,6 +129,19 @@ class SessionMiddleware(BaseHTTPMiddleware):
                 user = result.scalar_one_or_none()
                 if not user:
                     raise SessionError(f"User with telegram_id {telegram_id} not found")
+                user_id = user.id
+            else:
+                # For QR sessions, create a temporary user
+                temp_user = User(
+                    telegram_id=None,
+                    username=f"temp_user_{uuid.uuid4()}",
+                    first_name="Temporary",
+                    last_name="User"
+                )
+                db.add(temp_user)
+                await db.commit()
+                await db.refresh(temp_user)
+                user_id = temp_user.id
             
             # Generate JWT token
             token_data = {
@@ -140,10 +155,11 @@ class SessionMiddleware(BaseHTTPMiddleware):
             # Create session
             session = Session(
                 token=token,
-                telegram_id=telegram_id,
+                user_id=user_id,  # Add the user_id
                 status=SessionStatus.PENDING if not telegram_id else SessionStatus.AUTHENTICATED,
                 expires_at=token_data["exp"],
-                metadata=metadata or {}
+                session_metadata=metadata or {},
+                device_info={}  # Add empty device info as required by schema
             )
             db.add(session)
             await db.commit()

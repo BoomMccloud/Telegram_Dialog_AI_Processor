@@ -12,9 +12,9 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 from dotenv import load_dotenv
 
-from app.db.database import engine, async_session
-from app.db.base import Base
 from app.utils.logging import get_logger
+from app.db.database import engine, async_session
+from app.db.models.base import Base
 
 logger = get_logger(__name__)
 

@@ -86,7 +86,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         const token = localStorage.getItem('session_token');
         if (token) {
             try {
-                await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/logout`, {
+                await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/logout`, {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${token}`

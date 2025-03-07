@@ -6,7 +6,7 @@ from sqlalchemy.orm import sessionmaker
 
 # Use absolute imports
 from app.main import app, DATABASE_URL
-from app.db.base import Base
+from app.db.models.base import Base
 from app.db.database import get_db
 from app.middleware.session import SessionMiddleware
 from app.db.models.user import User

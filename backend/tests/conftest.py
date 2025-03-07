@@ -19,7 +19,7 @@ import time
 from sqlalchemy import text
 
 from app.main import app
-from app.db.base import Base
+from app.db.models.base import Base
 from app.middleware.session import SessionMiddleware, verify_session_dependency, SessionData
 from app.services.background_tasks import BackgroundTaskManager
 from app.db.utils import check_database_connection

@@ -11,17 +11,17 @@ from fastapi import APIRouter, HTTPException, status, Depends, Request
 from pydantic import BaseModel
 from telethon import TelegramClient
 from pathlib import Path
+from datetime import datetime, timedelta
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, delete
+from telethon.client import TelegramClient
+from telethon.tl.custom import QRLogin
 
 from ..utils.logging import get_logger
 from ..db.database import get_db
 from ..db.models.session import Session, SessionStatus
 from ..db.models.user import User
 from ..middleware.session import SessionMiddleware, verify_session_dependency
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete
-from telethon.client import TelegramClient
-from telethon.tl.custom import QRLogin
-
 from app.core.exceptions import (
     AuthenticationError,
     SessionError,
@@ -164,21 +164,7 @@ async def monitor_qr_login(
         except Exception as e:
             raise TelegramError("QR login failed", details={"error": str(e)})
             
-        # Get or create user
-        stmt = select(User).where(User.telegram_id == user.id)
-        result = await db.execute(stmt)
-        db_user = result.scalar_one_or_none()
-        
-        if not db_user:
-            db_user = User(
-                telegram_id=user.id,
-                username=user.username,
-                first_name=user.first_name,
-                last_name=user.last_name
-            )
-            db.add(db_user)
-            
-        # Update session with user
+        # Get session
         stmt = select(Session).where(Session.id == session_id)
         result = await db.execute(stmt)
         session = result.scalar_one_or_none()
@@ -186,8 +172,46 @@ async def monitor_qr_login(
         if not session:
             raise SessionError(f"Session {session_id} not found")
             
+        # Get or create permanent user
+        stmt = select(User).where(User.telegram_id == user.id)
+        result = await db.execute(stmt)
+        permanent_user = result.scalar_one_or_none()
+        
+        if not permanent_user:
+            permanent_user = User(
+                telegram_id=user.id,
+                username=user.username,
+                first_name=user.first_name,
+                last_name=user.last_name
+            )
+            db.add(permanent_user)
+            await db.commit()
+            await db.refresh(permanent_user)
+            
+        # Get temporary user to delete
+        stmt = select(User).where(User.id == session.user_id)
+        result = await db.execute(stmt)
+        temp_user = result.scalar_one_or_none()
+        
+        # Update session with permanent user
+        session.user_id = permanent_user.id
         session.telegram_id = user.id
         session.status = SessionStatus.AUTHENTICATED
+        session.expires_at = datetime.utcnow() + timedelta(days=7)
+        
+        # Delete temporary user if it exists and has no other sessions
+        if temp_user and temp_user.telegram_id is None:
+            # Check if temporary user has other active sessions
+            stmt = select(Session).where(
+                Session.user_id == temp_user.id,
+                Session.id != session_id
+            )
+            result = await db.execute(stmt)
+            other_sessions = result.scalar_one_or_none()
+            
+            if not other_sessions:
+                await db.delete(temp_user)
+        
         await db.commit()
         
     except (SessionError, TelegramError):

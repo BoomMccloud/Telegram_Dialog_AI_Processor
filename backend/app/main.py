@@ -12,10 +12,11 @@ from typing import List
 import time
 from sqlalchemy.sql import text
 
-from .api import auth, messages, dialogs, models
+from .api import auth, messages, dialogs
 from .utils.logging import get_logger
 from .db.database import get_db, DATABASE_URL
 from .db.models.base import Base
+from .db.init_db import init_db
 from .services.background_tasks import BackgroundTaskManager
 from .services.cleanup import run_periodic_cleanup
 from .middleware.session import SessionMiddleware
@@ -57,46 +58,74 @@ async def lifespan(app: FastAPI):
     logger.info("Starting up FastAPI application...")
     logger.info(f"Connecting to database: {DATABASE_URL}")
     
-    # Create database engine
-    engine = create_async_engine(DATABASE_URL)
-    async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    
-    # Create database pool
-    app.state.db_pool = async_session
-    
-    # Initialize background task manager
-    app.state.background_tasks = BackgroundTaskManager()
-    
-    # Create database tables
     try:
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-        logger.info("Database tables created successfully")
-    except Exception as e:
-        logger.error(f"Failed to create database tables: {str(e)}", exc_info=True)
-        raise
+        # Create database engine with retries
+        engine = create_async_engine(
+            DATABASE_URL,
+            pool_pre_ping=True,  # Enable connection health checks
+            pool_size=5,  # Set a reasonable pool size
+            max_overflow=10,  # Allow some overflow connections
+            echo=True  # Log SQL queries for debugging
+        )
+        async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
         
-    # Start periodic cleanup task
-    cleanup_interval = int(os.getenv("CLEANUP_INTERVAL_SECONDS", "3600"))
-    app.state.background_tasks.add_task(
-        run_periodic_cleanup(app.state.db_pool, cleanup_interval)
-    )
-    logger.info(f"Started periodic cleanup task with interval {cleanup_interval} seconds")
-    
-    # Initialize session middleware
-    session_middleware = SessionMiddleware(app)
-    
-    # Store instances in app state
-    app.state.session_middleware = session_middleware
-    
-    yield
-    
-    # Clean up background tasks
-    await app.state.background_tasks.cleanup()
-    
-    # Clean up database
-    await engine.dispose()
-    logger.info("Shutting down FastAPI application...")
+        # Test database connection
+        try:
+            async with engine.begin() as conn:
+                # Test basic connectivity
+                await conn.execute(text("SELECT 1"))
+                logger.info("Basic database connection test successful")
+                
+                # Test if we can create tables
+                await conn.execute(text("CREATE TABLE IF NOT EXISTS _test_connection (id serial PRIMARY KEY)"))
+                await conn.execute(text("DROP TABLE _test_connection"))
+                logger.info("Database write permissions test successful")
+                
+            logger.info("All database connection tests passed")
+        except Exception as e:
+            logger.error(f"Database connection test failed: {str(e)}", exc_info=True)
+            raise DatabaseError("Failed to connect to database", details={"error": str(e)})
+            
+        # Create database pool
+        app.state.db_pool = async_session
+        
+        # Initialize background task manager
+        app.state.background_tasks = BackgroundTaskManager()
+        
+        # Create database tables
+        try:
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+            logger.info("Database tables created successfully")
+        except Exception as e:
+            logger.error(f"Failed to create database tables: {str(e)}", exc_info=True)
+            raise DatabaseError("Failed to create database tables", details={"error": str(e)})
+            
+        # Start periodic cleanup task
+        cleanup_interval = int(os.getenv("CLEANUP_INTERVAL_SECONDS", "3600"))
+        app.state.background_tasks.add_task(
+            run_periodic_cleanup(app.state.db_pool, cleanup_interval)
+        )
+        logger.info(f"Started periodic cleanup task with interval {cleanup_interval} seconds")
+        
+        # Initialize session middleware
+        session_middleware = SessionMiddleware(app)
+        
+        # Store instances in app state
+        app.state.session_middleware = session_middleware
+        
+        yield
+        
+        # Clean up background tasks
+        await app.state.background_tasks.cleanup()
+        
+        # Clean up database
+        await engine.dispose()
+        logger.info("Shutting down FastAPI application...")
+        
+    except Exception as e:
+        logger.error(f"Failed to initialize application: {str(e)}", exc_info=True)
+        raise DatabaseError("Failed to initialize application", details={"error": str(e)})
 
 app = FastAPI(title="Telegram Dialog AI Processor", lifespan=lifespan)
 
@@ -132,7 +161,6 @@ app.add_exception_handler(TelethonError, telethon_error_handler)
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(messages.router, prefix="/api/messages", tags=["messages"])
 app.include_router(dialogs.router, prefix="/api/dialogs", tags=["dialogs"])
-app.include_router(models.router, prefix="/api/models", tags=["models"])
 
 @app.on_event("startup")
 async def startup_event():
