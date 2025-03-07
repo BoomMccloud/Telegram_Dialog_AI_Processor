@@ -114,7 +114,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         try {
             setLoading(true);
             const response = await fetch(
-                `${process.env.NEXT_PUBLIC_API_URL}/api/auth/session/verify`,
+                `${process.env.NEXT_PUBLIC_API_URL}/auth/session/verify`,
                 {
                     headers: {
                         'Authorization': `Bearer ${token}`
