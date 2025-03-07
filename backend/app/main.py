@@ -12,7 +12,7 @@ from typing import List
 import time
 from sqlalchemy.sql import text
 
-from .api import auth, messages
+from .api import auth, messages, dialogs, models
 from .utils.logging import get_logger
 from .db.database import get_db, DATABASE_URL
 from .db.models.base import Base
@@ -131,6 +131,8 @@ app.add_exception_handler(TelethonError, telethon_error_handler)
 # Register routers
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(messages.router, prefix="/api/messages", tags=["messages"])
+app.include_router(dialogs.router, prefix="/api/dialogs", tags=["dialogs"])
+app.include_router(models.router, prefix="/api/models", tags=["models"])
 
 @app.on_event("startup")
 async def startup_event():

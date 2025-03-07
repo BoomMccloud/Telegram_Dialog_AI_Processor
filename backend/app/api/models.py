@@ -7,7 +7,7 @@ from app.services.model_processor import (
     get_available_models, select_model_for_user, get_user_model
 )
 
-router = APIRouter(prefix="/api/models", tags=["models"])
+router = APIRouter()
 
 
 class ModelSelection(BaseModel):

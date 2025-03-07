@@ -29,7 +29,7 @@ from app.core.exceptions import (
     TelegramError
 )
 
-router = APIRouter(prefix="/api/auth")
+router = APIRouter()
 logger = get_logger(__name__)
 
 # Create sessions directory if it doesn't exist

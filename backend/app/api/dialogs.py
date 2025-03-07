@@ -11,7 +11,7 @@ from app.db.database import get_raw_connection, get_db
 from app.middleware.session import verify_session_dependency, SessionData
 
 # Create router
-router = APIRouter(prefix="/api", tags=["dialogs"])
+router = APIRouter()
 
 # Pydantic models for request/response
 class DialogSelection(BaseModel):

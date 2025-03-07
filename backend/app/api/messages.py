@@ -29,7 +29,7 @@ class Message(BaseModel):
     is_outgoing: bool = False
     dialog_id: Optional[str] = None
 
-router = APIRouter(prefix="/api/messages")
+router = APIRouter()
 
 @router.get("/dialogs", response_model=DialogListResponse)
 async def list_dialogs(
