@@ -285,6 +285,152 @@ for response in ProcessedResponses.get_approved():
 - Error handling and retry logic
 - Automatic response invalidation when new messages arrive
 
+## System Architecture
+
+### 1. API Layer (`/backend/app/api/`)
+
+#### 1.1 Authentication Endpoints (`/api/auth/`)
+- `routes.py`: Main router for auth endpoints
+  - POST `/login`: QR code-based login initiation
+  - POST `/verify`: QR code verification
+  - POST `/refresh`: Token refresh
+  - POST `/logout`: Session termination
+
+#### 1.2 Dialog Management (`/api/dialogs/`)
+- `routes.py`: Dialog management endpoints
+  - GET `/`: List user's dialogs
+  - POST `/`: Add new dialog for processing
+  - PATCH `/{dialog_id}`: Update dialog settings
+  - DELETE `/{dialog_id}`: Remove dialog from processing
+
+#### 1.3 Response Management (`/api/responses/`)
+- `routes.py`: Response handling endpoints
+  - GET `/pending`: Get pending responses
+  - POST `/{response_id}/approve`: Approve response
+  - POST `/{response_id}/reject`: Reject response
+  - PUT `/{response_id}`: Edit response
+  - GET `/history`: Get sent response history
+
+#### 1.4 User Settings (`/api/settings/`)
+- `routes.py`: User preference endpoints
+  - GET `/models`: Get available AI models
+  - PUT `/models`: Update model preferences
+  - GET `/profile`: Get user profile
+  - PUT `/profile`: Update user settings
+
+### 2. Service Layer (`/backend/app/services/`)
+
+#### 2.1 Authentication Service (`auth_service.py`)
+- Handle QR code generation and verification
+- Manage session creation and validation
+- Handle Telegram credential encryption/decryption
+- Token generation and validation
+
+#### 2.2 Dialog Service (`dialog_service.py`)
+- Dialog registration and configuration
+- Dialog state management
+- Processing status tracking
+- Integration with Telegram API for dialog info
+
+#### 2.3 Processing Service (`processing_service.py`)
+- Message batch processing
+- AI model integration
+- Response generation
+- Context management
+
+#### 2.4 Response Service (`response_service.py`)
+- Response storage and retrieval
+- Status management
+- Response sending via Telegram
+- History tracking
+
+#### 2.5 User Service (`user_service.py`)
+- User profile management
+- Preference handling
+- Model configuration
+- Session management
+
+### 3. Background Workers (`/backend/app/workers/`)
+
+#### 3.1 Message Processor (`message_processor.py`)
+- Poll for new messages
+- Batch processing coordination
+- Response generation scheduling
+
+#### 3.2 Response Sender (`response_sender.py`)
+- Handle approved response sending
+- Retry logic for failed sends
+- Status updates
+
+#### 3.3 Cleanup Worker (`cleanup_worker.py`)
+- Expired session cleanup
+- Temporary user cleanup
+- Old response pruning
+
+### 4. Utilities (`/backend/app/utils/`)
+
+#### 4.1 Telegram Utils (`telegram_utils.py`)
+- Telegram API client wrapper
+- Message formatting
+- Error handling
+
+#### 4.2 Security Utils (`security_utils.py`)
+- Encryption/decryption helpers
+- Token management
+- Password hashing
+
+#### 4.3 Database Utils (`db_utils.py`)
+- Connection management
+- Transaction helpers
+- Query builders
+
+#### 4.4 Validation Utils (`validation_utils.py`)
+- Input validation
+- Schema validation
+- Type checking
+
+### 5. System Data Flows
+
+#### 5.1 Message Processing Flow
+```
+MessageProcessor
+→ DialogService (get active dialogs)
+→ TelegramUtils (fetch messages)
+→ ProcessingService (generate response)
+→ ResponseService (store response)
+```
+
+#### 5.2 Response Approval Flow
+```
+API (approve endpoint)
+→ ResponseService (update status)
+→ ResponseSender (queue for sending)
+→ TelegramUtils (send message)
+→ ResponseService (update status to SENT)
+```
+
+#### 5.3 Authentication Flow
+```
+API (login endpoint)
+→ AuthService (generate QR)
+→ UserService (create temporary user)
+→ AuthService (verify QR scan)
+→ UserService (update with Telegram ID)
+→ AuthService (create session)
+```
+
+### 6. Architecture Principles
+
+The system follows clean architecture principles with:
+- Clear separation of concerns
+- Dependency injection
+- Service-oriented design
+- Background task management
+- Proper error handling
+- Scalable component organization
+
+Each component is designed to be testable and maintainable, with clear interfaces between layers. The services act as an abstraction layer between the API endpoints and the database models, ensuring business logic is properly encapsulated.
+
 ## Development
 
 ### Adding New Models
