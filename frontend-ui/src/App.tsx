@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AppThemeProvider } from './theme/ThemeContext';
 import AppLayout from './components/Layout/AppLayout';
 import { checkAuthentication } from './services/auth';
@@ -10,19 +10,6 @@ import Messages from './pages/Messages';
 import Data from './pages/Data';
 import Models from './pages/Models';
 import Login from './pages/Auth/Login';
-
-// Protected route component
-interface ProtectedRouteProps {
-  element: React.ReactNode;
-  isAuthenticated: boolean;
-}
-
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
-  element,
-  isAuthenticated
-}) => {
-  return isAuthenticated ? element : <Navigate to="/login" replace />;
-};
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
@@ -52,38 +39,30 @@ function App() {
     <AppThemeProvider>
       <Router>
         <Routes>
-          <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to="/" replace />} />
+          <Route path="/login" element={<Login />} />
           
           <Route path="/" element={
-            <ProtectedRoute isAuthenticated={isAuthenticated} element={
-              <AppLayout>
-                <Dashboard />
-              </AppLayout>
-            } />
+            <AppLayout isAuthenticated={isAuthenticated}>
+              <Dashboard />
+            </AppLayout>
           } />
           
           <Route path="/messages" element={
-            <ProtectedRoute isAuthenticated={isAuthenticated} element={
-              <AppLayout>
-                <Messages />
-              </AppLayout>
-            } />
+            <AppLayout isAuthenticated={isAuthenticated}>
+              <Messages />
+            </AppLayout>
           } />
           
           <Route path="/data" element={
-            <ProtectedRoute isAuthenticated={isAuthenticated} element={
-              <AppLayout>
-                <Data />
-              </AppLayout>
-            } />
+            <AppLayout isAuthenticated={isAuthenticated}>
+              <Data />
+            </AppLayout>
           } />
           
           <Route path="/models" element={
-            <ProtectedRoute isAuthenticated={isAuthenticated} element={
-              <AppLayout>
-                <Models />
-              </AppLayout>
-            } />
+            <AppLayout isAuthenticated={isAuthenticated}>
+              <Models />
+            </AppLayout>
           } />
         </Routes>
       </Router>

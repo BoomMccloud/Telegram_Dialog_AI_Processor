@@ -37,6 +37,7 @@ import {
 import { api } from '../../services/api';
 import { Dialog as DialogType, SessionStatus } from '../../types';
 import { checkAuthentication, initiateQRAuthentication, pollSessionStatus, devLogin } from '../../services/auth';
+import AuthRequiredDialog from '../../components/Auth/AuthRequiredDialog';
 
 const Data = () => {
   // State for dialogs
@@ -59,23 +60,35 @@ const Data = () => {
   const [expiresAt, setExpiresAt] = useState('');
   const [qrSessionError, setQrSessionError] = useState(false);
   
+  // Add state for authentication required dialog
+  const [authDialogOpen, setAuthDialogOpen] = useState(false);
+  
   // Fetch dialog list from backend
   const fetchDialogs = useCallback(async () => {
-    if (!isAuthenticated) return;
-    
-    setIsLoading(true);
-    setAuthError(null);
-    
     try {
+      setIsLoading(true);
+      setAuthError(null);
+      
+      // Try to fetch dialogs
       const response = await api.telegram.getDialogs();
       setDialogs(response.dialogs);
+      
+      // If we succeeded, update isAuthenticated state
+      setIsAuthenticated(true);
     } catch (error) {
       console.error('Failed to fetch dialogs:', error);
-      setAuthError('Failed to fetch Telegram dialogs. Please try again.');
+      
+      // Check if the error is due to authentication required
+      if (error instanceof Error && error.message === 'AUTH_REQUIRED') {
+        // Show authentication required dialog
+        setAuthDialogOpen(true);
+      } else {
+        setAuthError('Failed to fetch Telegram dialogs. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }
-  }, [isAuthenticated]);
+  }, []);
   
   // Initialize QR authentication
   const handleAuthenticate = async () => {
@@ -209,10 +222,7 @@ const Data = () => {
       try {
         const isAuth = await checkAuthentication();
         setIsAuthenticated(isAuth);
-        if (isAuth) {
-          // If we're already authenticated, fetch dialogs
-          fetchDialogs();
-        }
+        // We don't automatically fetch dialogs anymore, even if authenticated
       } catch (error) {
         console.error('Error checking authentication status:', error);
       } finally {
@@ -221,15 +231,8 @@ const Data = () => {
     };
     
     checkAuthStatus();
-  }, [fetchDialogs]);  // Include fetchDialogs in the dependency array
+  }, []);  // Remove fetchDialogs from dependency array
   
-  // Fetch dialogs when authenticated
-  useEffect(() => {
-    if (isAuthenticated) {
-      fetchDialogs();
-    }
-  }, [isAuthenticated, fetchDialogs]);
-
   // Filter dialogs by search query
   const filteredDialogs = dialogs.filter(dialog => 
     dialog.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -647,6 +650,13 @@ const Data = () => {
       )}
       
       {renderQrDialog()}
+      
+      {/* Authentication Required Dialog */}
+      <AuthRequiredDialog 
+        open={authDialogOpen} 
+        onClose={() => setAuthDialogOpen(false)} 
+        action="access your Telegram dialogs"
+      />
     </Box>
   );
 };

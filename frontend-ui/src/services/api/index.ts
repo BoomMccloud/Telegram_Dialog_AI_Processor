@@ -210,11 +210,20 @@ export const api = {
   
   // Telegram Dialogs
   telegram: {
-    getDialogs: () => 
-      apiRequest<DialogListResponse>({
+    getDialogs: async () => {
+      // Check if user is authenticated
+      const token = localStorage.getItem('accessToken');
+      if (!token) {
+        // Return a specific error that indicates authentication is required
+        throw new Error('AUTH_REQUIRED');
+      }
+      
+      // If authenticated, proceed with the API request
+      return apiRequest<DialogListResponse>({
         method: 'GET',
         url: '/dialogs',
-      }),
+      });
+    },
   },
   
   // Response endpoints

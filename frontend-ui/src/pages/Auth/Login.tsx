@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { initiateQRAuthentication, pollSessionStatus, devLogin } from '../../services/auth';
 import { SessionStatus } from '../../types';
 import PhoneAuth from '../../components/Auth/PhoneAuth';
@@ -67,6 +67,7 @@ enum AuthMethod {
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [authMethod, setAuthMethod] = useState<AuthMethod>(AuthMethod.SELECTION);
   const [qrCodeData, setQrCodeData] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<string>('');
@@ -75,6 +76,12 @@ const Login: React.FC = () => {
   const [devTelegramId, setDevTelegramId] = useState<string>('');
   
   const isDevelopment = process.env.NODE_ENV === 'development';
+  
+  // Get the redirect path from the location state or default to dashboard
+  const getRedirectPath = () => {
+    const state = location.state as { from?: string };
+    return state?.from || '/';
+  };
   
   const handleQRLogin = async () => {
     setLoading(true);
@@ -97,7 +104,7 @@ const Login: React.FC = () => {
         }
         
         if (status === SessionStatus.AUTHENTICATED) {
-          navigate('/dashboard');
+          navigate(getRedirectPath());
         }
       });
     } catch (err) {
@@ -122,7 +129,7 @@ const Login: React.FC = () => {
       const success = await devLogin(telegramId);
       
       if (success) {
-        navigate('/dashboard');
+        navigate(getRedirectPath());
       } else {
         setError('Development login failed');
       }
@@ -135,7 +142,7 @@ const Login: React.FC = () => {
   };
   
   const handlePhoneAuthSuccess = () => {
-    navigate('/dashboard');
+    navigate(getRedirectPath());
   };
   
   return (

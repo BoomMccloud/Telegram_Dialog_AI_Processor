@@ -36,9 +36,10 @@ const navItems = [
 
 interface AppLayoutProps {
   children: React.ReactNode;
+  isAuthenticated?: boolean;
 }
 
-const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
+const AppLayout: React.FC<AppLayoutProps> = ({ children, isAuthenticated = false }) => {
   const theme = useTheme();
   const { mode, toggleColorMode } = useThemeContext();
   const location = useLocation();

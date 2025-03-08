@@ -31,7 +31,10 @@ import {
   Close as RejectIcon,
   Send as SendIcon,
   Search as SearchIcon,
+  Refresh as RefreshIcon,
 } from '@mui/icons-material';
+import AuthRequiredDialog from '../../components/Auth/AuthRequiredDialog';
+import { api } from '../../services/api';
 
 interface Message {
   id: number;
@@ -91,6 +94,9 @@ const Messages = () => {
   // State for the filter
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // State for authentication required dialog
+  const [authDialogOpen, setAuthDialogOpen] = useState(false);
 
   // Handle page change
   const handleChangePage = (event: unknown, newPage: number) => {
@@ -186,11 +192,56 @@ const Messages = () => {
      message.suggestedResponse.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
+  // Function to fetch Telegram dialogs - this would be expanded in a real app
+  const fetchTelegramDialogs = async () => {
+    try {
+      const dialogsData = await api.telegram.getDialogs();
+      console.log('Fetched dialogs:', dialogsData);
+      // In a real application, you would process and display this data
+      // For now, we'll just show a success message
+      alert('Successfully fetched Telegram dialogs!');
+    } catch (error) {
+      console.error('Error fetching dialogs:', error);
+      
+      // Check if the error is due to authentication required
+      if (error instanceof Error && error.message === 'AUTH_REQUIRED') {
+        // Show authentication required dialog
+        setAuthDialogOpen(true);
+      } else {
+        // Handle other errors
+        alert('An error occurred while fetching dialogs.');
+      }
+    }
+  };
+
+  // Add a button at the top of the component to fetch Telegram dialogs
+  const renderFetchButton = () => (
+    <Box sx={{ mb: 2 }}>
+      <Button
+        variant="contained"
+        color="primary"
+        startIcon={<RefreshIcon />}
+        onClick={fetchTelegramDialogs}
+      >
+        Fetch Telegram Dialogs
+      </Button>
+    </Box>
+  );
+
   return (
     <Box>
       <Typography variant="h4" gutterBottom>
         Messages
       </Typography>
+      
+      {/* Add the fetch button */}
+      {renderFetchButton()}
+      
+      {/* Authentication Required Dialog */}
+      <AuthRequiredDialog 
+        open={authDialogOpen} 
+        onClose={() => setAuthDialogOpen(false)} 
+      />
       
       {/* Filters and Search */}
       <Box sx={{ mb: 3, display: 'flex', gap: 2 }}>
