@@ -4,13 +4,13 @@ import { initiatePhoneAuthentication, verifyPhoneCode } from '../../services/aut
 interface PhoneAuthProps {
   onSuccess: () => void;
   onCancel: () => void;
+  onSwitchToQR?: () => void;
 }
 
-const PhoneAuth: React.FC<PhoneAuthProps> = ({ onSuccess, onCancel }) => {
+const PhoneAuth: React.FC<PhoneAuthProps> = ({ onSuccess, onCancel, onSwitchToQR }) => {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [code, setCode] = useState('');
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [phoneCodeHash, setPhoneCodeHash] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [codeSent, setCodeSent] = useState(false);
@@ -26,7 +26,6 @@ const PhoneAuth: React.FC<PhoneAuthProps> = ({ onSuccess, onCancel }) => {
       
       const result = await initiatePhoneAuthentication(formattedPhone);
       setSessionId(result.sessionId);
-      setPhoneCodeHash(result.phoneCodeHash);
       setCodeSent(true);
     } catch (err) {
       console.error('Error sending code:', err);
@@ -95,6 +94,20 @@ const PhoneAuth: React.FC<PhoneAuthProps> = ({ onSuccess, onCancel }) => {
               {loading ? 'Sending...' : 'Send Code'}
             </button>
           </div>
+          
+          {onSwitchToQR && (
+            <div className="alternative-login">
+              <p>Having trouble with phone authentication?</p>
+              <button 
+                type="button" 
+                onClick={onSwitchToQR}
+                className="text-button"
+                disabled={loading}
+              >
+                Try QR Code Login
+              </button>
+            </div>
+          )}
         </form>
       ) : (
         <form onSubmit={handleVerifyCode}>

@@ -68,7 +68,7 @@ enum AuthMethod {
 const Login: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [authMethod, setAuthMethod] = useState<AuthMethod>(AuthMethod.SELECTION);
+  const [authMethod, setAuthMethod] = useState<AuthMethod>(AuthMethod.PHONE);
   const [qrCodeData, setQrCodeData] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
@@ -145,12 +145,30 @@ const Login: React.FC = () => {
     navigate(getRedirectPath());
   };
   
+  // Add function to handle switching to selection screen
+  const handleShowMethodSelection = () => {
+    setAuthMethod(AuthMethod.SELECTION);
+    setError(null);
+  };
+  
   return (
     <div className="login-page">
       <div className="login-container">
         <h1>Telegram Dialog AI Processor</h1>
         
         {error && <div className="auth-error">{error}</div>}
+        
+        {/* Add a link to show all authentication methods when not in selection screen */}
+        {authMethod !== AuthMethod.SELECTION && (
+          <div className="method-selection-link">
+            <button 
+              onClick={handleShowMethodSelection}
+              className="text-button"
+            >
+              Show all login methods
+            </button>
+          </div>
+        )}
         
         {authMethod === AuthMethod.SELECTION && (
           <div className="auth-methods">
@@ -212,6 +230,7 @@ const Login: React.FC = () => {
           <PhoneAuth 
             onSuccess={handlePhoneAuthSuccess}
             onCancel={() => setAuthMethod(AuthMethod.SELECTION)}
+            onSwitchToQR={handleQRLogin}
           />
         )}
       </div>

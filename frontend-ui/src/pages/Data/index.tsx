@@ -38,6 +38,7 @@ import { api } from '../../services/api';
 import { Dialog as DialogType, SessionStatus } from '../../types';
 import { checkAuthentication, initiateQRAuthentication, pollSessionStatus, devLogin } from '../../services/auth';
 import AuthRequiredDialog from '../../components/Auth/AuthRequiredDialog';
+import PhoneAuth from '../../components/Auth/PhoneAuth';
 
 const Data = () => {
   // State for dialogs
@@ -62,6 +63,9 @@ const Data = () => {
   
   // Add state for authentication required dialog
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
+  
+  // Add state for phone authentication
+  const [phoneDialogOpen, setPhoneDialogOpen] = useState<boolean>(false);
   
   // Fetch dialog list from backend
   const fetchDialogs = useCallback(async () => {
@@ -90,13 +94,26 @@ const Data = () => {
     }
   }, []);
   
-  // Initialize QR authentication
-  const handleAuthenticate = async () => {
+  // Handle phone authentication success
+  const handlePhoneAuthSuccess = () => {
+    console.log('[UI Debug] Phone authentication successful');
+    setIsAuthenticated(true);
+    setPhoneDialogOpen(false);
+    fetchDialogs();
+  };
+  
+  // Handle authenticate button click - now defaults to phone auth
+  const handleAuthenticateClick = () => {
+    setPhoneDialogOpen(true);
+  };
+  
+  // Initialize QR authentication - kept as an alternative
+  const handleQRAuthenticate = async () => {
     setIsLoading(true);
     setAuthError(null);
     setQrSessionError(false);
     
-    console.log('[UI Debug] Starting authentication process...');
+    console.log('[UI Debug] Starting QR authentication process...');
     
     try {
       const response = await initiateQRAuthentication();
@@ -480,12 +497,36 @@ const Data = () => {
         </Button>
         <Button 
           color="primary"
-          onClick={handleAuthenticate} 
+          onClick={handleQRAuthenticate} 
           disabled={isLoading}
         >
           Refresh QR Code
         </Button>
       </DialogActions>
+    </Dialog>
+  );
+
+  // Phone Authentication Dialog
+  const renderPhoneDialog = () => (
+    <Dialog 
+      open={phoneDialogOpen} 
+      onClose={() => setPhoneDialogOpen(false)}
+      maxWidth="sm"
+      fullWidth
+    >
+      <DialogTitle>Authenticate with Telegram</DialogTitle>
+      <DialogContent>
+        <Box sx={{ p: 2 }}>
+          <PhoneAuth 
+            onSuccess={handlePhoneAuthSuccess}
+            onCancel={() => setPhoneDialogOpen(false)}
+            onSwitchToQR={() => {
+              setPhoneDialogOpen(false);
+              handleQRAuthenticate();
+            }}
+          />
+        </Box>
+      </DialogContent>
     </Dialog>
   );
 
@@ -548,7 +589,7 @@ const Data = () => {
               variant="contained"
               color="primary"
               startIcon={isLoading ? <CircularProgress size={20} color="inherit" /> : <LoginIcon />}
-              onClick={handleAuthenticate}
+              onClick={handleAuthenticateClick}
               disabled={isLoading}
             >
               Authenticate
@@ -650,6 +691,7 @@ const Data = () => {
       )}
       
       {renderQrDialog()}
+      {renderPhoneDialog()}
       
       {/* Authentication Required Dialog */}
       <AuthRequiredDialog 
