@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Box, 
   Typography, 
@@ -19,6 +19,10 @@ import {
   IconButton,
   Tooltip,
   CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 import { 
   Refresh as RefreshIcon,
@@ -27,69 +31,122 @@ import {
   Group as GroupIcon,
   Campaign as ChannelIcon,
   Settings as SettingsIcon,
+  Login as LoginIcon,
+  Logout as LogoutIcon,
 } from '@mui/icons-material';
-
-// Define Dialog interface
-interface Dialog {
-  id: number;
-  telegram_dialog_id: string;
-  name: string;
-  unread_count: number;
-  type: 'PRIVATE' | 'GROUP' | 'CHANNEL';
-  is_processing_enabled: boolean;
-  auto_send_enabled: boolean;
-}
+import { api } from '../../services/api';
+import { Dialog as DialogType, SessionStatus } from '../../types';
+import { checkAuthentication, initiateQRAuthentication, pollSessionStatus, devLogin } from '../../services/auth';
 
 const Data = () => {
-  // Sample data - in a real app, this would come from an API
-  const [dialogs, setDialogs] = useState<Dialog[]>([
-    {
-      id: 1,
-      telegram_dialog_id: '123456789',
-      name: 'John Doe',
-      unread_count: 5,
-      type: 'PRIVATE',
-      is_processing_enabled: true,
-      auto_send_enabled: false,
-    },
-    {
-      id: 2,
-      telegram_dialog_id: '987654321',
-      name: 'Marketing Team',
-      unread_count: 10,
-      type: 'GROUP',
-      is_processing_enabled: true,
-      auto_send_enabled: true,
-    },
-    {
-      id: 3,
-      telegram_dialog_id: '456123789',
-      name: 'Company Announcements',
-      unread_count: 0,
-      type: 'CHANNEL',
-      is_processing_enabled: false,
-      auto_send_enabled: false,
-    },
-    {
-      id: 4,
-      telegram_dialog_id: '789456123',
-      name: 'Support Chat',
-      unread_count: 3,
-      type: 'GROUP',
-      is_processing_enabled: false,
-      auto_send_enabled: false,
-    },
-  ]);
-
+  // State for dialogs
+  const [dialogs, setDialogs] = useState<DialogType[]>([]);
+  
   // State for search
   const [searchQuery, setSearchQuery] = useState('');
   
-  // State for loading indicator
+  // State for loading indicators
   const [isLoading, setIsLoading] = useState(false);
+  const [isPollingSession, setIsPollingSession] = useState(false);
   
-  // State for authentication reminder
-  const [needsAuth, setNeedsAuth] = useState(false);
-
+  // State for authentication
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  
+  // State for QR code dialog
+  const [qrDialogOpen, setQrDialogOpen] = useState(false);
+  const [qrCode, setQrCode] = useState('');
+  const [expiresAt, setExpiresAt] = useState('');
+  const [qrSessionError, setQrSessionError] = useState(false);
+  
+  // Fetch dialog list from backend
+  const fetchDialogs = useCallback(async () => {
+    if (!isAuthenticated) return;
+    
+    setIsLoading(true);
+    setAuthError(null);
+    
+    try {
+      const response = await api.telegram.getDialogs();
+      setDialogs(response.dialogs);
+    } catch (error) {
+      console.error('Failed to fetch dialogs:', error);
+      setAuthError('Failed to fetch Telegram dialogs. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [isAuthenticated]);
+  
+  // Initialize QR authentication
+  const handleAuthenticate = async () => {
+    setIsLoading(true);
+    setAuthError(null);
+    setQrSessionError(false);
+    
+    console.log('[UI Debug] Starting authentication process...');
+    
+    try {
+      const response = await initiateQRAuthentication();
+      console.log('[UI Debug] QR code generated successfully', { 
+        session_id: response.session_id,
+        expires_at: response.expires_at
+      });
+      
+      setQrCode(response.qr_code);
+      localStorage.setItem('tempSessionId', response.session_id);
+      setExpiresAt(response.expires_at);
+      setQrDialogOpen(true);
+      
+      // Start polling for session status
+      setIsPollingSession(true);
+      
+      // Use the new polling function
+      pollSessionStatus(
+        (status, error) => {
+          console.log(`[UI Debug] Session status update: ${status}`, { error });
+          
+          if (status === SessionStatus.AUTHENTICATED) {
+            console.log('[UI Debug] Authentication successful, updating UI');
+            setIsAuthenticated(true);
+            setIsPollingSession(false);
+            setQrDialogOpen(false);
+            fetchDialogs();
+          } else if (status === SessionStatus.ERROR || status === SessionStatus.EXPIRED) {
+            console.log('[UI Debug] Authentication failed or expired');
+            setQrSessionError(true);
+            setIsPollingSession(false);
+            if (error) {
+              setAuthError(`Authentication error: ${error.message}`);
+            }
+          }
+        }
+      );
+    } catch (error) {
+      console.error('[UI Debug] Failed to create QR authentication:', error);
+      setAuthError('Failed to create authentication session. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Logout
+  const handleLogout = async () => {
+    setIsLoading(true);
+    
+    try {
+      await api.auth.logout();
+      setIsAuthenticated(false);
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      setDialogs([]);
+    } catch (error) {
+      console.error('Failed to logout:', error);
+      setAuthError('Failed to logout. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
   // Toggle processing for dialog
   const handleToggleProcessing = (id: number) => {
     setDialogs(prevDialogs => 
@@ -112,18 +169,13 @@ const Data = () => {
     );
   };
 
-  // Mock refreshing dialogs from Telegram
+  // Refresh dialogs from Telegram
   const handleRefreshDialogs = () => {
-    setIsLoading(true);
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false);
-      setNeedsAuth(Math.random() > 0.7); // Randomly show auth reminder for demo
-    }, 1000);
+    fetchDialogs();
   };
 
   // Get appropriate icon for dialog type
-  const getDialogIcon = (type: Dialog['type']) => {
+  const getDialogIcon = (type: DialogType['type']) => {
     switch (type) {
       case 'PRIVATE':
         return <PersonIcon />;
@@ -137,7 +189,7 @@ const Data = () => {
   };
 
   // Get appropriate chip for dialog type
-  const getDialogTypeChip = (type: Dialog['type']) => {
+  const getDialogTypeChip = (type: DialogType['type']) => {
     switch (type) {
       case 'PRIVATE':
         return <Chip label="Private" size="small" color="primary" variant="outlined" />;
@@ -149,10 +201,289 @@ const Data = () => {
         return <Chip label={type} size="small" variant="outlined" />;
     }
   };
+  
+  // Check for existing authentication tokens on component mount
+  useEffect(() => {
+    const checkAuthStatus = async () => {
+      setIsLoading(true);
+      try {
+        const isAuth = await checkAuthentication();
+        setIsAuthenticated(isAuth);
+        if (isAuth) {
+          // If we're already authenticated, fetch dialogs
+          fetchDialogs();
+        }
+      } catch (error) {
+        console.error('Error checking authentication status:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    checkAuthStatus();
+  }, [fetchDialogs]);  // Include fetchDialogs in the dependency array
+  
+  // Fetch dialogs when authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchDialogs();
+    }
+  }, [isAuthenticated, fetchDialogs]);
 
   // Filter dialogs by search query
   const filteredDialogs = dialogs.filter(dialog => 
     dialog.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // Test if a token is valid
+  const testToken = async (token: string) => {
+    try {
+      console.log(`[UI Debug] Testing token: ${token.substring(0, 10)}...`);
+      
+      // Make a direct fetch call to avoid interceptors
+      const response = await fetch('http://localhost:8000/api/auth/session/verify', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('[UI Debug] Token is valid:', data);
+        alert(`Token is valid! Status: ${data.status}`);
+        return true;
+      } else {
+        const errorText = await response.text();
+        console.error('[UI Debug] Token validation failed:', response.status, errorText);
+        alert(`Token validation failed: ${response.status} ${errorText}`);
+        return false;
+      }
+    } catch (error: unknown) {
+      console.error('[UI Debug] Token test error:', error);
+      alert(`Error testing token: ${error instanceof Error ? error.message : String(error)}`);
+      return false;
+    }
+  };
+
+  // Direct API call to dev login
+  const directDevLogin = async (telegramId: number) => {
+    try {
+      console.log(`[UI Debug] Making direct dev login call with ID: ${telegramId}`);
+      
+      const response = await fetch('http://localhost:8000/api/auth/dev-login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ telegram_id: telegramId })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('[UI Debug] Direct dev login successful:', data);
+        
+        // Store the token
+        if (data.token) {
+          localStorage.setItem('accessToken', data.token);
+          alert(`Login successful! Token: ${data.token.substring(0, 15)}...`);
+          
+          // Test the token immediately
+          await testToken(data.token);
+          
+          setIsAuthenticated(true);
+          setQrDialogOpen(false);
+          fetchDialogs();
+          return true;
+        } else {
+          alert('Login response did not contain a token');
+          return false;
+        }
+      } else {
+        const errorText = await response.text();
+        console.error('[UI Debug] Direct dev login failed:', response.status, errorText);
+        alert(`Login failed: ${response.status} ${errorText}`);
+        return false;
+      }
+    } catch (error: unknown) {
+      console.error('[UI Debug] Direct dev login error:', error);
+      alert(`Error during login: ${error instanceof Error ? error.message : String(error)}`);
+      return false;
+    }
+  };
+
+  // QR Code Authentication Dialog
+  const renderQrDialog = () => (
+    <Dialog open={qrDialogOpen} onClose={() => {
+      setQrDialogOpen(false);
+      setIsPollingSession(false);
+    }}>
+      <DialogTitle>Authenticate with Telegram</DialogTitle>
+      <DialogContent>
+        <Box sx={{ textAlign: 'center', p: 2 }}>
+          <Typography variant="body1" paragraph>
+            Scan this QR code with your Telegram app to authenticate:
+          </Typography>
+          
+          {qrCode && (
+            <img
+              src={`data:image/png;base64,${qrCode}`}
+              alt="QR Code for Telegram authentication"
+              style={{ maxWidth: '100%', height: 'auto' }}
+            />
+          )}
+          
+          <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 2 }}>
+            Session expires: {new Date(expiresAt).toLocaleString()}
+          </Typography>
+          
+          {isPollingSession && (
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mt: 2 }}>
+              <CircularProgress size={20} sx={{ mr: 1 }} />
+              <Typography variant="body2">
+                {qrSessionError 
+                  ? "Waiting for scan... (Having trouble connecting to server)" 
+                  : "Waiting for authentication..."}
+              </Typography>
+            </Box>
+          )}
+          
+          {qrSessionError && (
+            <Alert severity="info" sx={{ mt: 2, textAlign: 'left' }}>
+              Tip: Open Telegram on your mobile device, go to Settings → Devices → Scan QR Code
+            </Alert>
+          )}
+          
+          {/* Debug Tools */}
+          <Box sx={{ mt: 3, pt: 2, borderTop: '1px solid #eee' }}>
+            <Typography variant="overline" color="text.secondary">
+              Debug Options
+            </Typography>
+            
+            <Box sx={{ mt: 1 }}>
+              <Button 
+                variant="outlined" 
+                size="small" 
+                color="secondary" 
+                onClick={() => {
+                  console.log('[DEBUG] Checking session status manually');
+                  api.auth.verifySession()
+                    .then(response => {
+                      console.log('[DEBUG] Manual session check:', response);
+                      alert(`Session status: ${response.status}\nUser: ${response.user ? response.user.username : 'none'}`);
+                    })
+                    .catch(err => {
+                      console.error('[DEBUG] Manual session check failed:', err);
+                      alert(`Session check failed: ${err.message}`);
+                    });
+                }}
+              >
+                Check Session
+              </Button>
+              
+              <Button 
+                variant="outlined" 
+                size="small" 
+                color="warning" 
+                sx={{ ml: 1 }}
+                onClick={() => {
+                  // Try to simulate authentication for testing
+                  const fakeToken = prompt('Enter a test token to simulate authentication:');
+                  if (fakeToken) {
+                    localStorage.setItem('accessToken', fakeToken);
+                    alert('Token saved! Testing authentication...');
+                    setIsAuthenticated(true);
+                    setQrDialogOpen(false);
+                    fetchDialogs();
+                  }
+                }}
+              >
+                Test Auth
+              </Button>
+              
+              <Button 
+                variant="outlined" 
+                size="small" 
+                color="error" 
+                sx={{ ml: 1 }}
+                onClick={async () => {
+                  const telegramId = prompt('Enter a Telegram ID for dev login:');
+                  if (telegramId && !isNaN(Number(telegramId))) {
+                    const id = Number(telegramId);
+                    const success = await devLogin(id);
+                    
+                    if (success) {
+                      alert(`Dev login successful with ID ${id}`);
+                      setIsAuthenticated(true);
+                      setQrDialogOpen(false);
+                      fetchDialogs();
+                    } else {
+                      alert('Dev login failed. Check console for details.');
+                    }
+                  } else {
+                    alert('Please enter a valid numeric Telegram ID');
+                  }
+                }}
+              >
+                Dev Login
+              </Button>
+              
+              <Button 
+                variant="outlined" 
+                size="small" 
+                color="info" 
+                sx={{ ml: 1, mt: 1 }}
+                onClick={() => {
+                  const token = localStorage.getItem('accessToken');
+                  if (token) {
+                    testToken(token);
+                  } else {
+                    alert('No token found in localStorage');
+                  }
+                }}
+              >
+                Test Current Token
+              </Button>
+              
+              <Button 
+                variant="outlined" 
+                size="small" 
+                color="success" 
+                sx={{ ml: 1, mt: 1 }}
+                onClick={async () => {
+                  const telegramId = prompt('Enter a Telegram ID for direct dev login:');
+                  if (telegramId && !isNaN(Number(telegramId))) {
+                    await directDevLogin(Number(telegramId));
+                  } else {
+                    alert('Please enter a valid numeric Telegram ID');
+                  }
+                }}
+              >
+                Direct Dev Login
+              </Button>
+            </Box>
+          </Box>
+        </Box>
+      </DialogContent>
+      <DialogActions>
+        <Button 
+          onClick={() => {
+            setQrDialogOpen(false);
+            setIsPollingSession(false);
+          }}
+        >
+          Close
+        </Button>
+        <Button 
+          color="primary"
+          onClick={handleAuthenticate} 
+          disabled={isLoading}
+        >
+          Refresh QR Code
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 
   return (
@@ -161,17 +492,13 @@ const Data = () => {
         Telegram Dialogs
       </Typography>
       
-      {needsAuth && (
+      {authError && (
         <Alert 
           severity="warning" 
           sx={{ mb: 3 }}
-          action={
-            <Button color="inherit" size="small">
-              Authenticate
-            </Button>
-          }
+          onClose={() => setAuthError(null)}
         >
-          Your Telegram authentication has expired. Please authenticate to continue.
+          {authError}
         </Alert>
       )}
       
@@ -192,97 +519,134 @@ const Data = () => {
               ),
             }}
           />
-          <Button 
-            variant="contained" 
-            startIcon={isLoading ? <CircularProgress size={20} color="inherit" /> : <RefreshIcon />}
-            onClick={handleRefreshDialogs}
-            disabled={isLoading}
-          >
-            Refresh
-          </Button>
+          {isAuthenticated ? (
+            <>
+              <Button 
+                variant="contained" 
+                startIcon={isLoading ? <CircularProgress size={20} color="inherit" /> : <RefreshIcon />}
+                onClick={handleRefreshDialogs}
+                disabled={isLoading}
+                sx={{ mr: 1 }}
+              >
+                Refresh
+              </Button>
+              <Button
+                variant="outlined"
+                color="error"
+                startIcon={<LogoutIcon />}
+                onClick={handleLogout}
+                disabled={isLoading}
+              >
+                Logout
+              </Button>
+            </>
+          ) : (
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={isLoading ? <CircularProgress size={20} color="inherit" /> : <LoginIcon />}
+              onClick={handleAuthenticate}
+              disabled={isLoading}
+            >
+              Authenticate
+            </Button>
+          )}
         </Box>
         
         <Typography variant="body2" color="text.secondary">
-          Select which Telegram dialogs you want to process with AI responses.
+          {isAuthenticated 
+            ? "Select which Telegram dialogs you want to process with AI responses." 
+            : "Please authenticate with Telegram to manage your dialogs."}
         </Typography>
       </Paper>
       
-      <Paper elevation={2}>
-        <List>
-          {filteredDialogs.map((dialog, index) => (
-            <React.Fragment key={dialog.id}>
-              {index > 0 && <Divider />}
-              <ListItem
-                secondaryAction={
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          checked={dialog.auto_send_enabled}
-                          onChange={() => handleToggleAutoSend(dialog.id)}
-                          disabled={!dialog.is_processing_enabled}
+      {isAuthenticated && (
+        <Paper elevation={2}>
+          {filteredDialogs.length > 0 ? (
+            <List>
+              {filteredDialogs.map((dialog, index) => (
+                <React.Fragment key={dialog.id}>
+                  {index > 0 && <Divider />}
+                  <ListItem
+                    secondaryAction={
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <FormControlLabel
+                          control={
+                            <Switch
+                              checked={dialog.auto_send_enabled}
+                              onChange={() => handleToggleAutoSend(dialog.id)}
+                              disabled={!dialog.is_processing_enabled}
+                            />
+                          }
+                          label="Auto-send"
+                          labelPlacement="start"
                         />
-                      }
-                      label="Auto-send"
-                      labelPlacement="start"
-                    />
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          checked={dialog.is_processing_enabled}
-                          onChange={() => handleToggleProcessing(dialog.id)}
+                        <FormControlLabel
+                          control={
+                            <Switch
+                              checked={dialog.is_processing_enabled}
+                              onChange={() => handleToggleProcessing(dialog.id)}
+                            />
+                          }
+                          label="Process"
+                          labelPlacement="start"
                         />
-                      }
-                      label="Process"
-                      labelPlacement="start"
-                    />
-                    <Tooltip title="Settings">
-                      <IconButton edge="end" aria-label="settings">
-                        <SettingsIcon />
-                      </IconButton>
-                    </Tooltip>
-                  </Box>
-                }
-              >
-                <ListItemAvatar>
-                  <Avatar>
-                    {getDialogIcon(dialog.type)}
-                  </Avatar>
-                </ListItemAvatar>
-                <ListItemText
-                  primary={
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <Typography variant="subtitle1" component="span">
-                        {dialog.name}
-                      </Typography>
-                      {dialog.unread_count > 0 && (
-                        <Chip 
-                          label={dialog.unread_count} 
-                          size="small" 
-                          color="primary" 
-                          sx={{ ml: 1 }} 
-                        />
-                      )}
-                      <Box sx={{ ml: 'auto', mr: 2 }}>
-                        {getDialogTypeChip(dialog.type)}
+                        <Tooltip title="Settings">
+                          <IconButton edge="end" aria-label="settings">
+                            <SettingsIcon />
+                          </IconButton>
+                        </Tooltip>
                       </Box>
-                    </Box>
-                  }
-                  secondary={`ID: ${dialog.telegram_dialog_id}`}
-                />
-              </ListItem>
-            </React.Fragment>
-          ))}
-          {filteredDialogs.length === 0 && (
-            <ListItem>
-              <ListItemText 
-                primary="No dialogs found" 
-                secondary={searchQuery ? "Try a different search term" : "Refresh to load dialogs"} 
-              />
-            </ListItem>
+                    }
+                  >
+                    <ListItemAvatar>
+                      <Avatar>
+                        {getDialogIcon(dialog.type)}
+                      </Avatar>
+                    </ListItemAvatar>
+                    <ListItemText
+                      primary={
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          <Typography variant="body1" sx={{ mr: 1 }}>
+                            {dialog.name}
+                          </Typography>
+                          {dialog.unread_count > 0 && (
+                            <Chip 
+                              label={dialog.unread_count} 
+                              size="small" 
+                              color="primary" 
+                            />
+                          )}
+                        </Box>
+                      }
+                      secondary={
+                        <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
+                          {getDialogTypeChip(dialog.type)}
+                          <Typography variant="caption" sx={{ ml: 1 }}>
+                            ID: {dialog.telegram_dialog_id}
+                          </Typography>
+                        </Box>
+                      }
+                    />
+                  </ListItem>
+                </React.Fragment>
+              ))}
+            </List>
+          ) : (
+            <Box sx={{ p: 3, textAlign: 'center' }}>
+              {isLoading ? (
+                <CircularProgress />
+              ) : (
+                <Typography variant="body1" color="text.secondary">
+                  No dialogs found. Click refresh to fetch your Telegram dialogs.
+                </Typography>
+              )}
+            </Box>
           )}
-        </List>
-      </Paper>
+        </Paper>
+      )}
+      
+      {renderQrDialog()}
     </Box>
   );
 };

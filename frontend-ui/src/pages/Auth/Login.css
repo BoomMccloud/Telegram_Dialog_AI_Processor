@@ -1,0 +1,227 @@
+.login-page {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background-color: #f5f5f5;
+}
+
+.login-container {
+  width: 100%;
+  max-width: 500px;
+  padding: 2rem;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+.login-container h1 {
+  margin-bottom: 2rem;
+  color: #333;
+  font-size: 1.8rem;
+}
+
+.auth-methods {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.auth-methods h2 {
+  margin-bottom: 1.5rem;
+  font-size: 1.4rem;
+}
+
+.auth-method-btn {
+  padding: 12px 16px;
+  font-size: 1rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.auth-method-btn.qr {
+  background-color: #0088cc;
+  color: white;
+}
+
+.auth-method-btn.qr:hover {
+  background-color: #0077b3;
+}
+
+.auth-method-btn.phone {
+  background-color: #4caf50;
+  color: white;
+}
+
+.auth-method-btn.phone:hover {
+  background-color: #43a047;
+}
+
+.auth-method-btn:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+
+.auth-error {
+  padding: 10px;
+  margin-bottom: 16px;
+  background-color: #ffebee;
+  color: #d32f2f;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.qr-code-container {
+  margin: 2rem 0;
+  padding: 1rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background-color: #f9f9f9;
+}
+
+.qr-code-image {
+  max-width: 250px;
+  height: auto;
+  margin-bottom: 1rem;
+}
+
+.qr-code-instructions {
+  text-align: center;
+  margin-top: 1rem;
+}
+
+.qr-code-instructions p {
+  margin: 0.5rem 0;
+  font-size: 0.9rem;
+  color: #555;
+}
+
+.qr-code-instructions p.expiring {
+  color: #f44336;
+  font-weight: bold;
+}
+
+.refresh-button, .back-button {
+  padding: 8px 16px;
+  margin-top: 1rem;
+  background-color: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.refresh-button:hover, .back-button:hover {
+  background-color: #e0e0e0;
+}
+
+/* Phone Authentication */
+.phone-auth-container {
+  margin: 1rem 0;
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+  text-align: left;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 1rem;
+}
+
+.form-group small {
+  display: block;
+  margin-top: 0.5rem;
+  color: #757575;
+  font-size: 0.8rem;
+}
+
+.buttons {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 1.5rem;
+}
+
+.buttons button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.buttons button[type="button"] {
+  background-color: #f5f5f5;
+  color: #333;
+  border: 1px solid #ddd;
+}
+
+.buttons button[type="submit"] {
+  background-color: #4caf50;
+  color: white;
+}
+
+.buttons button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+/* Development Login */
+.dev-login {
+  margin-top: 3rem;
+  padding-top: 1.5rem;
+  border-top: 1px dashed #ddd;
+  text-align: left;
+}
+
+.dev-login h3 {
+  margin-bottom: 1rem;
+  font-size: 1.1rem;
+  color: #757575;
+}
+
+.dev-login-form {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.dev-login-form input {
+  flex-grow: 1;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.dev-login-form button {
+  padding: 8px 16px;
+  background-color: #ff9800;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.dev-login-form button:hover {
+  background-color: #f57c00;
+}
+
+.dev-login-form button:disabled {
+  background-color: #ffcc80;
+  cursor: not-allowed;
+} 

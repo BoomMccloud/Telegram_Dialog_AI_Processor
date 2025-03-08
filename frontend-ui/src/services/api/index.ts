@@ -1,8 +1,9 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
+import { QRAuthResponse, SessionVerifyResponse, DialogListResponse, SessionStatus } from '../../types';
 
 // Create a base API instance
 const apiClient: AxiosInstance = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:8000/api',
+  baseURL: '/api',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -11,9 +12,12 @@ const apiClient: AxiosInstance = axios.create({
 // Add request interceptor for authentication
 apiClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('accessToken');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    // Only add token if available and if Authorization header isn't already set
+    if (!config.headers.Authorization) {
+      const token = localStorage.getItem('accessToken');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
     }
     return config;
   },
@@ -25,6 +29,11 @@ apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+    
+    // Special case: verifySession endpoint should not trigger refresh to avoid loops
+    if (originalRequest.url?.includes('/auth/session/verify')) {
+      return Promise.reject(error);
+    }
     
     // If error is 401 and we haven't tried to refresh the token yet
     if (error.response?.status === 401 && !originalRequest._retry) {
@@ -49,10 +58,9 @@ apiClient.interceptors.response.use(
         originalRequest.headers.Authorization = `Bearer ${access_token}`;
         return apiClient(originalRequest);
       } catch (refreshError) {
-        // If refresh fails, clear tokens and redirect to login
+        // If refresh fails, clear tokens and reject
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
-        // In a real app, you might want to redirect to login page here
         return Promise.reject(refreshError);
       }
     }
@@ -64,10 +72,30 @@ apiClient.interceptors.response.use(
 // Generic API request function
 const apiRequest = async <T>(config: AxiosRequestConfig): Promise<T> => {
   try {
+    // Add request logging for auth endpoints
+    if (config.url?.includes('/auth/')) {
+      console.log(`[API Debug] Request to ${config.url}`, config);
+    }
+    
     const response: AxiosResponse<T> = await apiClient(config);
+    
+    // Add response logging for auth endpoints
+    if (config.url?.includes('/auth/')) {
+      console.log(`[API Debug] Response from ${config.url}:`, response.data);
+    }
+    
     return response.data;
   } catch (error) {
     console.error('API request failed:', error);
+    
+    // Add more detailed error logging for auth endpoints
+    if (config.url?.includes('/auth/')) {
+      if (axios.isAxiosError(error) && error.response) {
+        console.error(`[API Debug] Auth Error ${error.response.status}:`, 
+          error.response.data || error.message);
+      }
+    }
+    
     throw error;
   }
 };
@@ -88,10 +116,75 @@ export const api = {
         url: '/auth/refresh',
         data: { refresh_token: refreshToken },
       }),
+    createQRAuth: () => 
+      apiRequest<QRAuthResponse>({
+        method: 'POST',
+        url: '/auth/qr',
+      }),
+    verifySession: async () => {
+      try {
+        // Get the token from localStorage
+        const token = localStorage.getItem('accessToken');
+        // Even without a token, we can call the endpoint 
+        // as it will return UNAUTHENTICATED status
+        
+        // Make the request
+        const response = await apiRequest<SessionVerifyResponse>({
+          method: 'GET',
+          url: '/auth/session/verify',
+          headers: token ? {
+            Authorization: `Bearer ${token}`
+          } : {}
+        });
+        
+        // If authenticated, store tokens
+        if (response.status === SessionStatus.AUTHENTICATED && response.access_token) {
+          localStorage.setItem('accessToken', response.access_token);
+          if (response.refresh_token) {
+            localStorage.setItem('refreshToken', response.refresh_token);
+          }
+        }
+        
+        return response;
+      } catch (error) {
+        console.error('[API Debug] Session verification failed:', error);
+        throw error;
+      }
+    },
     logout: () => 
-      apiRequest({
+      apiRequest<{ status: string }>({
         method: 'POST',
         url: '/auth/logout',
+      }),
+    devLogin: (telegram_id: number) => 
+      apiRequest<{ 
+        session_id: string; 
+        token?: string;  // Backend returns this format
+        access_token?: string; 
+        refresh_token?: string;
+        expires_at: string;
+      }>({
+        method: 'POST',
+        url: '/auth/dev-login',
+        data: { telegram_id },
+      }),
+    // Phone auth - first step to send the code
+    initiatePhoneAuth: (phoneNumber: string) => 
+      apiRequest<{ session_id: string; expires_at: string; phone_code_hash: string }>({
+        method: 'POST',
+        url: '/auth/phone',
+        data: { phone_number: phoneNumber },
+      }),
+    // Phone auth - verify the code
+    verifyPhoneCode: (phoneNumber: string, code: string, sessionId: string) => 
+      apiRequest<SessionVerifyResponse>({
+        method: 'POST',
+        url: '/auth/phone/verify',
+        data: { 
+          phone_number: phoneNumber,
+          code: code,
+          session_id: sessionId
+        },
       }),
   },
   
@@ -112,6 +205,15 @@ export const api = {
       apiRequest({
         method: 'DELETE',
         url: `/dialogs/${id}`,
+      }),
+  },
+  
+  // Telegram Dialogs
+  telegram: {
+    getDialogs: () => 
+      apiRequest<DialogListResponse>({
+        method: 'GET',
+        url: '/dialogs',
       }),
   },
   

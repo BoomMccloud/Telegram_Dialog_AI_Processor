@@ -58,6 +58,8 @@ PUBLIC_PATHS = {
     "/api/auth/qr",
     "/api/auth/session/verify",
     "/api/auth/dev-login",
+    "/api/auth/phone",
+    "/api/auth/phone/verify",
     "/health",
     "/docs",
     "/redoc",
@@ -102,8 +104,8 @@ class SessionMiddleware(BaseHTTPMiddleware):
                 request.state.session = session
                 request.state.user = None
                 
-                if session.telegram_id:
-                    stmt = select(User).where(User.telegram_id == session.telegram_id)
+                if session.status == SessionStatus.AUTHENTICATED and session.user_id:
+                    stmt = select(User).where(User.id == session.user_id)
                     result = await db.execute(stmt)
                     user = result.scalar_one_or_none()
                     if user:
@@ -182,6 +184,13 @@ class SessionMiddleware(BaseHTTPMiddleware):
             if not session:
                 raise SessionError("Invalid or expired session")
             
+            # Load the user to get telegram_id if needed
+            user = None
+            if session.status == SessionStatus.AUTHENTICATED and session.user_id:
+                stmt = select(User).where(User.id == session.user_id)
+                result = await db.execute(stmt)
+                user = result.scalar_one_or_none()
+            
             return session
         except SessionError:
             raise
@@ -210,7 +219,8 @@ class SessionMiddleware(BaseHTTPMiddleware):
             if not session:
                 raise SessionError("Session not found or expired")
             
-            session.telegram_id = telegram_id
+            # Update session with user id instead of telegram_id
+            session.user_id = user.id
             session.status = SessionStatus.AUTHENTICATED
             session.expires_at = utcnow() + timedelta(days=7)
             
@@ -256,8 +266,29 @@ async def verify_session_dependency(
     try:
         session_middleware = request.app.state.session_middleware
         async with request.app.state.db_pool() as db:
-            session = await session_middleware.verify_session(credentials.credentials, db)
-            return session
+            session_db = await session_middleware.verify_session(credentials.credentials, db)
+            
+            # Get user to extract telegram_id if authenticated
+            telegram_id = None
+            if session_db.status == SessionStatus.AUTHENTICATED and session_db.user_id:
+                stmt = select(User).where(User.id == session_db.user_id)
+                result = await db.execute(stmt)
+                user = result.scalar_one_or_none()
+                if user:
+                    telegram_id = user.telegram_id
+            
+            # Convert Session DB model to SessionData DTO
+            session_data = SessionData(
+                id=session_db.id,
+                telegram_id=telegram_id,
+                status=session_db.status,
+                token=session_db.token,
+                created_at=session_db.created_at,
+                expires_at=session_db.expires_at,
+                session_metadata=session_db.session_metadata
+            )
+            
+            return session_data
     except Exception as e:
         logger.warning(f"Session verification failed: {str(e)}")
         raise AuthenticationError("Invalid or expired session")

@@ -17,3 +17,6 @@ database name is telegram_dialog_dev
 
 Backend:
 NODE_ENV=development npm run dev
+
+telegramID: 6761933542
++6596456152

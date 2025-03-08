@@ -28,4 +28,14 @@ class User(Base):
     auth_data = relationship("AuthenticationData", back_populates="user", cascade="all, delete-orphan")
 
     def __repr__(self):
-        return f"<User(id={self.id}, telegram_id={self.telegram_id}, username={self.username})>" 
+        return f"<User(id={self.id}, telegram_id={self.telegram_id}, username={self.username})>"
+        
+    def to_dict(self):
+        """Convert user model to dictionary for API responses"""
+        return {
+            "id": str(self.id),
+            "telegram_id": self.telegram_id,
+            "username": self.username,
+            "first_name": self.first_name,
+            "last_name": self.last_name
+        } 
