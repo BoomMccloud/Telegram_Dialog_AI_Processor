@@ -3,7 +3,8 @@ from typing import Dict, List, Optional
 import uuid
 from datetime import datetime
 import json
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
+import re
 
 # Import database connection
 from app.db.database import get_raw_connection, get_db
@@ -15,27 +16,50 @@ router = APIRouter()
 
 # Pydantic models for request/response
 class DialogSelection(BaseModel):
-    dialog_id: int
+    dialog_id: str
     dialog_name: str
-    processing_enabled: bool = True
-    auto_reply_enabled: bool = False
-    response_approval_required: bool = True
+    is_processing_enabled: bool = True
+    auto_send_enabled: bool = False
     priority: int = 0
-    processing_settings: Dict = Field(default_factory=dict)
+
+    @validator('dialog_id')
+    def validate_dialog_id(cls, v):
+        # Validate Telegram chat ID format
+        # Private chats: positive numbers
+        # Groups: -number
+        # Supergroups/Channels: -100number
+        if not re.match(r'^-?(?:100)?\d+$', v):
+            raise ValueError('Invalid Telegram chat ID format')
+        return v
+
+    @validator('priority')
+    def validate_priority(cls, v):
+        if v < 0:
+            raise ValueError('Priority must be non-negative')
+        return v
 
 class DialogSelectionResponse(BaseModel):
     selection_id: str
-    user_id: int
-    dialog_id: int
+    dialog_id: str
     dialog_name: str
     is_active: bool
-    processing_enabled: bool
-    auto_reply_enabled: bool
-    response_approval_required: bool
+    is_processing_enabled: bool
+    auto_send_enabled: bool
     priority: int
     created_at: str
     updated_at: str
-    processing_settings: Dict
+
+    @validator('dialog_id')
+    def validate_dialog_id(cls, v):
+        if not re.match(r'^-?(?:100)?\d+$', v):
+            raise ValueError('Invalid Telegram chat ID format')
+        return v
+
+    @validator('priority')
+    def validate_priority(cls, v):
+        if v < 0:
+            raise ValueError('Priority must be non-negative')
+        return v
 
 @router.post("/dialogs/select", 
     response_model=DialogSelectionResponse,
@@ -83,23 +107,23 @@ async def select_dialog(
             UPDATE dialogs
             SET is_processing_enabled = $1,
                 auto_send_enabled = $2,
-                updated_at = $3
-            WHERE user_id = $4 AND telegram_dialog_id = $5
+                priority = $3,
+                updated_at = $4
+            WHERE user_id = $5 AND telegram_dialog_id = $6
             RETURNING 
                 id as selection_id,
                 telegram_dialog_id as dialog_id,
                 name as dialog_name,
                 true as is_active,
-                is_processing_enabled as processing_enabled,
-                auto_send_enabled as auto_reply_enabled,
-                true as response_approval_required,
-                0 as priority,
+                is_processing_enabled,
+                auto_send_enabled,
+                priority,
                 created_at,
-                updated_at,
-                '{}'::jsonb as processing_settings
+                updated_at
             """,
-            dialog.processing_enabled,
-            dialog.auto_reply_enabled,
+            dialog.is_processing_enabled,
+            dialog.auto_send_enabled,
+            dialog.priority,
             datetime.utcnow(),
             user_id,
             str(dialog.dialog_id)  # Convert to string as telegram_dialog_id is VARCHAR
@@ -167,19 +191,17 @@ async def get_selected_dialogs(
                 telegram_dialog_id as dialog_id,
                 name as dialog_name,
                 true as is_active,
-                is_processing_enabled as processing_enabled,
-                auto_send_enabled as auto_reply_enabled,
-                true as response_approval_required,
-                0 as priority,
+                is_processing_enabled,
+                auto_send_enabled,
+                priority,
                 created_at,
-                updated_at,
-                '{}'::jsonb as processing_settings
+                updated_at
             FROM dialogs
             WHERE user_id = (
                 SELECT id FROM users WHERE telegram_id = $1
             )
             AND is_processing_enabled = true
-            ORDER BY name
+            ORDER BY priority DESC, name
             """,
             session.telegram_id
         )
@@ -216,14 +238,14 @@ async def get_selected_dialogs(
     }
 )
 async def deselect_dialog(
-    dialog_id: int,
+    dialog_id: str,
     session: SessionData = Depends(verify_session_dependency),
 ) -> Dict:
     """
     Disable processing for a dialog
     
     Args:
-        dialog_id: The Telegram dialog ID
+        dialog_id: The Telegram dialog ID (as a string)
     
     Returns:
         The updated dialog record
@@ -249,6 +271,7 @@ async def deselect_dialog(
             UPDATE dialogs
             SET is_processing_enabled = false,
                 auto_send_enabled = false,
+                priority = 0,
                 updated_at = $1
             WHERE user_id = $2 AND telegram_dialog_id = $3
             RETURNING 
@@ -256,13 +279,11 @@ async def deselect_dialog(
                 telegram_dialog_id as dialog_id,
                 name as dialog_name,
                 false as is_active,
-                is_processing_enabled as processing_enabled,
-                auto_send_enabled as auto_reply_enabled,
-                true as response_approval_required,
-                0 as priority,
+                is_processing_enabled,
+                auto_send_enabled,
+                priority,
                 created_at,
-                updated_at,
-                '{}'::jsonb as processing_settings
+                updated_at
             """,
             datetime.utcnow(),
             user_id,

@@ -201,7 +201,11 @@ export const api = {
         method: 'GET',
         url: '/dialogs',
       }),
-    update: (id: number, data: { is_processing_enabled?: boolean; auto_send_enabled?: boolean }) => 
+    update: (id: number, data: { 
+      is_processing_enabled?: boolean; 
+      auto_send_enabled?: boolean;
+      priority?: number;
+    }) => 
       apiRequest({
         method: 'PATCH',
         url: `/dialogs/${id}`,
@@ -219,11 +223,9 @@ export const api = {
         data: {
           dialog_id: dialogId,
           dialog_name: dialogName,
-          processing_enabled: true,
-          auto_reply_enabled: false,
-          response_approval_required: true,
-          priority: 1,
-          processing_settings: {}
+          is_processing_enabled: true,
+          auto_send_enabled: false,
+          priority: 0
         },
       }),
     unselect: (dialogId: number) => 

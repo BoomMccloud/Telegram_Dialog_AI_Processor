@@ -43,12 +43,11 @@ import PhoneAuth from '../../components/Auth/PhoneAuth';
 // Add interface for selected dialog response
 interface SelectedDialog {
   selection_id: string;
-  dialog_id: number;
+  dialog_id: string;
   dialog_name: string;
   is_active: boolean;
-  processing_enabled: boolean;
-  auto_reply_enabled: boolean;
-  response_approval_required: boolean;
+  is_processing_enabled: boolean;
+  auto_send_enabled: boolean;
   priority: number;
   created_at: string;
   updated_at: string;
@@ -81,46 +80,47 @@ const Data = () => {
   // Add state for phone authentication
   const [phoneDialogOpen, setPhoneDialogOpen] = useState<boolean>(false);
   
-  // Fetch dialog list from backend
-  const fetchDialogs = useCallback(async () => {
+  // Handle priority change
+  const handlePriorityChange = async (dialogId: number, priority: number) => {
+    try {
+      await api.dialogs.update(dialogId, { priority });
+      // Update local state
+      setDialogs(dialogs.map(dialog => 
+        dialog.id === dialogId 
+          ? { ...dialog, priority } 
+          : dialog
+      ));
+    } catch (error) {
+      setAuthError('Failed to update dialog priority. Please try again.');
+      console.error('Error updating dialog priority:', error);
+    }
+  };
+
+  // Fetch dialogs from API
+  const fetchDialogs = async () => {
     try {
       setIsLoading(true);
-      setAuthError(null);
-      
-      // Try to fetch dialogs
       const response = await api.telegram.getDialogs();
-      
-      // Also fetch selected dialogs to get their current state
-      const selectedResponse = await api.dialogs.getSelected() as SelectedDialog[];
-      const selectedDialogIds = new Set(selectedResponse.map(dialog => dialog.dialog_id));
-      
-      // Add processing properties to dialogs
+      // Add default values for UI state properties
       const enhancedDialogs = response.dialogs.map(dialog => ({
         ...dialog,
-        // Set processing status based on whether the dialog is in the selected list
-        is_processing_enabled: selectedDialogIds.has(dialog.id),
+        is_processing_enabled: false,
         auto_send_enabled: false,
+        priority: 0,
         telegram_dialog_id: dialog.id.toString()
       }));
-      
       setDialogs(enhancedDialogs);
-      
-      // If we succeeded, update isAuthenticated state
-      setIsAuthenticated(true);
     } catch (error) {
-      console.error('Failed to fetch dialogs:', error);
-      
-      // Check if the error is due to authentication required
       if (error instanceof Error && error.message === 'AUTH_REQUIRED') {
-        // Show authentication required dialog
         setAuthDialogOpen(true);
       } else {
-        setAuthError('Failed to fetch Telegram dialogs. Please try again.');
+        setAuthError('Failed to fetch dialogs. Please try again.');
+        console.error('Error fetching dialogs:', error);
       }
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  };
   
   // Handle phone authentication success
   const handlePhoneAuthSuccess = () => {
@@ -693,6 +693,20 @@ const Data = () => {
                   <ListItem
                     secondaryAction={
                       <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <FormControlLabel
+                          control={
+                            <TextField
+                              type="number"
+                              size="small"
+                              value={dialog.priority}
+                              onChange={(e) => handlePriorityChange(dialog.id, parseInt(e.target.value))}
+                              inputProps={{ min: 0, style: { width: '60px' } }}
+                              disabled={!dialog.is_processing_enabled}
+                            />
+                          }
+                          label="Priority"
+                          labelPlacement="start"
+                        />
                         <FormControlLabel
                           control={
                             <Switch
