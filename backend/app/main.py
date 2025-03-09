@@ -11,6 +11,7 @@ from sqlalchemy.orm import sessionmaker
 from typing import List
 import time
 from sqlalchemy.sql import text
+from fastapi.openapi.utils import get_openapi
 
 from .api import auth, messages, dialogs
 from .utils.logging import get_logger
@@ -127,12 +128,26 @@ async def lifespan(app: FastAPI):
         logger.error(f"Failed to initialize application: {str(e)}", exc_info=True)
         raise DatabaseError("Failed to initialize application", details={"error": str(e)})
 
-app = FastAPI(title="Telegram Dialog AI Processor", lifespan=lifespan)
+app = FastAPI(
+    title="Telegram Dialog AI Processor", 
+    lifespan=lifespan,
+    # Add OpenAPI security scheme for Bearer token
+    openapi_tags=[
+        {"name": "auth", "description": "Authentication operations"},
+        {"name": "messages", "description": "Message operations"},
+        {"name": "dialogs", "description": "Dialog operations"}
+    ],
+    swagger_ui_parameters={
+        "defaultModelsExpandDepth": -1,
+        "persistAuthorization": True  # This makes the authorization persist between page refreshes
+    }
+)
 
 # Configure CORS with secure defaults
 allowed_origins = get_allowed_origins()
 logger.info(f"Configuring CORS with allowed origins: {allowed_origins}")
 
+# Add the security scheme to the OpenAPI specification
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
@@ -147,6 +162,42 @@ app.add_middleware(
     ],
     max_age=3600,  # Cache preflight requests for 1 hour
 )
+
+# Add security scheme to OpenAPI schema
+security_schemes = {
+    "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Enter your JWT token in the format 'Bearer your_token_here'"
+    }
+}
+
+# Update the app's OpenAPI info
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    
+    openapi_schema = get_openapi(
+        title=app.title,
+        version="1.0.0",
+        description="Telegram Dialog AI Processor API",
+        routes=app.routes,
+    )
+    
+    # Add security schemes to the components
+    if "components" not in openapi_schema:
+        openapi_schema["components"] = {}
+    
+    openapi_schema["components"]["securitySchemes"] = security_schemes
+    
+    # Add global security requirement
+    openapi_schema["security"] = [{"BearerAuth": []}]
+    
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+app.openapi = custom_openapi
 
 # Add session middleware
 app.add_middleware(SessionMiddleware)

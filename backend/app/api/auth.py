@@ -159,13 +159,31 @@ async def logout(
         logger.error(f"Logout failed: {str(e)}", exc_info=True)
         raise DatabaseError("Failed to logout", details={"error": str(e)})
 
-@router.get("/session/verify")
+@router.get(
+    "/session/verify", 
+    response_model=SessionVerifyResponse,
+    # Add OpenAPI security requirement
+    openapi_extra={
+        "security": [{"BearerAuth": []}]
+    }
+)
 async def verify_session_status(
     request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     db: AsyncSession = Depends(get_db)
 ):
-    """Verify session status and return user data if authenticated"""
+    """
+    Verify session status and return user data if authenticated
+    
+    This endpoint requires authentication via Bearer token in the Authorization header.
+    If no token is provided or the token is invalid, it will return an UNAUTHENTICATED status.
+    
+    Security:
+    - Bearer Authentication: Send the token in the Authorization header as 'Bearer your_token_here'
+    
+    Returns:
+        A SessionVerifyResponse with the current session status and user information if authenticated
+    """
     try:
         # If no credentials provided, return an unauthenticated response without error
         if not credentials:
