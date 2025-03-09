@@ -40,6 +40,20 @@ import { checkAuthentication, initiateQRAuthentication, pollSessionStatus, devLo
 import AuthRequiredDialog from '../../components/Auth/AuthRequiredDialog';
 import PhoneAuth from '../../components/Auth/PhoneAuth';
 
+// Add interface for selected dialog response
+interface SelectedDialog {
+  selection_id: string;
+  dialog_id: number;
+  dialog_name: string;
+  is_active: boolean;
+  processing_enabled: boolean;
+  auto_reply_enabled: boolean;
+  response_approval_required: boolean;
+  priority: number;
+  created_at: string;
+  updated_at: string;
+}
+
 const Data = () => {
   // State for dialogs
   const [dialogs, setDialogs] = useState<DialogType[]>([]);
@@ -76,11 +90,15 @@ const Data = () => {
       // Try to fetch dialogs
       const response = await api.telegram.getDialogs();
       
+      // Also fetch selected dialogs to get their current state
+      const selectedResponse = await api.dialogs.getSelected() as SelectedDialog[];
+      const selectedDialogIds = new Set(selectedResponse.map(dialog => dialog.dialog_id));
+      
       // Add processing properties to dialogs
       const enhancedDialogs = response.dialogs.map(dialog => ({
         ...dialog,
-        // Add these properties since they're not in the backend response
-        is_processing_enabled: false,
+        // Set processing status based on whether the dialog is in the selected list
+        is_processing_enabled: selectedDialogIds.has(dialog.id),
         auto_send_enabled: false,
         telegram_dialog_id: dialog.id.toString()
       }));
@@ -216,25 +234,60 @@ const Data = () => {
   };
   
   // Toggle processing for dialog
-  const handleToggleProcessing = (id: number) => {
-    setDialogs(prevDialogs => 
-      prevDialogs.map(dialog => 
-        dialog.id === id
-          ? { ...dialog, is_processing_enabled: !dialog.is_processing_enabled }
-          : dialog
-      )
-    );
+  const handleToggleProcessing = async (id: number) => {
+    try {
+      const dialog = dialogs.find(d => d.id === id);
+      if (!dialog) {
+        throw new Error(`Dialog with ID ${id} not found`);
+      }
+
+      if (!dialog.is_processing_enabled) {
+        // Enable processing
+        await api.dialogs.select(id, dialog.name);
+      } else {
+        // Disable processing
+        await api.dialogs.unselect(id);
+      }
+
+      // Update local state
+      setDialogs(prevDialogs => 
+        prevDialogs.map(dialog => 
+          dialog.id === id
+            ? { ...dialog, is_processing_enabled: !dialog.is_processing_enabled }
+            : dialog
+        )
+      );
+    } catch (error) {
+      console.error('Failed to toggle processing:', error);
+      setAuthError('Failed to update dialog processing status. Please try again.');
+    }
   };
 
   // Toggle auto-send for dialog
-  const handleToggleAutoSend = (id: number) => {
-    setDialogs(prevDialogs => 
-      prevDialogs.map(dialog => 
-        dialog.id === id
-          ? { ...dialog, auto_send_enabled: !dialog.auto_send_enabled }
-          : dialog
-      )
-    );
+  const handleToggleAutoSend = async (id: number) => {
+    try {
+      const dialog = dialogs.find(d => d.id === id);
+      if (!dialog) {
+        throw new Error(`Dialog with ID ${id} not found`);
+      }
+
+      // Update the dialog's auto-send setting
+      await api.dialogs.update(id, { 
+        auto_send_enabled: !dialog.auto_send_enabled 
+      });
+
+      // Update local state
+      setDialogs(prevDialogs => 
+        prevDialogs.map(dialog => 
+          dialog.id === id
+            ? { ...dialog, auto_send_enabled: !dialog.auto_send_enabled }
+            : dialog
+        )
+      );
+    } catch (error) {
+      console.error('Failed to toggle auto-send:', error);
+      setAuthError('Failed to update dialog auto-send status. Please try again.');
+    }
   };
 
   // Refresh dialogs from Telegram

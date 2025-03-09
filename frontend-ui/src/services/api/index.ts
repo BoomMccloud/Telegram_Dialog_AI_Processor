@@ -199,18 +199,42 @@ export const api = {
     getAll: () => 
       apiRequest({
         method: 'GET',
-        url: '/dialogs',
+        url: '/api/dialogs',
       }),
     update: (id: number, data: { is_processing_enabled?: boolean; auto_send_enabled?: boolean }) => 
       apiRequest({
         method: 'PATCH',
-        url: `/dialogs/${id}`,
+        url: `/api/dialogs/${id}`,
         data,
       }),
     delete: (id: number) => 
       apiRequest({
         method: 'DELETE',
-        url: `/dialogs/${id}`,
+        url: `/api/dialogs/${id}`,
+      }),
+    select: (dialogId: number, dialogName: string) => 
+      apiRequest({
+        method: 'POST',
+        url: '/api/dialogs/select',
+        data: {
+          dialog_id: dialogId,
+          dialog_name: dialogName,
+          processing_enabled: true,
+          auto_reply_enabled: false,
+          response_approval_required: true,
+          priority: 1,
+          processing_settings: {}
+        },
+      }),
+    unselect: (dialogId: number) => 
+      apiRequest({
+        method: 'DELETE',
+        url: `/api/dialogs/selected/${dialogId}`,
+      }),
+    getSelected: () => 
+      apiRequest({
+        method: 'GET',
+        url: '/api/dialogs/selected',
       }),
   },
   
