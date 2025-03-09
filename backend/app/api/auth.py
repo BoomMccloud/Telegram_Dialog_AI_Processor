@@ -162,9 +162,18 @@ async def logout(
 @router.get(
     "/session/verify", 
     response_model=SessionVerifyResponse,
-    # Add OpenAPI security requirement
+    # Add OpenAPI security requirement explicitly
     openapi_extra={
-        "security": [{"BearerAuth": []}]
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+            {
+                "in": "header",
+                "name": "Authorization",
+                "schema": {"type": "string"},
+                "required": True,
+                "description": "Format: Bearer your_token_here"
+            }
+        ]
     }
 )
 async def verify_session_status(

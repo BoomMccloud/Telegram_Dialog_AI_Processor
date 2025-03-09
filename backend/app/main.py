@@ -199,6 +199,13 @@ def custom_openapi():
 
 app.openapi = custom_openapi
 
+# Register global security for all routes that will appear in Swagger UI
+app.swagger_ui_init_oauth = {
+    "usePkceWithAuthorizationCodeGrant": True,
+    "clientId": "swagger-ui",
+    "scopes": ["read", "write"]
+}
+
 # Add session middleware
 app.add_middleware(SessionMiddleware)
 
