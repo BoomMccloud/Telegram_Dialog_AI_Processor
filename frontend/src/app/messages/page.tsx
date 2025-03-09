@@ -28,7 +28,7 @@ interface Dialog {
 // Interface for selected dialogs from the API
 interface SelectedDialog {
   selection_id: string;
-  dialog_id: number;
+  dialog_id: string;
   dialog_name: string;
   is_active: boolean;
   processing_enabled: boolean;
@@ -37,6 +37,7 @@ interface SelectedDialog {
   priority: number;
   created_at: string;
   updated_at: string;
+  processing_settings: Record<string, any>;
 }
 
 interface ProcessingStatus {
@@ -379,16 +380,15 @@ export default function MessagesPage() {
       // Transform the API data to match the Dialog interface
       if (data && Array.isArray(data)) {
         const transformedDialogs = data.map((dialog: SelectedDialog) => ({
-          id: dialog.dialog_id,
+          id: parseInt(dialog.dialog_id), // Convert string to number since Dialog interface expects number
           name: dialog.dialog_name,
-          unread_count: 0, // Selected dialogs don't have unread count
-          is_group: false, // We don't know the type from selected dialogs API
+          unread_count: 0,
+          is_group: false,
           is_channel: false,
-          is_user: false,
-          // Add selected-specific data
+          is_user: true,
           processing_enabled: dialog.processing_enabled,
           auto_reply_enabled: dialog.auto_reply_enabled,
-          priority: dialog.priority
+          priority: dialog.priority || 0
         }));
         console.log('Transformed selected dialogs:', transformedDialogs);
         setApiSelectedDialogs(transformedDialogs);

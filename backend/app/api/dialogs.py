@@ -37,19 +37,30 @@ class DialogSelectionResponse(BaseModel):
     updated_at: str
     processing_settings: Dict
 
-@router.post("/dialogs/select", response_model=DialogSelectionResponse)
+@router.post("/dialogs/select", 
+    response_model=DialogSelectionResponse,
+    summary="Enable processing for a dialog",
+    description="Enable AI processing for a specific dialog. Requires authentication.",
+    responses={
+        401: {"description": "Invalid or expired session"},
+        403: {"description": "Not authenticated"}
+    },
+    openapi_extra={
+        "security": [{"BearerAuth": []}]
+    }
+)
 async def select_dialog(
     dialog: DialogSelection,
     session: SessionData = Depends(verify_session_dependency),
 ) -> Dict:
     """
-    Add a dialog to the user's selected dialogs list
+    Enable processing for a dialog
     
     Args:
         dialog: Dialog selection information
     
     Returns:
-        The created dialog selection record
+        The updated dialog record
         
     Note:
         Requires authentication via Bearer token in Authorization header
@@ -62,89 +73,42 @@ async def select_dialog(
             detail="Invalid session user"
         )
     
-    # Generate a UUID for the selection
-    selection_id = str(uuid.uuid4())
-    
     # Get db connection
     conn = await get_raw_connection()
     
     try:
-        # Check if dialog selection already exists
-        existing_selection = await conn.fetchrow(
+        # Update the dialog's processing settings
+        result = await conn.fetchrow(
             """
-            SELECT selection_id 
-            FROM user_selected_dialogs
-            WHERE user_id = $1 AND dialog_id = $2
+            UPDATE dialogs
+            SET is_processing_enabled = $1,
+                auto_send_enabled = $2,
+                updated_at = $3
+            WHERE user_id = $4 AND telegram_dialog_id = $5
+            RETURNING 
+                id as selection_id,
+                telegram_dialog_id as dialog_id,
+                name as dialog_name,
+                true as is_active,
+                is_processing_enabled as processing_enabled,
+                auto_send_enabled as auto_reply_enabled,
+                true as response_approval_required,
+                0 as priority,
+                created_at,
+                updated_at,
+                '{}'::jsonb as processing_settings
             """,
-            user_id, dialog.dialog_id
+            dialog.processing_enabled,
+            dialog.auto_reply_enabled,
+            datetime.utcnow(),
+            user_id,
+            str(dialog.dialog_id)  # Convert to string as telegram_dialog_id is VARCHAR
         )
         
-        if existing_selection:
-            # Update existing selection
-            await conn.execute(
-                """
-                UPDATE user_selected_dialogs
-                SET dialog_name = $1,
-                    is_active = true,
-                    processing_enabled = $2,
-                    auto_reply_enabled = $3,
-                    response_approval_required = $4,
-                    priority = $5,
-                    updated_at = $6,
-                    processing_settings = $7
-                WHERE user_id = $8 AND dialog_id = $9
-                """,
-                dialog.dialog_name, 
-                dialog.processing_enabled,
-                dialog.auto_reply_enabled,
-                dialog.response_approval_required,
-                dialog.priority,
-                datetime.utcnow(),
-                json.dumps(dialog.processing_settings),
-                user_id,
-                dialog.dialog_id
-            )
-            
-            # Get the updated record
-            result = await conn.fetchrow(
-                """
-                SELECT * FROM user_selected_dialogs
-                WHERE user_id = $1 AND dialog_id = $2
-                """,
-                user_id, dialog.dialog_id
-            )
-        else:
-            # Insert new selection
-            result = await conn.fetchrow(
-                """
-                INSERT INTO user_selected_dialogs (
-                    selection_id,
-                    user_id,
-                    dialog_id,
-                    dialog_name,
-                    is_active,
-                    processing_enabled,
-                    auto_reply_enabled,
-                    response_approval_required,
-                    priority,
-                    created_at,
-                    updated_at,
-                    processing_settings
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-                RETURNING *
-                """,
-                selection_id,
-                user_id,
-                dialog.dialog_id,
-                dialog.dialog_name,
-                True,  # is_active
-                dialog.processing_enabled,
-                dialog.auto_reply_enabled,
-                dialog.response_approval_required,
-                dialog.priority,
-                datetime.utcnow(),
-                datetime.utcnow(),
-                json.dumps(dialog.processing_settings)
+        if not result:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Dialog not found"
             )
         
         # Convert the record to a dictionary
@@ -157,20 +121,33 @@ async def select_dialog(
         
         return record
     
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to save selected dialog: {str(e)}"
+            detail=f"Failed to select dialog: {str(e)}"
         )
     finally:
         await conn.close()
 
-@router.get("/dialogs/selected", response_model=List[DialogSelectionResponse])
+@router.get("/dialogs/selected", 
+    response_model=List[DialogSelectionResponse],
+    summary="Get selected dialogs",
+    description="Get all dialogs with processing enabled. Requires authentication.",
+    responses={
+        401: {"description": "Invalid or expired session"},
+        403: {"description": "Not authenticated"}
+    },
+    openapi_extra={
+        "security": [{"BearerAuth": []}]
+    }
+)
 async def get_selected_dialogs(
     session: SessionData = Depends(verify_session_dependency),
 ) -> List[Dict]:
     """
-    Get the user's selected dialogs list
+    Get the user's selected dialogs list (dialogs with processing enabled)
     
     Returns:
         List of selected dialog records
@@ -190,12 +167,24 @@ async def get_selected_dialogs(
     conn = await get_raw_connection()
     
     try:
-        # Fetch all selected dialogs
+        # Fetch all selected dialogs (where processing is enabled)
         rows = await conn.fetch(
             """
-            SELECT * FROM user_selected_dialogs
-            WHERE user_id = $1
-            ORDER BY priority DESC, dialog_name
+            SELECT 
+                id as selection_id,
+                telegram_dialog_id as dialog_id,
+                name as dialog_name,
+                true as is_active,
+                is_processing_enabled as processing_enabled,
+                auto_send_enabled as auto_reply_enabled,
+                true as response_approval_required,
+                0 as priority,
+                created_at,
+                updated_at,
+                '{}'::jsonb as processing_settings
+            FROM dialogs
+            WHERE user_id = $1 AND is_processing_enabled = true
+            ORDER BY name
             """,
             user_id
         )
@@ -219,19 +208,30 @@ async def get_selected_dialogs(
     finally:
         await conn.close()
 
-@router.delete("/dialogs/selected/{dialog_id}", response_model=DialogSelectionResponse)
+@router.delete("/dialogs/selected/{dialog_id}", 
+    response_model=DialogSelectionResponse,
+    summary="Disable processing for a dialog",
+    description="Disable AI processing for a specific dialog. Requires authentication.",
+    responses={
+        401: {"description": "Invalid or expired session"},
+        403: {"description": "Not authenticated"}
+    },
+    openapi_extra={
+        "security": [{"BearerAuth": []}]
+    }
+)
 async def deselect_dialog(
     dialog_id: int,
     session: SessionData = Depends(verify_session_dependency),
 ) -> Dict:
     """
-    Remove a dialog from the user's selected dialogs list
+    Disable processing for a dialog
     
     Args:
         dialog_id: The Telegram dialog ID
     
     Returns:
-        The deactivated dialog selection record
+        The updated dialog record
         
     Note:
         Requires authentication via Bearer token in Authorization header
@@ -248,24 +248,36 @@ async def deselect_dialog(
     conn = await get_raw_connection()
     
     try:
-        # Update the dialog selection to inactive
+        # Update the dialog to disable processing
         result = await conn.fetchrow(
             """
-            UPDATE user_selected_dialogs
-            SET is_active = false,
+            UPDATE dialogs
+            SET is_processing_enabled = false,
+                auto_send_enabled = false,
                 updated_at = $1
-            WHERE user_id = $2 AND dialog_id = $3
-            RETURNING *
+            WHERE user_id = $2 AND telegram_dialog_id = $3
+            RETURNING 
+                id as selection_id,
+                telegram_dialog_id as dialog_id,
+                name as dialog_name,
+                false as is_active,
+                is_processing_enabled as processing_enabled,
+                auto_send_enabled as auto_reply_enabled,
+                true as response_approval_required,
+                0 as priority,
+                created_at,
+                updated_at,
+                '{}'::jsonb as processing_settings
             """,
             datetime.utcnow(),
             user_id,
-            dialog_id
+            str(dialog_id)  # Convert to string as telegram_dialog_id is VARCHAR
         )
         
         if not result:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Selected dialog not found"
+                detail="Dialog not found"
             )
         
         # Convert the record to a dictionary

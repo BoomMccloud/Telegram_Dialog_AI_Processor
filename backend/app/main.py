@@ -218,7 +218,7 @@ app.add_exception_handler(TelethonError, telethon_error_handler)
 # Register routers
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(messages.router, prefix="/api/messages", tags=["messages"])
-app.include_router(dialogs.router, prefix="/api/dialogs", tags=["dialogs"])
+app.include_router(dialogs.router, prefix="/api", tags=["dialogs"])
 
 @app.on_event("startup")
 async def startup_event():
