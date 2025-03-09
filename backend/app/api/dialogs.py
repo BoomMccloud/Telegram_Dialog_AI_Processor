@@ -155,14 +155,6 @@ async def get_selected_dialogs(
     Note:
         Requires authentication via Bearer token in Authorization header
     """
-    # Get user_id from session
-    user_id = session.telegram_id
-    if not user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid session user"
-        )
-    
     # Get db connection
     conn = await get_raw_connection()
     
@@ -183,10 +175,13 @@ async def get_selected_dialogs(
                 updated_at,
                 '{}'::jsonb as processing_settings
             FROM dialogs
-            WHERE user_id = $1 AND is_processing_enabled = true
+            WHERE user_id = (
+                SELECT id FROM users WHERE telegram_id = $1
+            )
+            AND is_processing_enabled = true
             ORDER BY name
             """,
-            user_id
+            session.telegram_id
         )
         
         # Convert the records to dictionaries
