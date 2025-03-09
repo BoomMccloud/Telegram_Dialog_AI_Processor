@@ -210,14 +210,32 @@ export const verifyPhoneCode = async (
     if (response.status === SessionStatus.AUTHENTICATED) {
       console.log('[Auth Debug] Phone verification successful!', response);
       
-      // Store the access token
+      // Store the access token if available
       if (response.access_token) {
         localStorage.setItem('accessToken', response.access_token);
-      }
-      
-      // Store refresh token if available
-      if (response.refresh_token) {
-        localStorage.setItem('refreshToken', response.refresh_token);
+        
+        // Store refresh token if available
+        if (response.refresh_token) {
+          localStorage.setItem('refreshToken', response.refresh_token);
+        }
+      } else {
+        // If no access_token in response, get one by verifying the session
+        console.log('[Auth Debug] No access token in phone verification response, fetching from session verify');
+        try {
+          const sessionResponse = await api.auth.verifySession();
+          if (sessionResponse.status === SessionStatus.AUTHENTICATED && sessionResponse.access_token) {
+            console.log('[Auth Debug] Got access token from session verify:', sessionResponse.access_token);
+            localStorage.setItem('accessToken', sessionResponse.access_token);
+            
+            if (sessionResponse.refresh_token) {
+              localStorage.setItem('refreshToken', sessionResponse.refresh_token);
+            }
+          } else {
+            console.warn('[Auth Debug] Session verified but no access token returned');
+          }
+        } catch (sessionError) {
+          console.error('[Auth Debug] Failed to verify session after phone authentication:', sessionError);
+        }
       }
       
       return true;

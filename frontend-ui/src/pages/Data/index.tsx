@@ -97,9 +97,37 @@ const Data = () => {
   // Handle phone authentication success
   const handlePhoneAuthSuccess = () => {
     console.log('[UI Debug] Phone authentication successful');
-    setIsAuthenticated(true);
-    setPhoneDialogOpen(false);
-    fetchDialogs();
+    
+    // Check if we have the access token before proceeding
+    const accessToken = localStorage.getItem('accessToken');
+    if (!accessToken) {
+      console.warn('[UI Debug] No access token found after authentication, checking session');
+      
+      // Try to verify the session to get tokens
+      api.auth.verifySession()
+        .then(response => {
+          if (response.status === SessionStatus.AUTHENTICATED) {
+            console.log('[UI Debug] Session verified after phone auth');
+            setIsAuthenticated(true);
+            setPhoneDialogOpen(false);
+            // Now try to fetch dialogs
+            fetchDialogs();
+          } else {
+            setAuthError('Authentication successful but session could not be verified. Please try again.');
+            setPhoneDialogOpen(false);
+          }
+        })
+        .catch(error => {
+          console.error('[UI Debug] Failed to verify session after phone auth:', error);
+          setAuthError('Authentication successful but session could not be verified. Please try again.');
+          setPhoneDialogOpen(false);
+        });
+    } else {
+      // We have the token, proceed normally
+      setIsAuthenticated(true);
+      setPhoneDialogOpen(false);
+      fetchDialogs();
+    }
   };
   
   // Handle authenticate button click - now defaults to phone auth

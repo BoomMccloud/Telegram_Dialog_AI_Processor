@@ -88,11 +88,17 @@ const apiRequest = async <T>(config: AxiosRequestConfig): Promise<T> => {
   } catch (error) {
     console.error('API request failed:', error);
     
-    // Add more detailed error logging for auth endpoints
-    if (config.url?.includes('/auth/')) {
-      if (axios.isAxiosError(error) && error.response) {
-        console.error(`[API Debug] Auth Error ${error.response.status}:`, 
-          error.response.data || error.message);
+    // Add more detailed error logging
+    if (axios.isAxiosError(error)) {
+      console.error(`[API Error] ${config.method?.toUpperCase()} ${config.url} failed with status ${error.response?.status}`);
+      
+      if (error.response?.data) {
+        console.error('[API Error] Response data:', error.response.data);
+      }
+      
+      if (error.response?.status === 401) {
+        console.error('[API Error] Authentication error - token may be invalid or expired');
+        console.error('[API Error] Authorization header:', error.config?.headers?.Authorization || 'Not set');
       }
     }
     
@@ -221,7 +227,10 @@ export const api = {
       // If authenticated, proceed with the API request
       return apiRequest<DialogListResponse>({
         method: 'GET',
-        url: '/dialogs',
+        url: '/messages/dialogs',
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
       });
     },
   },

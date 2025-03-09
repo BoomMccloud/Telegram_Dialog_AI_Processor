@@ -18,6 +18,8 @@ from telethon.client import TelegramClient
 from telethon.tl.custom import QRLogin
 from fastapi.security import HTTPAuthorizationCredentials
 from fastapi.security import HTTPBearer
+import jwt
+import uuid
 
 from ..utils.logging import get_logger
 from ..db.database import get_db
@@ -170,7 +172,9 @@ async def verify_session_status(
                 "status": "UNAUTHENTICATED",
                 "telegram_id": None,
                 "expires_at": None,
-                "user": None
+                "user": None,
+                "access_token": None,
+                "refresh_token": None
             }
             
         # Try to verify the session
@@ -183,7 +187,9 @@ async def verify_session_status(
                 "status": "UNAUTHENTICATED",
                 "telegram_id": None,
                 "expires_at": None,
-                "user": None
+                "user": None,
+                "access_token": None,
+                "refresh_token": None
             }
             
         # Get user data if authenticated
@@ -192,12 +198,46 @@ async def verify_session_status(
             stmt = select(User).where(User.id == session.user_id)
             result = await db.execute(stmt)
             user = result.scalar_one_or_none()
+            
+            # If authenticated, also generate new access token
+            if user:
+                # Generate new JWT token for this session
+                access_token = session.token
+                
+                # For authenticated users, also return a refresh token
+                refresh_token = None
+                if not session.refresh_token:
+                    # Generate a refresh token if one doesn't exist
+                    refresh_token_data = {
+                        "jti": str(uuid.uuid4()),
+                        "exp": datetime.utcnow() + timedelta(days=30),  # 30 day refresh token
+                        "type": "refresh"
+                    }
+                    refresh_token = jwt.encode(refresh_token_data, session_middleware.jwt_secret, algorithm="HS256")
+                    
+                    # Save refresh token to session
+                    session.refresh_token = refresh_token
+                    await db.commit()
+                else:
+                    refresh_token = session.refresh_token
+                
+                return {
+                    "status": session.status,
+                    "telegram_id": user.telegram_id if user else None,
+                    "expires_at": session.expires_at.isoformat() if session.expires_at else None,
+                    "user": user.to_dict() if user else None,
+                    "access_token": access_token,
+                    "refresh_token": refresh_token
+                }
         
+        # Default response for non-authenticated sessions
         return {
             "status": session.status,
             "telegram_id": user.telegram_id if user else None,
             "expires_at": session.expires_at.isoformat() if session.expires_at else None,
-            "user": user.to_dict() if user else None
+            "user": user.to_dict() if user else None,
+            "access_token": None,
+            "refresh_token": None
         }
         
     except Exception as e:
@@ -208,7 +248,9 @@ async def verify_session_status(
             "status": "ERROR",
             "telegram_id": None,
             "expires_at": None,
-            "user": None
+            "user": None,
+            "access_token": None,
+            "refresh_token": None
         }
 
 async def monitor_qr_login(
@@ -489,6 +531,26 @@ async def verify_phone_code(
             session.user_id = permanent_user.id
             session.status = SessionStatus.AUTHENTICATED
             session.expires_at = datetime.utcnow() + timedelta(days=7)
+            
+            # Generate access token and refresh token
+            session_middleware = request.app.state.session_middleware
+            access_token_data = {
+                "jti": str(uuid.uuid4()),
+                "exp": datetime.utcnow() + timedelta(hours=24)
+            }
+            access_token = jwt.encode(access_token_data, session_middleware.jwt_secret, algorithm="HS256")
+            
+            refresh_token_data = {
+                "jti": str(uuid.uuid4()),
+                "exp": datetime.utcnow() + timedelta(days=30),
+                "type": "refresh"
+            }
+            refresh_token = jwt.encode(refresh_token_data, session_middleware.jwt_secret, algorithm="HS256")
+            
+            # Update session with new tokens
+            session.token = access_token
+            session.refresh_token = refresh_token
+            
             await db.commit()
             
             # Return session details
@@ -496,7 +558,9 @@ async def verify_phone_code(
                 "status": session.status,
                 "telegram_id": permanent_user.telegram_id,
                 "expires_at": session.expires_at.isoformat(),
-                "user": permanent_user.to_dict()
+                "user": permanent_user.to_dict(),
+                "access_token": access_token,
+                "refresh_token": refresh_token
             }
         finally:
             await client.disconnect()
