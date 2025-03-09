@@ -32,21 +32,30 @@ export interface UserData {
 
 // Dialog types
 export enum DialogType {
-  PRIVATE = "PRIVATE",
-  GROUP = "GROUP",
-  CHANNEL = "CHANNEL"
+  PRIVATE = "private",
+  GROUP = "group",
+  CHANNEL = "channel"
 }
 
-export interface Dialog {
+// Base Dialog interface matching backend's TelegramDialog model
+interface BaseDialog {
   id: number;
-  telegram_dialog_id: string;
   name: string;
   unread_count: number;
-  type: DialogType;
+  is_group: boolean;
+  is_channel: boolean;
+  is_user: boolean;
+  type: string;
+}
+
+// Extended Dialog interface with UI-specific properties
+export interface Dialog extends BaseDialog {
+  // UI state properties not in the backend
   is_processing_enabled: boolean;
   auto_send_enabled: boolean;
+  telegram_dialog_id: string;
 }
 
 export interface DialogListResponse {
-  dialogs: Dialog[];
+  dialogs: BaseDialog[]; // Use BaseDialog for the response, will be enhanced in the component
 } 

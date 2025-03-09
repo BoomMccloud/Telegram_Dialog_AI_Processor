@@ -75,7 +75,17 @@ const Data = () => {
       
       // Try to fetch dialogs
       const response = await api.telegram.getDialogs();
-      setDialogs(response.dialogs);
+      
+      // Add processing properties to dialogs
+      const enhancedDialogs = response.dialogs.map(dialog => ({
+        ...dialog,
+        // Add these properties since they're not in the backend response
+        is_processing_enabled: false,
+        auto_send_enabled: false,
+        telegram_dialog_id: dialog.id.toString()
+      }));
+      
+      setDialogs(enhancedDialogs);
       
       // If we succeeded, update isAuthenticated state
       setIsAuthenticated(true);
@@ -235,11 +245,11 @@ const Data = () => {
   // Get appropriate icon for dialog type
   const getDialogIcon = (type: DialogType['type']) => {
     switch (type) {
-      case 'PRIVATE':
+      case 'private':
         return <PersonIcon />;
-      case 'GROUP':
+      case 'group':
         return <GroupIcon />;
-      case 'CHANNEL':
+      case 'channel':
         return <ChannelIcon />;
       default:
         return <PersonIcon />;
@@ -249,11 +259,11 @@ const Data = () => {
   // Get appropriate chip for dialog type
   const getDialogTypeChip = (type: DialogType['type']) => {
     switch (type) {
-      case 'PRIVATE':
+      case 'private':
         return <Chip label="Private" size="small" color="primary" variant="outlined" />;
-      case 'GROUP':
+      case 'group':
         return <Chip label="Group" size="small" color="success" variant="outlined" />;
-      case 'CHANNEL':
+      case 'channel':
         return <Chip label="Channel" size="small" color="info" variant="outlined" />;
       default:
         return <Chip label={type} size="small" variant="outlined" />;
@@ -283,35 +293,15 @@ const Data = () => {
     dialog.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Test if a token is valid
-  const testToken = async (token: string) => {
+  const testToken = async () => {
     try {
-      console.log(`[UI Debug] Testing token: ${token.substring(0, 10)}...`);
-      
-      // Make a direct fetch call to avoid interceptors
-      const response = await fetch('http://localhost:8000/api/auth/session/verify', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log('[UI Debug] Token is valid:', data);
-        alert(`Token is valid! Status: ${data.status}`);
-        return true;
-      } else {
-        const errorText = await response.text();
-        console.error('[UI Debug] Token validation failed:', response.status, errorText);
-        alert(`Token validation failed: ${response.status} ${errorText}`);
-        return false;
-      }
-    } catch (error: unknown) {
-      console.error('[UI Debug] Token test error:', error);
-      alert(`Error testing token: ${error instanceof Error ? error.message : String(error)}`);
-      return false;
+      console.log("Checking session status...");
+      const response = await api.auth.verifySession();
+      console.log("Session verification result:", response);
+      alert(`Session status: ${response.status}\nTelegram ID: ${response.telegram_id}`);
+    } catch (error) {
+      console.error("Session verification failed:", error);
+      alert("Session verification failed: " + (error instanceof Error ? error.message : "Unknown error"));
     }
   };
 
@@ -338,7 +328,7 @@ const Data = () => {
           alert(`Login successful! Token: ${data.token.substring(0, 15)}...`);
           
           // Test the token immediately
-          await testToken(data.token);
+          await testToken();
           
           setIsAuthenticated(true);
           setQrDialogOpen(false);
@@ -485,7 +475,7 @@ const Data = () => {
                 onClick={() => {
                   const token = localStorage.getItem('accessToken');
                   if (token) {
-                    testToken(token);
+                    testToken();
                   } else {
                     alert('No token found in localStorage');
                   }
@@ -611,6 +601,14 @@ const Data = () => {
               >
                 Logout
               </Button>
+              <Button 
+                variant="outlined"
+                onClick={testToken}
+                sx={{ ml: 2 }}
+                disabled={isLoading}
+              >
+                Verify Session
+              </Button>
             </>
           ) : (
             <Button
@@ -695,7 +693,7 @@ const Data = () => {
                         <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
                           {getDialogTypeChip(dialog.type)}
                           <Typography variant="caption" sx={{ ml: 1 }}>
-                            ID: {dialog.telegram_dialog_id}
+                            ID: {dialog.id}
                           </Typography>
                         </Box>
                       }

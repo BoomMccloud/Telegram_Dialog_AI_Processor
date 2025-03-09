@@ -32,6 +32,7 @@ from app.core.exceptions import (
     DatabaseError,
     TelegramError
 )
+from app.services.auth import client_sessions
 
 router = APIRouter()
 logger = get_logger(__name__)
@@ -553,6 +554,14 @@ async def verify_phone_code(
             
             await db.commit()
             
+            # Store the authenticated client in client_sessions
+            client_sessions[access_token] = {
+                "client": client,
+                "status": "authenticated",
+                "telegram_id": permanent_user.telegram_id
+            }
+            logger.info(f"Stored authenticated client in client_sessions with token: {access_token[:10]}...")
+            
             # Return session details
             return {
                 "status": session.status,
@@ -562,8 +571,10 @@ async def verify_phone_code(
                 "access_token": access_token,
                 "refresh_token": refresh_token
             }
-        finally:
+        except Exception as e:
+            # Only disconnect the client if there's an error
             await client.disconnect()
+            raise e
             
     except (SessionError, TelegramError):
         raise

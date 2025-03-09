@@ -29,12 +29,27 @@ class Message(BaseModel):
     is_outgoing: bool = False
     dialog_id: Optional[str] = None
 
+# Define custom models for Telegram dialogs that match the actual returned format
+class TelegramDialog(BaseModel):
+    """Schema for Telegram dialog data"""
+    id: int
+    name: str
+    unread_count: int
+    is_group: bool
+    is_channel: bool
+    is_user: bool
+    type: str
+
+class TelegramDialogListResponse(BaseModel):
+    """Response model for list of Telegram dialogs"""
+    dialogs: List[TelegramDialog]
+
 router = APIRouter()
 
-@router.get("/dialogs", response_model=DialogListResponse)
+@router.get("/dialogs", response_model=TelegramDialogListResponse)
 async def list_dialogs(
     session: SessionData = Depends(verify_session_dependency)
-) -> DialogListResponse:
+) -> TelegramDialogListResponse:
     """
     Get list of dialogs (chats)
     
@@ -46,7 +61,7 @@ async def list_dialogs(
     """
     try:
         dialogs = await get_dialogs(session.token)
-        return DialogListResponse(dialogs=dialogs)
+        return TelegramDialogListResponse(dialogs=dialogs)
     except ValueError as e:
         raise ValidationError(str(e))
     except Exception as e:
