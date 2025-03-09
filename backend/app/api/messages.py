@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, security
 from typing import List, Optional, Dict
 from pydantic import BaseModel
 from datetime import datetime
@@ -46,7 +46,19 @@ class TelegramDialogListResponse(BaseModel):
 
 router = APIRouter()
 
-@router.get("/dialogs", response_model=TelegramDialogListResponse)
+@router.get(
+    "/dialogs", 
+    response_model=TelegramDialogListResponse,
+    summary="Get list of dialogs",
+    description="Get list of available Telegram dialogs (chats). Requires authentication.",
+    responses={
+        401: {"description": "Invalid or expired session"},
+        403: {"description": "Not authenticated"}
+    },
+    openapi_extra={
+        "security": [{"BearerAuth": []}]
+    }
+)
 async def list_dialogs(
     session: SessionData = Depends(verify_session_dependency)
 ) -> TelegramDialogListResponse:
@@ -68,7 +80,19 @@ async def list_dialogs(
         logger.error(f"Failed to list dialogs: {str(e)}", exc_info=True)
         raise TelegramError("Failed to fetch dialogs", details={"error": str(e)})
 
-@router.get("/messages", response_model=List[Message])
+@router.get(
+    "/messages", 
+    response_model=List[Message],
+    summary="Get recent messages",
+    description="Get recent messages from all dialogs. Requires authentication.",
+    responses={
+        401: {"description": "Invalid or expired session"},
+        403: {"description": "Not authenticated"}
+    },
+    openapi_extra={
+        "security": [{"BearerAuth": []}]
+    }
+)
 async def list_messages(
     limit: int = 20,
     session: SessionData = Depends(verify_session_dependency)
@@ -94,7 +118,19 @@ async def list_messages(
         logger.error(f"Failed to list messages: {str(e)}", exc_info=True)
         raise TelegramError("Failed to fetch messages", details={"error": str(e)})
 
-@router.post("/messages/send", response_model=MessageResponse)
+@router.post(
+    "/messages/send", 
+    response_model=MessageResponse,
+    summary="Send a message",
+    description="Send a message to a specific dialog. Requires authentication.",
+    responses={
+        401: {"description": "Invalid or expired session"},
+        403: {"description": "Not authenticated"}
+    },
+    openapi_extra={
+        "security": [{"BearerAuth": []}]
+    }
+)
 async def create_message(
     message: MessageSend,
     session: SessionData = Depends(verify_session_dependency)
