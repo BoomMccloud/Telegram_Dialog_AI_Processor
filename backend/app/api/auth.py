@@ -33,6 +33,7 @@ from app.core.exceptions import (
     TelegramError
 )
 from app.services.auth import client_sessions
+from app.db.models.types import AuthMethod
 
 router = APIRouter()
 logger = get_logger(__name__)
@@ -452,9 +453,13 @@ async def phone_auth(
 ):
     """Start phone number authentication by sending code"""
     try:
-        # Create initial session
+        # Create initial session with phone auth method
         session_middleware = request.app.state.session_middleware
-        session = await session_middleware.create_session(db=db)
+        session = await session_middleware.create_session(
+            db=db,
+            metadata={"phone_number": auth_data.phone_number},
+            auth_method=AuthMethod.PHONE
+        )
         
         # Create Telegram client with session file in sessions directory
         session_file = str(SESSIONS_DIR / f'session_{session.id}')
@@ -471,11 +476,11 @@ async def phone_auth(
             result = await client.send_code_request(auth_data.phone_number)
             phone_code_hash = result.phone_code_hash
             
-            # Store in session metadata
-            session.session_metadata = {
+            # Update session metadata with verification data
+            session.update_metadata({
                 "phone_number": auth_data.phone_number,
                 "phone_code_hash": phone_code_hash
-            }
+            })
             await db.commit()
         except Exception as e:
             logger.error(f"Failed to send code: {str(e)}", exc_info=True)

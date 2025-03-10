@@ -23,6 +23,8 @@ from app.db.database import get_db
 from app.db.models.session import Session, SessionStatus
 from app.db.models.user import User
 from app.core.exceptions import SessionError, AuthenticationError, DatabaseError
+from app.services.auth import client_sessions
+from app.db.models.types import AuthMethod
 
 logger = get_logger(__name__)
 
@@ -119,10 +121,20 @@ class SessionMiddleware(BaseHTTPMiddleware):
             logger.error(f"Session middleware error: {str(e)}", exc_info=True)
             raise DatabaseError("Database operation failed", details={"error": str(e)})
 
-    async def create_session(self, db: AsyncSession, telegram_id: Optional[int] = None, is_qr: bool = False, metadata: Dict = None) -> Session:
+    async def create_session(self, db: AsyncSession, telegram_id: Optional[int] = None, is_qr: bool = False, metadata: Dict = None, auth_method: str = None) -> Session:
         """Create and store session in database using ORM"""
         try:
             user_id = None
+            
+            # Determine auth method
+            if auth_method:
+                auth_method = AuthMethod(auth_method)
+            elif is_qr:
+                auth_method = AuthMethod.QR
+            elif telegram_id:
+                auth_method = AuthMethod.TELEGRAM
+            else:
+                auth_method = AuthMethod.UNKNOWN
             
             # If telegram_id is provided, verify user exists
             if telegram_id:
@@ -132,8 +144,8 @@ class SessionMiddleware(BaseHTTPMiddleware):
                 if not user:
                     raise SessionError(f"User with telegram_id {telegram_id} not found")
                 user_id = user.id
-            else:
-                # For QR sessions, create a temporary user
+            elif AuthMethod.requires_temp_user(auth_method):
+                # Create temporary user for auth methods that require it
                 temp_user = User(
                     telegram_id=None,
                     username=f"temp_user_{uuid.uuid4()}",
@@ -149,7 +161,7 @@ class SessionMiddleware(BaseHTTPMiddleware):
             token_data = {
                 "jti": str(uuid.uuid4()),
                 "exp": utcnow() + timedelta(
-                    minutes=self.qr_token_expire_minutes if is_qr else self.access_token_expire_minutes
+                    minutes=self.qr_token_expire_minutes if auth_method == AuthMethod.QR else self.access_token_expire_minutes
                 )
             }
             token = jwt.encode(token_data, self.jwt_secret, algorithm="HS256")
@@ -157,15 +169,27 @@ class SessionMiddleware(BaseHTTPMiddleware):
             # Create session
             session = Session(
                 token=token,
-                user_id=user_id,  # Add the user_id
+                user_id=user_id,
                 status=SessionStatus.PENDING if not telegram_id else SessionStatus.AUTHENTICATED,
                 expires_at=token_data["exp"],
                 session_metadata=metadata or {},
-                device_info={}  # Add empty device info as required by schema
+                device_info={},
+                auth_method=auth_method
             )
             db.add(session)
             await db.commit()
             await db.refresh(session)
+            
+            # Validate session based on authentication state
+            if session.status == SessionStatus.AUTHENTICATED:
+                is_valid, error = session.validate_post_auth()
+                if not is_valid:
+                    raise SessionError(f"Invalid authenticated session: {error}")
+            else:
+                is_valid, error = session.validate_pre_auth()
+                if not is_valid:
+                    raise SessionError(f"Invalid pre-auth session: {error}")
+            
             return session
         except Exception as e:
             logger.error(f"Failed to create session: {str(e)}", exc_info=True)
@@ -184,12 +208,19 @@ class SessionMiddleware(BaseHTTPMiddleware):
             if not session:
                 raise SessionError("Invalid or expired session")
             
-            # Load the user to get telegram_id if needed
-            user = None
-            if session.status == SessionStatus.AUTHENTICATED and session.user_id:
-                stmt = select(User).where(User.id == session.user_id)
-                result = await db.execute(stmt)
-                user = result.scalar_one_or_none()
+            # Validate session based on authentication state
+            if session.status == SessionStatus.AUTHENTICATED:
+                is_valid, error = session.validate_post_auth()
+                if not is_valid:
+                    raise SessionError(f"Invalid authenticated session: {error}")
+            else:
+                is_valid, error = session.validate_pre_auth()
+                if not is_valid:
+                    raise SessionError(f"Invalid pre-auth session: {error}")
+            
+            # Update last activity
+            session.update_activity()
+            await db.commit()
             
             return session
         except SessionError:
