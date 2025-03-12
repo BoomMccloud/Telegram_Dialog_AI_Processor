@@ -12,6 +12,9 @@ class SessionStatus(str, enum.Enum):
     ERROR = "ERROR"
     EXPIRED = 'EXPIRED'
 
+    # Add PostgreSQL enum name
+    __enum_name__ = 'session_status'
+
 class TokenType(str, enum.Enum):
     """Token type enum"""
     ACCESS = "access"
@@ -46,7 +49,8 @@ class AuthMethod(str, enum.Enum):
     def requires_metadata(cls, method: str) -> set[str]:
         """Get required metadata fields for auth method"""
         if method == cls.PHONE:
-            return {"phone_number", "phone_code_hash"}
+            # Only require phone_number initially, as phone_code_hash is added later
+            return {"phone_number"}
         elif method == cls.QR:
             return {"qr_login_token"}
         elif method == cls.PASSWORD:

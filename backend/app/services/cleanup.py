@@ -3,8 +3,8 @@ Cleanup service for maintaining database hygiene
 """
 
 import asyncio
-from datetime import datetime, timedelta
-from sqlalchemy import delete, and_, String
+from datetime import datetime, timedelta, timezone
+from sqlalchemy import delete, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.session import Session
@@ -12,6 +12,10 @@ from app.db.models.types import SessionStatus
 from app.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+def utcnow() -> datetime:
+    """Get current UTC datetime with timezone info"""
+    return datetime.now(timezone.utc)
 
 async def cleanup_expired_sessions(db: AsyncSession):
     """
@@ -25,11 +29,13 @@ async def cleanup_expired_sessions(db: AsyncSession):
         # 1. Not authenticated and expired
         # 2. Authenticated but inactive for 7 days
         
+        current_time = utcnow()
+        
         # First, delete non-authenticated expired sessions
         stmt = delete(Session).where(
             and_(
-                Session.status.cast(String) != SessionStatus.AUTHENTICATED.value,
-                Session.expires_at < datetime.utcnow()
+                Session.status != 'AUTHENTICATED',  # Use string value directly
+                Session.expires_at < current_time
             )
         )
         await db.execute(stmt)
@@ -37,8 +43,8 @@ async def cleanup_expired_sessions(db: AsyncSession):
         # Then, delete inactive authenticated sessions
         stmt = delete(Session).where(
             and_(
-                Session.status.cast(String) == SessionStatus.AUTHENTICATED.value,
-                Session.last_activity < datetime.utcnow() - timedelta(days=7)
+                Session.status == 'AUTHENTICATED',  # Use string value directly
+                Session.last_activity < current_time - timedelta(days=7)
             )
         )
         await db.execute(stmt)

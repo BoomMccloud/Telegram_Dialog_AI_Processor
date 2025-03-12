@@ -7,27 +7,31 @@ from sqlalchemy.sql import func
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 from uuid import uuid4
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
 
 from .base import Base
 from .types import SessionStatus, TokenType, AuthMethod
+
+def utcnow() -> datetime:
+    """Get current UTC datetime with timezone info"""
+    return datetime.now(timezone.utc)
 
 class Session(Base):
     __tablename__ = "sessions"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
-    status = Column(SQLEnum(SessionStatus), nullable=False, default=SessionStatus.PENDING)
+    status = Column(SQLEnum(SessionStatus, name='session_status'), nullable=False, default=SessionStatus.PENDING)
     token = Column(String(500), unique=True, nullable=False)
     refresh_token = Column(String(500), unique=True, nullable=True)
-    token_type = Column(SQLEnum(TokenType), nullable=False, default=TokenType.ACCESS)
+    token_type = Column(SQLEnum(TokenType, name='token_type'), nullable=False, default=TokenType.ACCESS)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
     expires_at = Column(TIMESTAMP(timezone=True), nullable=False)
     last_activity = Column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
     session_metadata = Column(JSONB, default=dict, nullable=False)
     device_info = Column(JSONB, default=dict, nullable=False)
-    auth_method = Column(SQLEnum(AuthMethod), nullable=False, default=AuthMethod.UNKNOWN)
+    auth_method = Column(SQLEnum(AuthMethod, name='auth_method'), nullable=False, default=AuthMethod.UNKNOWN)
 
     # Relationships
     user = relationship("User", back_populates="sessions")
@@ -35,7 +39,7 @@ class Session(Base):
     @property
     def is_expired(self) -> bool:
         """Check if the session is expired"""
-        return datetime.utcnow() > self.expires_at
+        return utcnow() > self.expires_at
 
     @property
     def is_active(self) -> bool:
@@ -45,7 +49,7 @@ class Session(Base):
             return (
                 not self.is_expired
                 and self.user_id is not None
-                and (datetime.utcnow() - self.last_activity) < timedelta(days=7)
+                and (utcnow() - self.last_activity) < timedelta(days=7)
             )
         else:
             # More lenient checks for pre-auth sessions
@@ -93,14 +97,14 @@ class Session(Base):
         if not self.refresh_token:
             return False, "Missing refresh token"
             
-        if (datetime.utcnow() - self.last_activity) >= timedelta(days=7):
+        if (utcnow() - self.last_activity) >= timedelta(days=7):
             return False, "Session inactive"
             
         return True, None
 
     def update_activity(self):
         """Update the last activity timestamp"""
-        self.last_activity = datetime.utcnow()
+        self.last_activity = utcnow()
 
     def update_metadata(self, data: Dict[str, Any]):
         """
