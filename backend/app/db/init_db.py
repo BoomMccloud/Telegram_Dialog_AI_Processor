@@ -14,7 +14,6 @@ from dotenv import load_dotenv
 
 from app.utils.logging import get_logger
 from app.db.database import engine, async_session
-from app.db.models.base import Base
 
 logger = get_logger(__name__)
 
@@ -67,15 +66,15 @@ def split_sql_statements(sql: str) -> list[str]:
     return [stmt.strip() for stmt in statements if stmt.strip()]
 
 async def init_db() -> None:
-    """Initialize database with all models and run migrations"""
+    """Initialize database with migrations only"""
     try:
-        # Create all tables using the engine
-        async with engine.begin() as conn:
-            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS pgcrypto;"))
-            await conn.run_sync(Base.metadata.create_all)
-            
         # Run migrations using a session
         async with async_session() as db:
+            # Create extensions first
+            async with db.begin():
+                await db.execute(text("CREATE EXTENSION IF NOT EXISTS pgcrypto;"))
+                await db.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
+            
             await run_migrations(db)
             logger.info("Database initialized successfully")
             

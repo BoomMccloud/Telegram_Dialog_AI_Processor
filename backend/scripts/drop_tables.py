@@ -60,7 +60,7 @@ async def drop_all_tables(drop_extensions: bool = False):
             logger.info("Dropping custom types...")
             await conn.execute("""
                 DROP TYPE IF EXISTS 
-                    sessionstatus,
+                    session_status,
                     tokentype,
                     dialogtype,
                     processingstatus

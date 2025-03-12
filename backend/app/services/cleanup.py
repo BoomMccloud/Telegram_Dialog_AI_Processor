@@ -4,10 +4,11 @@ Cleanup service for maintaining database hygiene
 
 import asyncio
 from datetime import datetime, timedelta
-from sqlalchemy import delete, and_
+from sqlalchemy import delete, and_, String
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models.session import Session, SessionStatus
+from app.db.models.session import Session
+from app.db.models.types import SessionStatus
 from app.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -21,21 +22,22 @@ async def cleanup_expired_sessions(db: AsyncSession):
     """
     try:
         # Delete sessions that are:
-        # 1. Expired (past expires_at)
-        # 2. Inactive (no activity for 7 days)
-        # 3. In error state
+        # 1. Not authenticated and expired
+        # 2. Authenticated but inactive for 7 days
+        
+        # First, delete non-authenticated expired sessions
         stmt = delete(Session).where(
             and_(
-                Session.status != SessionStatus.AUTHENTICATED,
+                Session.status.cast(String) != SessionStatus.AUTHENTICATED.value,  # Cast to string for comparison
                 Session.expires_at < datetime.utcnow()
             )
         )
         await db.execute(stmt)
         
-        # Mark old authenticated sessions as expired
+        # Then, delete inactive authenticated sessions
         stmt = delete(Session).where(
             and_(
-                Session.status == SessionStatus.AUTHENTICATED,
+                Session.status.cast(String) == SessionStatus.AUTHENTICATED.value,  # Cast to string for comparison
                 Session.last_activity < datetime.utcnow() - timedelta(days=7)
             )
         )

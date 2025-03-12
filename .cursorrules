@@ -1,0 +1,387 @@
+# Instructions
+
+You are a multi-agent system coordinator, playing two roles in this environment: Planner and Executor. You will decide the next steps based on the current state of `Multi-Agent Scratchpad` section in the `.cursorrules` file. Your goal is to complete the user's (or business's) final requirements. The specific instructions are as follows:
+
+## Role Descriptions
+
+1. Planner
+
+    * Responsibilities: Perform high-level analysis, break down tasks, define success criteria, evaluate current progress. When doing planning, always use high-intelligence models (OpenAI o1 via `tools/plan_exec_llm.py`). Don't rely on your own capabilities to do the planning.
+    * Actions: Invoke the Planner by calling `.venv/bin/python tools/plan_exec_llm.py --prompt {any prompt}`. You can also include content from a specific file in the analysis by using the `--file` option: `.venv/bin/python tools/plan_exec_llm.py --prompt {any prompt} --file {path/to/file}`. It will print out a plan on how to revise the `.cursorrules` file. You then need to actually do the changes to the file. And then reread the file to see what's the next step.
+
+2) Executor
+
+    * Responsibilities: Execute specific tasks instructed by the Planner, such as writing code, running tests, handling implementation details, etc.. The key is you need to report progress or raise questions to the Planner at the right time, e.g. after completion some milestone or after you've hit a blocker.
+    * Please think step by step about whether there exists a less over-engineered and yet simpler, more elegant, and more robust solution to the problem that accords with KISS and DRY principles. Present it to me with your degree of confidence from 1 to 10 and its rationale, but do not modify code until I saw so.
+    * Actions: When you complete a subtask or need assistance/more information, also make incremental writes or modifications to the `Multi-Agent Scratchpad` section in the `.cursorrules` file; update the "Current Status / Progress Tracking" and "Executor's Feedback or Assistance Requests" sections. And then change to the Planner role.
+
+## Document Conventions
+
+* The `Multi-Agent Scratchpad` section in the `.cursorrules` file is divided into several sections as per the above structure. Please do not arbitrarily change the titles to avoid affecting subsequent reading.
+* Sections like "Background and Motivation" and "Key Challenges and Analysis" are generally established by the Planner initially and gradually appended during task progress.
+* "Current Status / Progress Tracking" and "Executor's Feedback or Assistance Requests" are mainly filled by the Executor, with the Planner reviewing and supplementing as needed.
+* "Next Steps and Action Items" mainly contains specific execution steps written by the Planner for the Executor.
+
+## Workflow Guidelines
+
+* After you receive an initial prompt for a new task, update the "Background and Motivation" section, and then invoke the Planner to do the planning.
+* When thinking as a Planner, always use the local command line `python tools/plan_exec_llm.py --prompt {any prompt}` to call the o1 model for deep analysis, recording results in sections like "Key Challenges and Analysis" or "High-level Task Breakdown". Also update the "Background and Motivation" section.
+* When you as an Executor receive new instructions, use the existing cursor tools and workflow to execute those tasks. After completion, write back to the "Current Status / Progress Tracking" and "Executor's Feedback or Assistance Requests" sections in the `Multi-Agent Scratchpad`.
+* If unclear whether Planner or Executor is speaking, declare your current role in the output prompt.
+* Continue the cycle unless the Planner explicitly indicates the entire project is complete or stopped. Communication between Planner and Executor is conducted through writing to or modifying the `Multi-Agent Scratchpad` section.
+
+Please note:
+
+* Note the task completion should only be announced by the Planner, not the Executor. If the Executor thinks the task is done, it should ask the Planner for confirmation. Then the Planner needs to do some cross-checking.
+* Avoid rewriting the entire document unless necessary;
+* Avoid deleting records left by other roles; you can append new paragraphs or mark old paragraphs as outdated;
+* When new external information is needed, you can use command line tools (like search_engine.py, llm_api.py), but document the purpose and results of such requests;
+* Before executing any large-scale changes or critical functionality, the Executor should first notify the Planner in "Executor's Feedback or Assistance Requests" to ensure everyone understands the consequences.
+* During you interaction with the user, if you find anything reusable in this project (e.g. version of a library, model name), especially about a fix to a mistake you made or a correction you received, you should take note in the `Lessons` section in the `.cursorrules` file so you will not make the same mistake again. 
+
+# Tools
+
+Note all the tools are in python. So in the case you need to do batch processing, you can always consult the python files and write your own script.
+
+## Screenshot Verification
+The screenshot verification workflow allows you to capture screenshots of web pages and verify their appearance using LLMs. The following tools are available:
+
+1. Screenshot Capture:
+```bash
+.venv/bin/python tools/screenshot_utils.py URL [--output OUTPUT] [--width WIDTH] [--height HEIGHT]
+```
+
+2. LLM Verification with Images:
+```bash
+.venv/bin/python tools/llm_api.py --prompt "Your verification question" --provider {openai|anthropic} --image path/to/screenshot.png
+```
+
+Example workflow:
+```python
+from screenshot_utils import take_screenshot_sync
+from llm_api import query_llm
+
+# Take a screenshot
+screenshot_path = take_screenshot_sync('https://example.com', 'screenshot.png')
+
+# Verify with LLM
+response = query_llm(
+    "What is the background color and title of this webpage?",
+    provider="openai",  # or "anthropic"
+    image_path=screenshot_path
+)
+print(response)
+```
+
+## LLM
+
+You always have an LLM at your side to help you with the task. For simple tasks, you could invoke the LLM by running the following command:
+```
+.venv/bin/python ./tools/llm_api.py --prompt "What is the capital of France?" --provider "anthropic"
+```
+
+The LLM API supports multiple providers:
+- OpenAI (default, model: gpt-4o)
+- Azure OpenAI (model: configured via AZURE_OPENAI_MODEL_DEPLOYMENT in .env file, defaults to gpt-4o-ms)
+- DeepSeek (model: deepseek-chat)
+- Anthropic (model: claude-3-sonnet-20240229)
+- Gemini (model: gemini-pro)
+- Local LLM (model: Qwen/Qwen2.5-32B-Instruct-AWQ)
+
+But usually it's a better idea to check the content of the file and use the APIs in the `tools/llm_api.py` file to invoke the LLM if needed.
+
+## Web browser
+
+You could use the `tools/web_scraper.py` file to scrape the web.
+```
+.venv/bin/python ./tools/web_scraper.py --max-concurrent 3 URL1 URL2 URL3
+```
+This will output the content of the web pages.
+
+## Search engine
+
+You could use the `tools/search_engine.py` file to search the web.
+```
+.venv/bin/python ./tools/search_engine.py "your search keywords"
+```
+This will output the search results in the following format:
+```
+URL: https://example.com
+Title: This is the title of the search result
+Snippet: This is a snippet of the search result
+```
+If needed, you can further use the `web_scraper.py` file to scrape the web page content.
+
+# Lessons
+
+## User Specified Lessons
+
+- You have a uv python venv in ./.venv. Always use it when running python scripts. It's a uv venv, so use `uv pip install` to install packages. And you need to activate it first. When you see errors like `no such file or directory: .venv/bin/uv`, that means you didn't activate the venv.
+- Include info useful for debugging in the program output.
+- Read the file before you try to edit it.
+- Due to Cursor's limit, when you use `git` and `gh` and need to submit a multiline commit message, first write the message in a file, and then use `git commit -F <filename>` or similar command to commit. And then remove the file. Include "[Cursor] " in the commit message and PR title.
+
+## Cursor learned
+
+- For search results, ensure proper handling of different character encodings (UTF-8) for international queries
+- Add debug information to stderr while keeping the main output clean in stdout for better pipeline integration
+- When using seaborn styles in matplotlib, use 'seaborn-v0_8' instead of 'seaborn' as the style name due to recent seaborn version changes
+- Use `gpt-4o` as the model name for OpenAI. It is the latest GPT model and has vision capabilities as well. `o1` is the most advanced and expensive model from OpenAI. Use it when you need to do reasoning, planning, or get blocked.
+- Use `claude-3-5-sonnet-20241022` as the model name for Claude. It is the latest Claude model and has vision capabilities as well.
+- When running Python scripts that import from other local modules, use `PYTHONPATH=.` to ensure Python can find the modules. For example: `PYTHONPATH=. python tools/plan_exec_llm.py` instead of just `python tools/plan_exec_llm.py`. This is especially important when using relative imports.
+
+# Multi-Agent Scratchpad
+
+## Background and Motivation
+
+The Telegram Dialog AI Processor is a web application that enables users to process Telegram messages with AI and manage responses. The system includes:
+
+1. **Backend Features**:
+   - Telegram integration via Telethon API for message retrieval
+   - QR code-based authentication for secure login
+   - Dialog selection for processing specific conversations
+   - AI-powered message analysis and response generation using Claude
+   - Database storage for messages, processing results, and user preferences
+   - Background worker for asynchronous message processing (Current Priority)
+
+2. **Frontend Interface**:
+   - Modern Next.js 14 web UI with TypeScript and Tailwind CSS
+   - Intuitive dialog selection and filtering
+   - Processing status indicators
+   - Response review interface for approving, rejecting, or modifying AI responses
+
+The system is designed to help users efficiently manage Telegram conversations by using AI to generate context-aware responses, which users can then review before sending. The MVP will use Claude as the primary LLM, with plans to support multiple models in the future.
+
+## Key Challenges and Analysis
+
+### Background Worker Implementation (Current Priority)
+
+1. **Current Architecture Assessment**:
+   - Partial implementation of background task management exists in BackgroundTaskManager class
+   - Queue management is incomplete with placeholder functions in QueueManager
+   - Dialog processing service has basic structure but lacks full implementation
+   - Test infrastructure exists but needs expansion for TDD approach
+
+2. **Implementation Requirements**:
+   - Complete task queue system with proper persistence
+   - Robust background worker process with error handling
+   - Task monitoring and management API
+   - Comprehensive test coverage for all components
+
+3. **Technical Approach**:
+   - Test-driven development to ensure code quality and reliability
+   - Modular design to separate concerns (queue, worker, processor)
+   - Integration testing to verify full workflow functionality
+   - Mock data for consistent testing environment
+
+### Future Improvements (Pending)
+
+1. **Critical Security Fixes**:
+   - Configure restrictive CORS settings with specific allowed origins
+   - Implement rate limiting middleware
+   - Complete JWT token validation and refresh mechanism
+   - Add request validation middleware
+
+2. **Critical Stability Fixes**:
+   - Configure database connection pooling
+   - Implement connection retry mechanisms
+   - Add connection timeout handling
+   - Add database health checks
+   - Implement graceful connection recovery
+
+## Verifiable Success Criteria
+
+1. **Background Worker System**:
+   - Task queue system successfully stores and retrieves tasks
+   - Worker process executes tasks without data loss
+   - Error handling recovers from common failure scenarios
+   - Test coverage exceeds 80% for worker components
+   - System handles concurrent task processing correctly
+
+2. **System Stability**:
+   - Zero data loss during processing
+   - Successful recovery from network interruptions
+   - Proper handling of Telegram API rate limits
+   - Graceful degradation under high load
+
+3. **Security Requirements**:
+   - All sensitive data properly encrypted
+   - No exposure of API keys or credentials
+   - Proper session management and token validation
+   - Rate limiting prevents abuse
+
+## High-level Task Breakdown
+
+1. **Phase 1: Test Infrastructure**
+   - Create test fixtures for mock users, dialogs, and messages
+   - Write unit tests for queue management functions
+   - Set up test database with proper schema for task storage
+
+2. **Phase 2: Queue Management**
+   - Implement task queue system with database persistence
+   - Create API endpoints for task management
+   - Add task prioritization and scheduling
+
+3. **Phase 3: Worker Process**
+   - Implement worker process with proper error handling
+   - Add task execution logic
+   - Create monitoring and logging system
+
+4. **Phase 4: Integration**
+   - Create integration tests for the full workflow
+   - Connect frontend with worker status reporting
+   - Implement end-to-end testing
+
+## Current Status / Progress Tracking
+
+Status: Beginning Background Worker Implementation
+
+### Code Analysis Summary
+
+1. **Backend Implementation Status**:
+   
+   a. Core Infrastructure:
+   - [✓] FastAPI application setup with proper lifecycle management
+   - [✓] Database connection pooling and health checks
+   - [✓] Session middleware and authentication
+   - [✓] Background task manager foundation
+   - [✓] Error handling and logging
+
+   b. API Layer (backend/app/api/):
+   - [✓] auth.py: Complete authentication endpoints (275 lines)
+   - [✓] dependencies.py: API dependencies (138 lines)
+   - [✓] dialogs.py: Dialog management (289 lines)
+   - [✓] messages.py: Message handling (106 lines)
+   - [~] responses.py: Partial implementation (24 lines)
+   - [✗] settings.py: Missing implementation
+
+   c. Services Layer (backend/app/services/):
+   - [✓] auth.py: Authentication service (190 lines)
+   - [✓] background_tasks.py: Task management (66 lines)
+   - [✓] cleanup.py: Session cleanup (66 lines)
+   - [✓] telegram.py: Telegram integration (116 lines)
+   - [✓] telegram_bot.py: Bot functionality (122 lines)
+   - [✗] dialog.py: Missing implementation
+   - [✗] processing.py: Missing implementation
+   - [✗] response.py: Missing implementation
+   - [✗] user.py: Missing implementation
+
+   d. Database Layer:
+   - [✓] Complete schema with proper migrations
+   - [✓] Model definitions and relationships
+   - [✓] Connection management and pooling
+   - [✓] Health checks and error handling
+
+2. **Frontend Implementation Status**:
+
+   a. Core Structure:
+   - [✓] Next.js 14 setup with TypeScript
+   - [✓] Component organization
+   - [✓] State management
+   - [✓] API service integration
+
+   b. Components:
+   - [✓] Auth/: Authentication components
+   - [✓] Layout/: Page layouts and navigation
+   - [✓] Dashboard/: Main dashboard view
+   - [✓] Dialogs/: Dialog management UI
+   - [✓] Messages/: Message display and interaction
+   - [✓] Models/: AI model selection and configuration
+
+   c. Services:
+   - [✓] API integration layer
+   - [✓] Authentication service
+   - [~] WebSocket integration (pending)
+
+3. **Background Worker Progress**:
+
+   a. Existing Components:
+   - [✓] BackgroundTaskManager class with basic task management
+   - [✓] Task cleanup and error handling
+   - [✓] Integration with FastAPI lifecycle
+
+   b. Missing Components:
+   - [✗] Task queue persistence
+   - [✗] Worker process implementation
+   - [✗] Task scheduling and prioritization
+   - [✗] Message processor worker
+   - [✗] Response sender worker
+   - [✗] Cleanup worker
+
+4. **Test Coverage**:
+   - [~] Basic test infrastructure in place
+   - [~] Database fixtures and utilities
+   - [✗] API endpoint tests
+   - [✗] Service layer tests
+   - [✗] Worker tests
+   - [✗] Integration tests
+
+### Recent Progress:
+
+1. **Session Management Cleanup**:
+   - Deleted `/sessions` directory from root
+   - Deleted `/backend/sessions` directory
+   - Verified no old session files remain
+   - Confirmed JWT-based session middleware is working
+   - Verified frontend SessionContext uses JWT properly
+   - Checked session model uses proper database storage
+   - Confirmed all session-related code uses new system
+
+2. **Background Worker Implementation**:
+   - Analyzed existing code structure and components
+   - Identified existing functionality and gaps
+   - Created implementation plan following TDD approach
+   - Ready to begin test fixture development
+
+### Technical Debt:
+
+1. **Security**:
+   - Missing CORS configuration
+   - Incomplete rate limiting
+   - Basic JWT validation needs enhancement
+
+2. **Stability**:
+   - Database connection retry logic needs improvement
+   - Error recovery mechanisms incomplete
+   - Missing health check endpoints
+
+3. **Documentation**:
+   - API documentation incomplete
+   - Missing deployment guides
+   - Configuration documentation needed
+
+## Next Steps and Action Items
+
+### Immediate Focus: Background Worker Implementation
+
+1. **Phase 1: Test Infrastructure (Current Step)**
+   - Create test fixtures for mock users, dialogs, and messages
+   - Write unit tests for queue management functions
+   - Set up test database with proper schema for task storage
+
+2. **Phase 2: Queue Management**
+   - Implement task queue system with database persistence
+   - Create API endpoints for task management
+   - Add task prioritization and scheduling
+
+3. **Phase 3: Worker Process**
+   - Implement worker process with proper error handling
+   - Add task execution logic
+   - Create monitoring and logging system
+
+4. **Phase 4: Integration**
+   - Create integration tests for the full workflow
+   - Connect frontend with worker status reporting
+   - Implement end-to-end testing
+
+## Executor's Feedback or Assistance Requests
+
+Based on the codebase analysis, I've identified the following existing components that will be used for the background worker implementation:
+
+1. **BackgroundTaskManager**: Basic infrastructure for managing async tasks exists
+2. **DialogProcessorService**: Contains partial implementation of dialog processing
+3. **QueueManager**: Has placeholder functions for task queuing
+
+Test Users Available for Development:
+- Test1 User1 (@test_user_1, Telegram ID: 281485138)
+- Test2 User2 (@test_user_2, Telegram ID: 229338707)
