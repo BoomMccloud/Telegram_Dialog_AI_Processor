@@ -121,13 +121,13 @@ async def select_dialog(
         
         if not result:
             # Dialog doesn't exist, determine dialog type based on ID format
-            dialog_type = "PRIVATE"  # Default type - use uppercase string
+            dialog_type = DialogType.PRIVATE.value  # Default type - use .value to get string
             dialog_id_str = str(dialog.dialog_id)
             
             if dialog_id_str.startswith('-100'):
-                dialog_type = "CHANNEL"  # Use uppercase string
+                dialog_type = DialogType.CHANNEL.value  # Use .value to get string
             elif dialog_id_str.startswith('-'):
-                dialog_type = "GROUP"  # Use uppercase string
+                dialog_type = DialogType.GROUP.value  # Use .value to get string
                 
             # Create the dialog
             logger.info(f"Dialog not found, creating new dialog: {dialog.dialog_name} (ID: {dialog_id_str}, Type: {dialog_type})")

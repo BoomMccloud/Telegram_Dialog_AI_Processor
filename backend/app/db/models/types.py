@@ -21,9 +21,9 @@ class TokenType(str, enum.Enum):
     REFRESH = "refresh"
 
 class DialogType(str, enum.Enum):
-    PRIVATE = 'private'
-    GROUP = 'group'
-    CHANNEL = 'channel'
+    PRIVATE = 'PRIVATE'
+    GROUP = 'GROUP'
+    CHANNEL = 'CHANNEL'
 
 class ProcessingStatus(str, enum.Enum):
     PENDING_APPROVAL = 'pending_approval'
