@@ -51,6 +51,19 @@ interface DialogUpdateParams {
   priority?: number;
 }
 
+// Add interface for selected dialog response
+interface SelectedDialogResponse {
+  selection_id: string;
+  dialog_id: string;
+  dialog_name: string;
+  is_active: boolean;
+  is_processing_enabled: boolean;
+  auto_send_enabled: boolean;
+  priority?: number;
+  created_at: string;
+  updated_at: string;
+}
+
 const Data = () => {
   // State for dialogs
   const [dialogs, setDialogs] = useState<DialogType[]>([]);
@@ -81,6 +94,10 @@ const Data = () => {
   // State for dialog type filtering
   const [dialogTypeFilter, setDialogTypeFilter] = useState<'all' | 'private' | 'group' | 'channel'>('all');
   
+  // State for selected dialogs
+  const [selectedDialogIds, setSelectedDialogIds] = useState<number[]>([]);
+  const [isLoadingSelected, setIsLoadingSelected] = useState(false);
+  
   // Handle priority change
   const handlePriorityChange = async (dialogId: number, priority: number) => {
     try {
@@ -102,14 +119,26 @@ const Data = () => {
     try {
       setIsLoading(true);
       const response = await api.telegram.getDialogs();
-      // Add default values for UI state properties
+      
+      // Fetch selected dialogs to get their processing status
+      let selectedDialogs: number[] = [];
+      try {
+        const selectedResponse = await api.dialogs.getSelected() as SelectedDialogResponse[];
+        selectedDialogs = selectedResponse.map(dialog => parseInt(dialog.dialog_id));
+        setSelectedDialogIds(selectedDialogs);
+      } catch (error) {
+        console.error('Error fetching selected dialogs:', error);
+      }
+      
+      // Add default values for UI state properties and update with selected status
       const enhancedDialogs = response.dialogs.map(dialog => ({
         ...dialog,
-        is_processing_enabled: false,
-        auto_send_enabled: false,
-        priority: 0,
+        is_processing_enabled: selectedDialogs.includes(dialog.id),
+        auto_send_enabled: false, // This will be updated if we have more detailed info
+        priority: 0, // This will be updated if we have more detailed info
         telegram_dialog_id: dialog.id.toString()
       }));
+      
       setDialogs(enhancedDialogs);
     } catch (error) {
       if (error instanceof Error && error.message === 'AUTH_REQUIRED') {
@@ -120,6 +149,43 @@ const Data = () => {
       }
     } finally {
       setIsLoading(false);
+    }
+  };
+  
+  // Fetch selected dialogs to update UI state
+  const fetchSelectedDialogs = async () => {
+    if (!isAuthenticated) return;
+    
+    try {
+      setIsLoadingSelected(true);
+      const selectedDialogs = await api.dialogs.getSelected() as SelectedDialogResponse[];
+      
+      // Extract dialog IDs and update state
+      const selectedIds = selectedDialogs.map(dialog => parseInt(dialog.dialog_id));
+      setSelectedDialogIds(selectedIds);
+      
+      // Update dialog list with processing status
+      setDialogs(prevDialogs => 
+        prevDialogs.map(dialog => {
+          const selectedDialog = selectedDialogs.find(
+            sd => parseInt(sd.dialog_id) === dialog.id
+          );
+          
+          if (selectedDialog) {
+            return {
+              ...dialog,
+              is_processing_enabled: true,
+              auto_send_enabled: selectedDialog.auto_send_enabled || false,
+              priority: selectedDialog.priority || 0
+            };
+          }
+          return dialog;
+        })
+      );
+    } catch (error) {
+      console.error('Error fetching selected dialogs:', error);
+    } finally {
+      setIsLoadingSelected(false);
     }
   };
   
@@ -291,11 +357,6 @@ const Data = () => {
     }
   };
 
-  // Refresh dialogs from Telegram
-  const handleRefreshDialogs = () => {
-    fetchDialogs();
-  };
-
   // Get appropriate icon for dialog type
   const getDialogIcon = (type: DialogType['type']) => {
     switch (type) {
@@ -331,7 +392,12 @@ const Data = () => {
       try {
         const isAuth = await checkAuthentication();
         setIsAuthenticated(isAuth);
-        // We don't automatically fetch dialogs anymore, even if authenticated
+        
+        // If authenticated, fetch dialogs and selected dialogs
+        if (isAuth) {
+          await fetchDialogs();
+          await fetchSelectedDialogs();
+        }
       } catch (error) {
         console.error('Error checking authentication status:', error);
       } finally {
@@ -649,9 +715,12 @@ const Data = () => {
             <>
               <Button 
                 variant="contained" 
-                startIcon={isLoading ? <CircularProgress size={20} color="inherit" /> : <RefreshIcon />}
-                onClick={handleRefreshDialogs}
-                disabled={isLoading}
+                startIcon={isLoading || isLoadingSelected ? <CircularProgress size={20} color="inherit" /> : <RefreshIcon />}
+                onClick={() => {
+                  fetchDialogs();
+                  fetchSelectedDialogs();
+                }}
+                disabled={isLoading || isLoadingSelected}
                 sx={{ mr: 1 }}
               >
                 Refresh
@@ -661,7 +730,7 @@ const Data = () => {
                 color="error"
                 startIcon={<LogoutIcon />}
                 onClick={handleLogout}
-                disabled={isLoading}
+                disabled={isLoading || isLoadingSelected}
               >
                 Logout
               </Button>
@@ -669,7 +738,7 @@ const Data = () => {
                 variant="outlined"
                 onClick={testToken}
                 sx={{ ml: 2 }}
-                disabled={isLoading}
+                disabled={isLoading || isLoadingSelected}
               >
                 Verify Session
               </Button>
@@ -689,7 +758,7 @@ const Data = () => {
         
         <Typography variant="body2" color="text.secondary">
           {isAuthenticated 
-            ? "Select which Telegram dialogs you want to process with AI responses." 
+            ? `Select which Telegram dialogs you want to process with AI responses. ${selectedDialogIds.length} dialog(s) currently selected.` 
             : "Please authenticate with Telegram to manage your dialogs."}
         </Typography>
       </Paper>
@@ -789,6 +858,7 @@ const Data = () => {
                             <Switch
                               checked={dialog.is_processing_enabled}
                               onChange={() => handleToggleProcessing(dialog.id)}
+                              disabled={isLoadingSelected}
                             />
                           }
                           label="Process"
@@ -820,6 +890,14 @@ const Data = () => {
                               color="primary" 
                             />
                           )}
+                          {selectedDialogIds.includes(dialog.id) && (
+                            <Chip 
+                              label="Selected" 
+                              size="small" 
+                              color="success" 
+                              sx={{ ml: 1 }}
+                            />
+                          )}
                         </Box>
                       }
                       secondary={
@@ -837,7 +915,7 @@ const Data = () => {
             </List>
           ) : (
             <Box sx={{ p: 3, textAlign: 'center' }}>
-              {isLoading ? (
+              {isLoading || isLoadingSelected ? (
                 <CircularProgress />
               ) : (
                 <Typography variant="body1" color="text.secondary">
