@@ -112,9 +112,13 @@ class Session(Base):
         Args:
             data: New metadata to merge with existing
         """
-        current = self.session_metadata or {}
-        current.update(data)
-        self.session_metadata = current
+        if self.session_metadata is None:
+            self.session_metadata = {}
+        # Create a new dict to ensure SQLAlchemy detects the change
+        updated = dict(self.session_metadata)
+        updated.update(data)
+        # Assign the new dict to trigger SQLAlchemy's change detection
+        self.session_metadata = updated
 
     def update_device_info(self, info: Dict[str, Any]):
         """

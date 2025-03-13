@@ -453,7 +453,7 @@ async def phone_auth(
 ):
     """Start phone number authentication by sending code"""
     try:
-        # Create initial session with phone auth method
+        # Create session first to get a stable ID
         session_middleware = request.app.state.session_middleware
         session = await session_middleware.create_session(
             db=db,
@@ -461,7 +461,7 @@ async def phone_auth(
             auth_method=AuthMethod.PHONE
         )
         
-        # Create Telegram client with session file in sessions directory
+        # Create Telegram client with permanent session file
         session_file = str(SESSIONS_DIR / f'session_{session.id}')
         client = TelegramClient(
             session_file,
@@ -469,24 +469,39 @@ async def phone_auth(
             api_hash=os.getenv("TELEGRAM_API_HASH")
         )
         
-        # Connect and send verification code
+        phone_code_hash = None
         try:
             await client.connect()
             # Send code to phone
             result = await client.send_code_request(auth_data.phone_number)
             phone_code_hash = result.phone_code_hash
             
-            # Update session metadata with verification data
+            # Update session metadata
             session.update_metadata({
                 "phone_number": auth_data.phone_number,
                 "phone_code_hash": phone_code_hash
             })
             await db.commit()
+            
+            # Keep client connected for next request
+            client_sessions[str(session.id)] = {
+                "client": client,
+                "status": "pending",
+                "phone_code_hash": phone_code_hash
+            }
+            logger.info(f"Stored pending client in client_sessions for session: {session.id}")
+            
         except Exception as e:
             logger.error(f"Failed to send code: {str(e)}", exc_info=True)
-            raise TelegramError("Failed to send verification code", details={"error": str(e)})
-        finally:
             await client.disconnect()
+            raise TelegramError("Failed to send verification code", details={"error": str(e)})
+            
+        # Verify metadata was saved
+        await db.refresh(session)
+        logger.info(f"Created session {session.id} with metadata: {session.session_metadata}")
+        
+        if "phone_code_hash" not in session.session_metadata:
+            raise DatabaseError("Failed to save phone code hash in session metadata")
             
         return {
             "session_id": str(session.id),
@@ -516,22 +531,31 @@ async def verify_phone_code(
         if not session:
             raise SessionError(f"Session {verify_data.session_id} not found")
             
-        # Create Telegram client with session file
-        session_file = str(SESSIONS_DIR / f'session_{session.id}')
-        client = TelegramClient(
-            session_file,
-            api_id=int(os.getenv("TELEGRAM_API_ID")),
-            api_hash=os.getenv("TELEGRAM_API_HASH")
-        )
+        # Get existing client from client_sessions
+        client_info = client_sessions.get(str(session.id))
+        if not client_info or not client_info["client"]:
+            raise SessionError("Phone verification session expired or not found")
+            
+        client = client_info["client"]
         
         try:
-            await client.connect()
+            if not client.is_connected():
+                await client.connect()
             
             # Sign in with code
             try:
+                # Log session metadata to help diagnose issues
+                logger.info(f"Session ID: {session.id}, Metadata: {session.session_metadata}")
+                
                 phone_code_hash = session.session_metadata.get("phone_code_hash")
                 if not phone_code_hash:
-                    raise SessionError("Phone code hash not found in session")
+                    # Get the session again to make sure we have latest data
+                    await db.refresh(session)
+                    logger.info(f"After refresh - Session ID: {session.id}, Metadata: {session.session_metadata}")
+                    
+                    phone_code_hash = session.session_metadata.get("phone_code_hash")
+                    if not phone_code_hash:
+                        raise SessionError("Phone code hash not found in session")
                     
                 await client.sign_in(
                     phone=verify_data.phone_number,
@@ -586,13 +610,16 @@ async def verify_phone_code(
             
             await db.commit()
             
-            # Store the authenticated client in client_sessions
+            # Update client in client_sessions with new token
             client_sessions[access_token] = {
                 "client": client,
                 "status": "authenticated",
                 "telegram_id": permanent_user.telegram_id
             }
-            logger.info(f"Stored authenticated client in client_sessions with token: {access_token[:10]}...")
+            # Remove the old session entry
+            client_sessions.pop(str(session.id), None)
+            
+            logger.info(f"Updated client in client_sessions with token: {access_token[:10]}...")
             
             # Return session details
             return {
@@ -603,9 +630,12 @@ async def verify_phone_code(
                 "access_token": access_token,
                 "refresh_token": refresh_token
             }
+            
         except Exception as e:
             # Only disconnect the client if there's an error
             await client.disconnect()
+            # Clean up client_sessions on error
+            client_sessions.pop(str(session.id), None)
             raise e
             
     except (SessionError, TelegramError):
