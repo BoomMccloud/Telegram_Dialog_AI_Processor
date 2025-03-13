@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Box, 
   Typography, 
@@ -23,6 +23,9 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Tabs,
+  Tab,
+  Badge,
 } from '@mui/material';
 import { 
   Refresh as RefreshIcon,
@@ -33,6 +36,7 @@ import {
   Settings as SettingsIcon,
   Login as LoginIcon,
   Logout as LogoutIcon,
+  FilterList as FilterListIcon,
 } from '@mui/icons-material';
 import { api } from '../../services/api';
 import { Dialog as DialogType, SessionStatus } from '../../types';
@@ -40,17 +44,11 @@ import { checkAuthentication, initiateQRAuthentication, pollSessionStatus, devLo
 import AuthRequiredDialog from '../../components/Auth/AuthRequiredDialog';
 import PhoneAuth from '../../components/Auth/PhoneAuth';
 
-// Add interface for selected dialog response
-interface SelectedDialog {
-  selection_id: string;
-  dialog_id: string;
-  dialog_name: string;
-  is_active: boolean;
-  is_processing_enabled: boolean;
-  auto_send_enabled: boolean;
-  priority: number;
-  created_at: string;
-  updated_at: string;
+// Add interface for dialog update
+interface DialogUpdateParams {
+  is_processing_enabled?: boolean;
+  auto_send_enabled?: boolean;
+  priority?: number;
 }
 
 const Data = () => {
@@ -80,10 +78,13 @@ const Data = () => {
   // Add state for phone authentication
   const [phoneDialogOpen, setPhoneDialogOpen] = useState<boolean>(false);
   
+  // State for dialog type filtering
+  const [dialogTypeFilter, setDialogTypeFilter] = useState<'all' | 'private' | 'group' | 'channel'>('all');
+  
   // Handle priority change
   const handlePriorityChange = async (dialogId: number, priority: number) => {
     try {
-      await api.dialogs.update(dialogId, { priority });
+      await api.dialogs.update(dialogId, { priority } as DialogUpdateParams);
       // Update local state
       setDialogs(dialogs.map(dialog => 
         dialog.id === dialogId 
@@ -341,10 +342,20 @@ const Data = () => {
     checkAuthStatus();
   }, []);  // Remove fetchDialogs from dependency array
   
-  // Filter dialogs by search query
-  const filteredDialogs = dialogs.filter(dialog => 
-    dialog.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Filter dialogs by search query and type
+  const filteredDialogs = dialogs.filter(dialog => {
+    const matchesSearch = dialog.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesType = dialogTypeFilter === 'all' || dialog.type === dialogTypeFilter;
+    return matchesSearch && matchesType;
+  });
+  
+  // Count dialogs by type for badges
+  const dialogCounts = {
+    all: dialogs.length,
+    private: dialogs.filter(dialog => dialog.type === 'private').length,
+    group: dialogs.filter(dialog => dialog.type === 'group').length,
+    channel: dialogs.filter(dialog => dialog.type === 'channel').length
+  };
 
   const testToken = async () => {
     try {
@@ -685,6 +696,61 @@ const Data = () => {
       
       {isAuthenticated && (
         <Paper elevation={2}>
+          {/* Dialog Type Filter Tabs */}
+          <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+            <Tabs 
+              value={dialogTypeFilter} 
+              onChange={(_, newValue) => setDialogTypeFilter(newValue)}
+              aria-label="dialog type filter tabs"
+              variant="fullWidth"
+            >
+              <Tab 
+                label={
+                  <Badge badgeContent={dialogCounts.all} color="primary" max={999}>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <FilterListIcon sx={{ mr: 0.5 }} fontSize="small" />
+                      <Typography>All</Typography>
+                    </Box>
+                  </Badge>
+                } 
+                value="all" 
+              />
+              <Tab 
+                label={
+                  <Badge badgeContent={dialogCounts.private} color="primary" max={999}>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <PersonIcon sx={{ mr: 0.5 }} fontSize="small" />
+                      <Typography>Private</Typography>
+                    </Box>
+                  </Badge>
+                } 
+                value="private" 
+              />
+              <Tab 
+                label={
+                  <Badge badgeContent={dialogCounts.group} color="success" max={999}>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <GroupIcon sx={{ mr: 0.5 }} fontSize="small" />
+                      <Typography>Groups</Typography>
+                    </Box>
+                  </Badge>
+                } 
+                value="group" 
+              />
+              <Tab 
+                label={
+                  <Badge badgeContent={dialogCounts.channel} color="info" max={999}>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <ChannelIcon sx={{ mr: 0.5 }} fontSize="small" />
+                      <Typography>Channels</Typography>
+                    </Box>
+                  </Badge>
+                } 
+                value="channel" 
+              />
+            </Tabs>
+          </Box>
+          
           {filteredDialogs.length > 0 ? (
             <List>
               {filteredDialogs.map((dialog, index) => (
