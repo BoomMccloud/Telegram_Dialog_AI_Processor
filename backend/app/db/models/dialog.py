@@ -18,7 +18,7 @@ class Dialog(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     telegram_dialog_id = Column(String(255), nullable=False)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    name = Column(String(255), nullable=False)
+    title = Column(String(255), nullable=False)
     type = Column(SQLEnum(DialogType), nullable=False)
     unread_count = Column(Integer, default=0)
     last_message = Column(JSONB, default=dict)
@@ -38,4 +38,4 @@ class Dialog(Base):
     )
 
     def __repr__(self):
-        return f"<Dialog(id={self.id}, name={self.name}, type={self.type})>" 
+        return f"<Dialog(id={self.id}, name={self.title}, type={self.type})>" 

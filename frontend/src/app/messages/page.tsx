@@ -34,7 +34,6 @@ interface SelectedDialog {
   processing_enabled: boolean;
   auto_reply_enabled: boolean;
   response_approval_required: boolean;
-  priority: number;
   created_at: string;
   updated_at: string;
   processing_settings: Record<string, any>;
@@ -388,7 +387,6 @@ export default function MessagesPage() {
           is_user: true,
           processing_enabled: dialog.processing_enabled,
           auto_reply_enabled: dialog.auto_reply_enabled,
-          priority: dialog.priority || 0
         }));
         console.log('Transformed selected dialogs:', transformedDialogs);
         setApiSelectedDialogs(transformedDialogs);
@@ -474,7 +472,7 @@ export default function MessagesPage() {
           }
           
           // Call the API to remove from processing using DELETE method
-          return managedFetch(`${API_URL}/dialogs/${sessionId}/selected/${dialogId}`, {
+          return managedFetch(`${API_URL}/dialogs/${sessionId}/selected/${String(dialogId)}`, {
             method: 'DELETE',
             headers: {
               'Content-Type': 'application/json',
@@ -517,10 +515,9 @@ export default function MessagesPage() {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              dialog_id: dialogId,
+              dialog_id: String(dialogId),
               dialog_name: dialog.name,
               processing_enabled: true,
-              priority: 1,
             }),
           });
         });

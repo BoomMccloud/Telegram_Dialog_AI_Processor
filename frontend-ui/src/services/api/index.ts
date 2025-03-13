@@ -204,34 +204,32 @@ export const api = {
     update: (id: number, data: { 
       is_processing_enabled?: boolean; 
       auto_send_enabled?: boolean;
-      priority?: number;
     }) => 
       apiRequest({
         method: 'PATCH',
-        url: `/dialogs/${id}`,
+        url: `/dialogs/${String(id)}`,
         data,
       }),
     delete: (id: number) => 
       apiRequest({
         method: 'DELETE',
-        url: `/dialogs/${id}`,
+        url: `/dialogs/${String(id)}`,
       }),
     select: (dialogId: number, dialogName: string) => 
       apiRequest({
         method: 'POST',
         url: '/dialogs/select',
         data: {
-          dialog_id: dialogId,
+          dialog_id: String(dialogId),
           dialog_name: dialogName,
           is_processing_enabled: true,
-          auto_send_enabled: false,
-          priority: 0
+          auto_send_enabled: false
         },
       }),
     unselect: (dialogId: number) => 
       apiRequest({
         method: 'DELETE',
-        url: `/dialogs/selected/${dialogId}`,
+        url: `/dialogs/selected/${String(dialogId)}`,
       }),
     getSelected: () => 
       apiRequest({
