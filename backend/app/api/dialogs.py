@@ -11,6 +11,8 @@ import logging
 from app.db.database import get_raw_connection, get_db
 # Import session middleware
 from app.middleware.session import verify_session_dependency, SessionData
+# Import DialogType enum
+from app.db.models.types import DialogType
 
 # Create router
 router = APIRouter()
@@ -119,13 +121,13 @@ async def select_dialog(
         
         if not result:
             # Dialog doesn't exist, determine dialog type based on ID format
-            dialog_type = "private"  # Default type
+            dialog_type = "PRIVATE"  # Default type - use uppercase string
             dialog_id_str = str(dialog.dialog_id)
             
             if dialog_id_str.startswith('-100'):
-                dialog_type = "channel"
+                dialog_type = "CHANNEL"  # Use uppercase string
             elif dialog_id_str.startswith('-'):
-                dialog_type = "group"
+                dialog_type = "GROUP"  # Use uppercase string
                 
             # Create the dialog
             logger.info(f"Dialog not found, creating new dialog: {dialog.dialog_name} (ID: {dialog_id_str}, Type: {dialog_type})")
