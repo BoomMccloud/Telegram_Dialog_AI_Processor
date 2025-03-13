@@ -51,7 +51,6 @@ interface BaseDialog {
 // Extended Dialog interface with UI-specific properties
 export interface Dialog extends BaseDialog {
   // UI state properties not in the backend
-  priority: number;
   is_processing_enabled: boolean;
   auto_send_enabled: boolean;
   telegram_dialog_id: string;

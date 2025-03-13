@@ -48,7 +48,6 @@ import PhoneAuth from '../../components/Auth/PhoneAuth';
 interface DialogUpdateParams {
   is_processing_enabled?: boolean;
   auto_send_enabled?: boolean;
-  priority?: number;
 }
 
 // Add interface for selected dialog response
@@ -59,7 +58,6 @@ interface SelectedDialogResponse {
   is_active: boolean;
   is_processing_enabled: boolean;
   auto_send_enabled: boolean;
-  priority?: number;
   created_at: string;
   updated_at: string;
 }
@@ -92,28 +90,12 @@ const Data = () => {
   const [phoneDialogOpen, setPhoneDialogOpen] = useState<boolean>(false);
   
   // State for dialog type filtering
-  const [dialogTypeFilter, setDialogTypeFilter] = useState<'all' | 'private' | 'group' | 'channel'>('all');
+  const [dialogTypeFilter, setDialogTypeFilter] = useState<'all' | 'selected' | 'private' | 'group' | 'channel'>('all');
   
   // State for selected dialogs
   const [selectedDialogIds, setSelectedDialogIds] = useState<number[]>([]);
   const [isLoadingSelected, setIsLoadingSelected] = useState(false);
   
-  // Handle priority change
-  const handlePriorityChange = async (dialogId: number, priority: number) => {
-    try {
-      await api.dialogs.update(dialogId, { priority } as DialogUpdateParams);
-      // Update local state
-      setDialogs(dialogs.map(dialog => 
-        dialog.id === dialogId 
-          ? { ...dialog, priority } 
-          : dialog
-      ));
-    } catch (error) {
-      setAuthError('Failed to update dialog priority. Please try again.');
-      console.error('Error updating dialog priority:', error);
-    }
-  };
-
   // Fetch dialogs from API
   const fetchDialogs = async () => {
     try {
@@ -135,7 +117,6 @@ const Data = () => {
         ...dialog,
         is_processing_enabled: selectedDialogs.includes(dialog.id),
         auto_send_enabled: false, // This will be updated if we have more detailed info
-        priority: 0, // This will be updated if we have more detailed info
         telegram_dialog_id: dialog.id.toString()
       }));
       
@@ -175,8 +156,7 @@ const Data = () => {
             return {
               ...dialog,
               is_processing_enabled: true,
-              auto_send_enabled: selectedDialog.auto_send_enabled || false,
-              priority: selectedDialog.priority || 0
+              auto_send_enabled: selectedDialog.auto_send_enabled || false
             };
           }
           return dialog;
@@ -341,7 +321,7 @@ const Data = () => {
       // Update the dialog's auto-send setting
       await api.dialogs.update(id, { 
         auto_send_enabled: !dialog.auto_send_enabled 
-      });
+      } as DialogUpdateParams);
 
       // Update local state
       setDialogs(prevDialogs => 
@@ -411,13 +391,23 @@ const Data = () => {
   // Filter dialogs by search query and type
   const filteredDialogs = dialogs.filter(dialog => {
     const matchesSearch = dialog.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesType = dialogTypeFilter === 'all' || dialog.type === dialogTypeFilter;
+    let matchesType = true;
+    
+    if (dialogTypeFilter === 'selected') {
+      // For "Selected" tab, only show dialogs that are selected for processing
+      matchesType = selectedDialogIds.includes(dialog.id);
+    } else if (dialogTypeFilter !== 'all') {
+      // For other tabs, filter by dialog type
+      matchesType = dialog.type === dialogTypeFilter;
+    }
+    
     return matchesSearch && matchesType;
   });
   
   // Count dialogs by type for badges
   const dialogCounts = {
     all: dialogs.length,
+    selected: selectedDialogIds.length,
     private: dialogs.filter(dialog => dialog.type === 'private').length,
     group: dialogs.filter(dialog => dialog.type === 'group').length,
     channel: dialogs.filter(dialog => dialog.type === 'channel').length
@@ -786,6 +776,17 @@ const Data = () => {
               />
               <Tab 
                 label={
+                  <Badge badgeContent={dialogCounts.selected} color="success" max={999}>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <FilterListIcon sx={{ mr: 0.5 }} fontSize="small" />
+                      <Typography>Selected</Typography>
+                    </Box>
+                  </Badge>
+                } 
+                value="selected" 
+              />
+              <Tab 
+                label={
                   <Badge badgeContent={dialogCounts.private} color="primary" max={999}>
                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
                       <PersonIcon sx={{ mr: 0.5 }} fontSize="small" />
@@ -828,20 +829,6 @@ const Data = () => {
                   <ListItem
                     secondaryAction={
                       <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <FormControlLabel
-                          control={
-                            <TextField
-                              type="number"
-                              size="small"
-                              value={dialog.priority}
-                              onChange={(e) => handlePriorityChange(dialog.id, parseInt(e.target.value))}
-                              inputProps={{ min: 0, style: { width: '60px' } }}
-                              disabled={!dialog.is_processing_enabled}
-                            />
-                          }
-                          label="Priority"
-                          labelPlacement="start"
-                        />
                         <FormControlLabel
                           control={
                             <Switch
