@@ -360,3 +360,41 @@ WHERE dialogs.is_processing_enabled = true]
 2025-03-14 13:47:32,430 - __main__ - INFO - Dialog 4: ID=b915c8d6-f899-4f19-8efc-2158b03528b0, Title=PTAL x AdsGram, Type=DialogType.GROUP, Unread=0, Last processed: None, Metadata: {}
 2025-03-14 13:47:32,430 - __main__ - INFO - Dialog 5: ID=ebb6cd7c-0fe4-4e12-b838-5356e2eefe87, Title=Jc Jawe.eth, Type=DialogType.PRIVATE, Unread=0, Last processed: None, Metadata: {}
 2025-03-14 13:47:32,430 - __main__ - INFO - Processing cycle completed in 0.01 seconds
+2025-03-14 13:48:32,502 - __main__ - INFO - Starting processing cycle
+2025-03-14 13:48:32,509 - __main__ - INFO - Found 5 dialogs with processing enabled
+2025-03-14 13:48:32,511 - __main__ - INFO - Logged dialog count (5) to /Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/backend/logs/dialog_count.log
+2025-03-14 13:48:32,511 - __main__ - INFO - Dialog 1: ID=c433cf15-e15b-4cca-adc3-eb6ec4a3ba6a, Title=Telegram, Type=DialogType.PRIVATE, Unread=0, Last processed: None, Metadata: {}
+2025-03-14 13:48:32,511 - __main__ - INFO - Dialog 2: ID=20f75da2-43ba-492e-83fb-d2caf3c825e6, Title=userinfobot, Type=DialogType.PRIVATE, Unread=0, Last processed: None, Metadata: {}
+2025-03-14 13:48:32,511 - __main__ - INFO - Dialog 3: ID=f12544a4-d144-4542-97f3-6d011ee67245, Title=Wallet, Type=DialogType.PRIVATE, Unread=0, Last processed: None, Metadata: {}
+2025-03-14 13:48:32,511 - __main__ - INFO - Dialog 4: ID=b915c8d6-f899-4f19-8efc-2158b03528b0, Title=PTAL x AdsGram, Type=DialogType.GROUP, Unread=0, Last processed: None, Metadata: {}
+2025-03-14 13:48:32,511 - __main__ - INFO - Dialog 5: ID=ebb6cd7c-0fe4-4e12-b838-5356e2eefe87, Title=Jc Jawe.eth, Type=DialogType.PRIVATE, Unread=0, Last processed: None, Metadata: {}
+2025-03-14 13:48:32,511 - __main__ - INFO - Processing cycle completed in 0.01 seconds
+2025-03-14 13:49:32,579 - __main__ - INFO - Starting processing cycle
+2025-03-14 13:49:32,587 - __main__ - INFO - Found 5 dialogs with processing enabled
+2025-03-14 13:49:32,588 - __main__ - INFO - Logged dialog count (5) to /Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/backend/logs/dialog_count.log
+2025-03-14 13:49:32,588 - __main__ - INFO - Dialog 1: ID=c433cf15-e15b-4cca-adc3-eb6ec4a3ba6a, Title=Telegram, Type=DialogType.PRIVATE, Unread=0, Last processed: None, Metadata: {}
+2025-03-14 13:49:32,588 - __main__ - INFO - Dialog 2: ID=20f75da2-43ba-492e-83fb-d2caf3c825e6, Title=userinfobot, Type=DialogType.PRIVATE, Unread=0, Last processed: None, Metadata: {}
+2025-03-14 13:49:32,588 - __main__ - INFO - Dialog 3: ID=f12544a4-d144-4542-97f3-6d011ee67245, Title=Wallet, Type=DialogType.PRIVATE, Unread=0, Last processed: None, Metadata: {}
+2025-03-14 13:49:32,588 - __main__ - INFO - Dialog 4: ID=b915c8d6-f899-4f19-8efc-2158b03528b0, Title=PTAL x AdsGram, Type=DialogType.GROUP, Unread=0, Last processed: None, Metadata: {}
+2025-03-14 13:49:32,588 - __main__ - INFO - Dialog 5: ID=ebb6cd7c-0fe4-4e12-b838-5356e2eefe87, Title=Jc Jawe.eth, Type=DialogType.PRIVATE, Unread=0, Last processed: None, Metadata: {}
+2025-03-14 13:49:32,588 - __main__ - INFO - Processing cycle completed in 0.01 seconds
+2025-03-14 13:50:32,661 - __main__ - INFO - Starting processing cycle
+2025-03-14 13:50:32,668 - __main__ - INFO - Found 5 dialogs with processing enabled
+2025-03-14 13:50:32,670 - __main__ - INFO - Logged dialog count (5) to /Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/backend/logs/dialog_count.log
+2025-03-14 13:50:32,670 - __main__ - INFO - Dialog 1: ID=c433cf15-e15b-4cca-adc3-eb6ec4a3ba6a, Title=Telegram, Type=DialogType.PRIVATE, Unread=0, Last processed: None, Metadata: {}
+2025-03-14 13:50:32,670 - __main__ - INFO - Dialog 2: ID=20f75da2-43ba-492e-83fb-d2caf3c825e6, Title=userinfobot, Type=DialogType.PRIVATE, Unread=0, Last processed: None, Metadata: {}
+2025-03-14 13:50:32,670 - __main__ - INFO - Dialog 3: ID=f12544a4-d144-4542-97f3-6d011ee67245, Title=Wallet, Type=DialogType.PRIVATE, Unread=0, Last processed: None, Metadata: {}
+2025-03-14 13:50:32,670 - __main__ - INFO - Dialog 4: ID=b915c8d6-f899-4f19-8efc-2158b03528b0, Title=PTAL x AdsGram, Type=DialogType.GROUP, Unread=0, Last processed: None, Metadata: {}
+2025-03-14 13:50:32,670 - __main__ - INFO - Dialog 5: ID=ebb6cd7c-0fe4-4e12-b838-5356e2eefe87, Title=Jc Jawe.eth, Type=DialogType.PRIVATE, Unread=0, Last processed: None, Metadata: {}
+2025-03-14 13:50:32,670 - __main__ - INFO - Processing cycle completed in 0.01 seconds
+2025-03-14 13:59:04,840 - __main__ - INFO - Starting processing cycle
+2025-03-14 13:59:04,844 - __main__ - INFO - Found 5 dialogs with processing enabled
+2025-03-14 13:59:04,870 - __main__ - INFO - Logged dialog count (5) to /Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/backend/logs/dialog_count.log
+2025-03-14 13:59:04,874 - __main__ - INFO - Dialog 1: ID=c433cf15-e15b-4cca-adc3-eb6ec4a3ba6a, Title=Telegram, Type=DialogType.PRIVATE, Unread=0, Last processed: None, Metadata: {}
+2025-03-14 13:59:04,874 - __main__ - INFO - Dialog 2: ID=20f75da2-43ba-492e-83fb-d2caf3c825e6, Title=userinfobot, Type=DialogType.PRIVATE, Unread=0, Last processed: None, Metadata: {}
+2025-03-14 13:59:04,874 - __main__ - INFO - Dialog 3: ID=f12544a4-d144-4542-97f3-6d011ee67245, Title=Wallet, Type=DialogType.PRIVATE, Unread=0, Last processed: None, Metadata: {}
+2025-03-14 13:59:04,874 - __main__ - INFO - Dialog 4: ID=b915c8d6-f899-4f19-8efc-2158b03528b0, Title=PTAL x AdsGram, Type=DialogType.GROUP, Unread=0, Last processed: None, Metadata: {}
+2025-03-14 13:59:04,875 - __main__ - INFO - Dialog 5: ID=ebb6cd7c-0fe4-4e12-b838-5356e2eefe87, Title=Jc Jawe.eth, Type=DialogType.PRIVATE, Unread=0, Last processed: None, Metadata: {}
+2025-03-14 13:59:04,875 - __main__ - INFO - Processing cycle completed in 0.03 seconds
+2025-03-14 13:59:21,746 - __main__ - INFO - Received signal 2, shutting down gracefully...
+2025-03-14 13:59:21,896 - __main__ - INFO - Worker process shutting down
