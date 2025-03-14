@@ -28,7 +28,7 @@ class Dialog(Base):
     last_processed_at = Column(TIMESTAMP(timezone=True))
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
-    metadata = Column(JSONB, nullable=True)
+    dialog_metadata = Column(JSONB, nullable=True)
 
     # Relationships
     user = relationship("User", back_populates="dialogs")

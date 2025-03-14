@@ -1,0 +1,362 @@
+2025-03-14 12:18:18,411 - __main__ - INFO - Worker initialized with 60s interval
+2025-03-14 12:18:18,411 - __main__ - INFO - Starting worker process
+2025-03-14 12:18:18,411 - __main__ - INFO - Starting processing cycle
+2025-03-14 12:18:18,476 - __main__ - ERROR - Error fetching processing-enabled dialogs: (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) <class 'asyncpg.exceptions.UndefinedColumnError'>: column dialogs.unread_count does not exist
+[SQL: SELECT dialogs.id, dialogs.telegram_dialog_id, dialogs.user_id, dialogs.title, dialogs.type, dialogs.unread_count, dialogs.last_message, dialogs.is_processing_enabled, dialogs.auto_send_enabled, dialogs.last_processed_message_id, dialogs.last_processed_at, dialogs.created_at, dialogs.updated_at 
+FROM dialogs 
+WHERE dialogs.is_processing_enabled = true]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+Traceback (most recent call last):
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 514, in _prepare_and_execute
+    prepared_stmt, attributes = await adapt_connection._prepare(
+                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 765, in _prepare
+    prepared_stmt = await self._connection.prepare(
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/asyncpg/connection.py", line 636, in prepare
+    return await self._prepare(
+           ^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/asyncpg/connection.py", line 654, in _prepare
+    stmt = await self._get_statement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/asyncpg/connection.py", line 433, in _get_statement
+    statement = await self._protocol.prepare(
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "asyncpg/protocol/protocol.pyx", line 166, in prepare
+asyncpg.exceptions.UndefinedColumnError: column dialogs.unread_count does not exist
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1960, in _exec_single_context
+    self.dialect.do_execute(
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/engine/default.py", line 924, in do_execute
+    cursor.execute(statement, parameters)
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 572, in execute
+    self._adapt_connection.await_(
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 127, in await_only
+    return current.driver.switch(awaitable)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 192, in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 550, in _prepare_and_execute
+    self._handle_exception(error)
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 501, in _handle_exception
+    self._adapt_connection._handle_exception(error)
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 789, in _handle_exception
+    raise translated_error from error
+sqlalchemy.dialects.postgresql.asyncpg.AsyncAdapt_asyncpg_dbapi.ProgrammingError: <class 'asyncpg.exceptions.UndefinedColumnError'>: column dialogs.unread_count does not exist
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/backend/app/services/worker.py", line 72, in get_processing_enabled_dialogs
+    result = await session.execute(query)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/ext/asyncio/session.py", line 452, in execute
+    result = await greenlet_spawn(
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 197, in greenlet_spawn
+    result = context.throw(*sys.exc_info())
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 2306, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 2191, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/orm/context.py", line 293, in orm_execute_statement
+    result = conn.execute(
+             ^^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1408, in execute
+    return meth(
+           ^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/sql/elements.py", line 513, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1630, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1839, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1979, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 2335, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1960, in _exec_single_context
+    self.dialect.do_execute(
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/engine/default.py", line 924, in do_execute
+    cursor.execute(statement, parameters)
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 572, in execute
+    self._adapt_connection.await_(
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 127, in await_only
+    return current.driver.switch(awaitable)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 192, in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 550, in _prepare_and_execute
+    self._handle_exception(error)
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 501, in _handle_exception
+    self._adapt_connection._handle_exception(error)
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 789, in _handle_exception
+    raise translated_error from error
+sqlalchemy.exc.ProgrammingError: (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) <class 'asyncpg.exceptions.UndefinedColumnError'>: column dialogs.unread_count does not exist
+[SQL: SELECT dialogs.id, dialogs.telegram_dialog_id, dialogs.user_id, dialogs.title, dialogs.type, dialogs.unread_count, dialogs.last_message, dialogs.is_processing_enabled, dialogs.auto_send_enabled, dialogs.last_processed_message_id, dialogs.last_processed_at, dialogs.created_at, dialogs.updated_at 
+FROM dialogs 
+WHERE dialogs.is_processing_enabled = true]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+2025-03-14 12:18:18,487 - __main__ - INFO - Logged dialog count (0) to /Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/backend/logs/dialog_count.log
+2025-03-14 12:18:18,487 - __main__ - INFO - Processing cycle completed in 0.08 seconds
+2025-03-14 12:19:06,446 - __main__ - INFO - Received signal 2, shutting down gracefully...
+2025-03-14 12:19:06,541 - __main__ - INFO - Worker process shutting down
+2025-03-14 12:34:34,150 - __main__ - INFO - Worker initialized with 60s interval
+2025-03-14 12:34:34,150 - __main__ - INFO - Starting worker process
+2025-03-14 12:34:34,150 - __main__ - INFO - Starting processing cycle
+2025-03-14 12:34:34,205 - __main__ - ERROR - Error fetching processing-enabled dialogs: (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) <class 'asyncpg.exceptions.UndefinedColumnError'>: column dialogs.last_processed_at does not exist
+[SQL: SELECT dialogs.id, dialogs.telegram_dialog_id, dialogs.user_id, dialogs.title, dialogs.type, dialogs.unread_count, dialogs.last_message, dialogs.is_processing_enabled, dialogs.auto_send_enabled, dialogs.last_processed_message_id, dialogs.last_processed_at, dialogs.created_at, dialogs.updated_at, dialogs.dialog_metadata 
+FROM dialogs 
+WHERE dialogs.is_processing_enabled = true]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+Traceback (most recent call last):
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 514, in _prepare_and_execute
+    prepared_stmt, attributes = await adapt_connection._prepare(
+                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 765, in _prepare
+    prepared_stmt = await self._connection.prepare(
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/asyncpg/connection.py", line 636, in prepare
+    return await self._prepare(
+           ^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/asyncpg/connection.py", line 654, in _prepare
+    stmt = await self._get_statement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/asyncpg/connection.py", line 433, in _get_statement
+    statement = await self._protocol.prepare(
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "asyncpg/protocol/protocol.pyx", line 166, in prepare
+asyncpg.exceptions.UndefinedColumnError: column dialogs.last_processed_at does not exist
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1960, in _exec_single_context
+    self.dialect.do_execute(
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/engine/default.py", line 924, in do_execute
+    cursor.execute(statement, parameters)
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 572, in execute
+    self._adapt_connection.await_(
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 127, in await_only
+    return current.driver.switch(awaitable)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 192, in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 550, in _prepare_and_execute
+    self._handle_exception(error)
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 501, in _handle_exception
+    self._adapt_connection._handle_exception(error)
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 789, in _handle_exception
+    raise translated_error from error
+sqlalchemy.dialects.postgresql.asyncpg.AsyncAdapt_asyncpg_dbapi.ProgrammingError: <class 'asyncpg.exceptions.UndefinedColumnError'>: column dialogs.last_processed_at does not exist
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/backend/app/services/worker.py", line 72, in get_processing_enabled_dialogs
+    result = await session.execute(query)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/ext/asyncio/session.py", line 452, in execute
+    result = await greenlet_spawn(
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 197, in greenlet_spawn
+    result = context.throw(*sys.exc_info())
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 2306, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 2191, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/orm/context.py", line 293, in orm_execute_statement
+    result = conn.execute(
+             ^^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1408, in execute
+    return meth(
+           ^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/sql/elements.py", line 513, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1630, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1839, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1979, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 2335, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1960, in _exec_single_context
+    self.dialect.do_execute(
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/engine/default.py", line 924, in do_execute
+    cursor.execute(statement, parameters)
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 572, in execute
+    self._adapt_connection.await_(
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 127, in await_only
+    return current.driver.switch(awaitable)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 192, in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 550, in _prepare_and_execute
+    self._handle_exception(error)
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 501, in _handle_exception
+    self._adapt_connection._handle_exception(error)
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 789, in _handle_exception
+    raise translated_error from error
+sqlalchemy.exc.ProgrammingError: (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) <class 'asyncpg.exceptions.UndefinedColumnError'>: column dialogs.last_processed_at does not exist
+[SQL: SELECT dialogs.id, dialogs.telegram_dialog_id, dialogs.user_id, dialogs.title, dialogs.type, dialogs.unread_count, dialogs.last_message, dialogs.is_processing_enabled, dialogs.auto_send_enabled, dialogs.last_processed_message_id, dialogs.last_processed_at, dialogs.created_at, dialogs.updated_at, dialogs.dialog_metadata 
+FROM dialogs 
+WHERE dialogs.is_processing_enabled = true]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+2025-03-14 12:34:34,217 - __main__ - INFO - Logged dialog count (0) to /Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/backend/logs/dialog_count.log
+2025-03-14 12:34:34,217 - __main__ - INFO - Processing cycle completed in 0.07 seconds
+2025-03-14 12:35:25,995 - __main__ - INFO - Received signal 2, shutting down gracefully...
+2025-03-14 12:35:26,281 - __main__ - INFO - Worker process shutting down
+2025-03-14 13:42:15,464 - __main__ - INFO - Worker initialized with 60s interval
+2025-03-14 13:42:15,464 - __main__ - INFO - Starting worker process
+2025-03-14 13:42:15,464 - __main__ - INFO - Starting processing cycle
+2025-03-14 13:42:15,526 - __main__ - ERROR - Error fetching processing-enabled dialogs: (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) <class 'asyncpg.exceptions.UndefinedColumnError'>: column dialogs.last_processed_at does not exist
+[SQL: SELECT dialogs.id, dialogs.telegram_dialog_id, dialogs.user_id, dialogs.title, dialogs.type, dialogs.unread_count, dialogs.last_message, dialogs.is_processing_enabled, dialogs.auto_send_enabled, dialogs.last_processed_message_id, dialogs.last_processed_at, dialogs.created_at, dialogs.updated_at, dialogs.dialog_metadata 
+FROM dialogs 
+WHERE dialogs.is_processing_enabled = true]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+Traceback (most recent call last):
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 514, in _prepare_and_execute
+    prepared_stmt, attributes = await adapt_connection._prepare(
+                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 765, in _prepare
+    prepared_stmt = await self._connection.prepare(
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/asyncpg/connection.py", line 636, in prepare
+    return await self._prepare(
+           ^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/asyncpg/connection.py", line 654, in _prepare
+    stmt = await self._get_statement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/asyncpg/connection.py", line 433, in _get_statement
+    statement = await self._protocol.prepare(
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "asyncpg/protocol/protocol.pyx", line 166, in prepare
+asyncpg.exceptions.UndefinedColumnError: column dialogs.last_processed_at does not exist
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1960, in _exec_single_context
+    self.dialect.do_execute(
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/engine/default.py", line 924, in do_execute
+    cursor.execute(statement, parameters)
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 572, in execute
+    self._adapt_connection.await_(
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 127, in await_only
+    return current.driver.switch(awaitable)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 192, in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 550, in _prepare_and_execute
+    self._handle_exception(error)
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 501, in _handle_exception
+    self._adapt_connection._handle_exception(error)
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 789, in _handle_exception
+    raise translated_error from error
+sqlalchemy.dialects.postgresql.asyncpg.AsyncAdapt_asyncpg_dbapi.ProgrammingError: <class 'asyncpg.exceptions.UndefinedColumnError'>: column dialogs.last_processed_at does not exist
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/backend/app/services/worker.py", line 72, in get_processing_enabled_dialogs
+    result = await session.execute(query)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/ext/asyncio/session.py", line 452, in execute
+    result = await greenlet_spawn(
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 197, in greenlet_spawn
+    result = context.throw(*sys.exc_info())
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 2306, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 2191, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/orm/context.py", line 293, in orm_execute_statement
+    result = conn.execute(
+             ^^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1408, in execute
+    return meth(
+           ^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/sql/elements.py", line 513, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1630, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1839, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1979, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 2335, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1960, in _exec_single_context
+    self.dialect.do_execute(
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/engine/default.py", line 924, in do_execute
+    cursor.execute(statement, parameters)
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 572, in execute
+    self._adapt_connection.await_(
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 127, in await_only
+    return current.driver.switch(awaitable)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 192, in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 550, in _prepare_and_execute
+    self._handle_exception(error)
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 501, in _handle_exception
+    self._adapt_connection._handle_exception(error)
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 789, in _handle_exception
+    raise translated_error from error
+sqlalchemy.exc.ProgrammingError: (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) <class 'asyncpg.exceptions.UndefinedColumnError'>: column dialogs.last_processed_at does not exist
+[SQL: SELECT dialogs.id, dialogs.telegram_dialog_id, dialogs.user_id, dialogs.title, dialogs.type, dialogs.unread_count, dialogs.last_message, dialogs.is_processing_enabled, dialogs.auto_send_enabled, dialogs.last_processed_message_id, dialogs.last_processed_at, dialogs.created_at, dialogs.updated_at, dialogs.dialog_metadata 
+FROM dialogs 
+WHERE dialogs.is_processing_enabled = true]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+2025-03-14 13:42:15,537 - __main__ - INFO - Logged dialog count (0) to /Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/backend/logs/dialog_count.log
+2025-03-14 13:42:15,537 - __main__ - INFO - Processing cycle completed in 0.07 seconds
+2025-03-14 13:42:27,739 - __main__ - INFO - Received signal 2, shutting down gracefully...
+2025-03-14 13:42:28,551 - __main__ - INFO - Worker process shutting down
+2025-03-14 13:46:32,283 - __main__ - INFO - Worker initialized with 60s interval
+2025-03-14 13:46:32,283 - __main__ - INFO - Starting worker process
+2025-03-14 13:46:32,283 - __main__ - INFO - Starting processing cycle
+2025-03-14 13:46:32,347 - __main__ - INFO - Found 5 dialogs with processing enabled
+2025-03-14 13:46:32,348 - __main__ - INFO - Logged dialog count (5) to /Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/backend/logs/dialog_count.log
+2025-03-14 13:46:32,348 - __main__ - INFO - Dialog 1: ID=c433cf15-e15b-4cca-adc3-eb6ec4a3ba6a, Title=Telegram, Type=DialogType.PRIVATE, Unread=0, Last processed: None, Metadata: {}
+2025-03-14 13:46:32,348 - __main__ - INFO - Dialog 2: ID=20f75da2-43ba-492e-83fb-d2caf3c825e6, Title=userinfobot, Type=DialogType.PRIVATE, Unread=0, Last processed: None, Metadata: {}
+2025-03-14 13:46:32,348 - __main__ - INFO - Dialog 3: ID=f12544a4-d144-4542-97f3-6d011ee67245, Title=Wallet, Type=DialogType.PRIVATE, Unread=0, Last processed: None, Metadata: {}
+2025-03-14 13:46:32,348 - __main__ - INFO - Dialog 4: ID=b915c8d6-f899-4f19-8efc-2158b03528b0, Title=PTAL x AdsGram, Type=DialogType.GROUP, Unread=0, Last processed: None, Metadata: {}
+2025-03-14 13:46:32,348 - __main__ - INFO - Dialog 5: ID=ebb6cd7c-0fe4-4e12-b838-5356e2eefe87, Title=Jc Jawe.eth, Type=DialogType.PRIVATE, Unread=0, Last processed: None, Metadata: {}
+2025-03-14 13:46:32,348 - __main__ - INFO - Processing cycle completed in 0.06 seconds
+2025-03-14 13:47:32,416 - __main__ - INFO - Starting processing cycle
+2025-03-14 13:47:32,427 - __main__ - INFO - Found 5 dialogs with processing enabled
+2025-03-14 13:47:32,429 - __main__ - INFO - Logged dialog count (5) to /Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/backend/logs/dialog_count.log
+2025-03-14 13:47:32,430 - __main__ - INFO - Dialog 1: ID=c433cf15-e15b-4cca-adc3-eb6ec4a3ba6a, Title=Telegram, Type=DialogType.PRIVATE, Unread=0, Last processed: None, Metadata: {}
+2025-03-14 13:47:32,430 - __main__ - INFO - Dialog 2: ID=20f75da2-43ba-492e-83fb-d2caf3c825e6, Title=userinfobot, Type=DialogType.PRIVATE, Unread=0, Last processed: None, Metadata: {}
+2025-03-14 13:47:32,430 - __main__ - INFO - Dialog 3: ID=f12544a4-d144-4542-97f3-6d011ee67245, Title=Wallet, Type=DialogType.PRIVATE, Unread=0, Last processed: None, Metadata: {}
+2025-03-14 13:47:32,430 - __main__ - INFO - Dialog 4: ID=b915c8d6-f899-4f19-8efc-2158b03528b0, Title=PTAL x AdsGram, Type=DialogType.GROUP, Unread=0, Last processed: None, Metadata: {}
+2025-03-14 13:47:32,430 - __main__ - INFO - Dialog 5: ID=ebb6cd7c-0fe4-4e12-b838-5356e2eefe87, Title=Jc Jawe.eth, Type=DialogType.PRIVATE, Unread=0, Last processed: None, Metadata: {}
+2025-03-14 13:47:32,430 - __main__ - INFO - Processing cycle completed in 0.01 seconds

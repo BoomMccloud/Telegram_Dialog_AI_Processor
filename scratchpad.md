@@ -26,4 +26,4 @@ Progress:
   - Test1 User1 (@test_user_1, Telegram ID: 281485138)
   - Test2 User2 (@test_user_2, Telegram ID: 229338707)
 
-tree -L 3 -I 'sessions'
+tree -L 3 -I 'sessions|tests|scripts|__*'
