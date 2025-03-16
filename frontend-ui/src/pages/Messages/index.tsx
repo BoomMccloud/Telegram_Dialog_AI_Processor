@@ -26,6 +26,8 @@ import {
   Tooltip,
   CircularProgress,
   Alert,
+  Tabs,
+  Tab,
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
@@ -33,19 +35,55 @@ import EditIcon from '@mui/icons-material/Edit';
 import SendIcon from '@mui/icons-material/Send';
 import SearchIcon from '@mui/icons-material/Search';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import HistoryIcon from '@mui/icons-material/History';
+import PendingIcon from '@mui/icons-material/Pending';
 import AuthRequiredDialog from '../../components/Auth/AuthRequiredDialog';
 import { api } from '../../services/api';
 import { Response, ResponseStatus } from '../../types';
 
+// Tab interface
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
+
+// Tab Panel component
+function TabPanel(props: TabPanelProps) {
+  const { children, value, index, ...other } = props;
+
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`messages-tabpanel-${index}`}
+      aria-labelledby={`messages-tab-${index}`}
+      {...other}
+    >
+      {value === index && (
+        <Box sx={{ pt: 3 }}>
+          {children}
+        </Box>
+      )}
+    </div>
+  );
+}
+
 const Messages = () => {
+  // Tab state
+  const [tabValue, setTabValue] = useState(0);
+  
   // State for messages
-  const [messages, setMessages] = useState<Response[]>([]);
+  const [pendingMessages, setPendingMessages] = useState<Response[]>([]);
+  const [historyMessages, setHistoryMessages] = useState<Response[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [totalMessages, setTotalMessages] = useState(0);
+  const [totalPendingMessages, setTotalPendingMessages] = useState(0);
+  const [totalHistoryMessages, setTotalHistoryMessages] = useState(0);
   
   // Pagination state
-  const [page, setPage] = useState(0);
+  const [pendingPage, setPendingPage] = useState(0);
+  const [historyPage, setHistoryPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   
   // Edit dialog state
@@ -60,33 +98,33 @@ const Messages = () => {
   // Auth required dialog
   const [showAuthDialog, setShowAuthDialog] = useState(false);
 
+  // Handle tab change
+  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
+    setTabValue(newValue);
+    // Reset search when switching tabs
+    setSearchQuery('');
+  };
+
   // Fetch messages on component mount and when filters change
   useEffect(() => {
-    fetchMessages();
-  }, [page, rowsPerPage, statusFilter]);
+    if (tabValue === 0) {
+      fetchPendingMessages();
+    } else {
+      fetchHistoryMessages();
+    }
+  }, [tabValue, pendingPage, historyPage, rowsPerPage, statusFilter]);
 
-  // Function to fetch messages from API
-  const fetchMessages = async () => {
+  // Function to fetch pending messages from API
+  const fetchPendingMessages = async () => {
     setLoading(true);
     setError(null);
     
     try {
-      let response;
-      
-      if (statusFilter === 'pending_approval') {
-        response = await api.responses.getPending(page * rowsPerPage, rowsPerPage);
-      } else {
-        response = await api.responses.getHistory(
-          page * rowsPerPage, 
-          rowsPerPage, 
-          statusFilter !== 'all' ? statusFilter : undefined
-        );
-      }
-      
-      setMessages(response.responses);
-      setTotalMessages(response.total);
+      const response = await api.responses.getPending(pendingPage * rowsPerPage, rowsPerPage);
+      setPendingMessages(response.responses);
+      setTotalPendingMessages(response.total);
     } catch (err: unknown) {
-      console.error('Error fetching messages:', err);
+      console.error('Error fetching pending messages:', err);
       
       // Check for authentication error
       if (err instanceof Error && err.message === 'AUTH_REQUIRED') {
@@ -95,25 +133,74 @@ const Messages = () => {
                 (err.response as { status?: number })?.status === 401) {
         setShowAuthDialog(true);
       } else {
-        setError('Failed to load messages. Please try again later.');
+        setError('Failed to load pending messages. Please try again later.');
       }
       
-      setMessages([]);
-      setTotalMessages(0);
+      setPendingMessages([]);
+      setTotalPendingMessages(0);
     } finally {
       setLoading(false);
     }
   };
 
-  // Handle page change
-  const handleChangePage = (_event: unknown, newPage: number) => {
-    setPage(newPage);
+  // Function to fetch history messages from API
+  const fetchHistoryMessages = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const response = await api.responses.getHistory(
+        historyPage * rowsPerPage, 
+        rowsPerPage, 
+        statusFilter !== 'all' ? statusFilter : undefined
+      );
+      
+      setHistoryMessages(response.responses);
+      setTotalHistoryMessages(response.total);
+    } catch (err: unknown) {
+      console.error('Error fetching history messages:', err);
+      
+      // Check for authentication error
+      if (err instanceof Error && err.message === 'AUTH_REQUIRED') {
+        setShowAuthDialog(true);
+      } else if (typeof err === 'object' && err !== null && 'response' in err && 
+                (err.response as { status?: number })?.status === 401) {
+        setShowAuthDialog(true);
+      } else {
+        setError('Failed to load message history. Please try again later.');
+      }
+      
+      setHistoryMessages([]);
+      setTotalHistoryMessages(0);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Refresh current view
+  const refreshCurrentView = () => {
+    if (tabValue === 0) {
+      fetchPendingMessages();
+    } else {
+      fetchHistoryMessages();
+    }
+  };
+
+  // Handle page change for pending messages
+  const handlePendingPageChange = (_event: unknown, newPage: number) => {
+    setPendingPage(newPage);
+  };
+
+  // Handle page change for history messages
+  const handleHistoryPageChange = (_event: unknown, newPage: number) => {
+    setHistoryPage(newPage);
   };
 
   // Handle rows per page change
   const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
     setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
+    setPendingPage(0);
+    setHistoryPage(0);
   };
 
   // Open edit dialog
@@ -136,7 +223,7 @@ const Messages = () => {
     
     try {
       await api.responses.update(selectedMessage.id, { edited_response: editedText });
-      fetchMessages(); // Refresh messages after update
+      refreshCurrentView(); // Refresh messages after update
       handleCloseEditDialog();
     } catch (err) {
       console.error('Error updating response:', err);
@@ -148,7 +235,7 @@ const Messages = () => {
   const handleApprove = async (id: string) => {
     try {
       await api.responses.approve(id);
-      fetchMessages(); // Refresh messages after approval
+      refreshCurrentView(); // Refresh messages after approval
     } catch (err) {
       console.error('Error approving response:', err);
       setError('Failed to approve response. Please try again.');
@@ -159,7 +246,7 @@ const Messages = () => {
   const handleReject = async (id: string) => {
     try {
       await api.responses.reject(id);
-      fetchMessages(); // Refresh messages after rejection
+      refreshCurrentView(); // Refresh messages after rejection
     } catch (err) {
       console.error('Error rejecting response:', err);
       setError('Failed to reject response. Please try again.');
@@ -170,7 +257,7 @@ const Messages = () => {
   const handleSend = async (id: string) => {
     try {
       await api.responses.send(id);
-      fetchMessages(); // Refresh messages after sending
+      refreshCurrentView(); // Refresh messages after sending
     } catch (err) {
       console.error('Error sending response:', err);
       setError('Failed to send response. Please try again.');
@@ -178,7 +265,13 @@ const Messages = () => {
   };
 
   // Filter messages by search query
-  const filteredMessages = messages.filter(message => 
+  const filteredPendingMessages = pendingMessages.filter(message => 
+    message.dialog_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    message.suggested_response.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (message.edited_response && message.edited_response.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
+
+  const filteredHistoryMessages = historyMessages.filter(message => 
     message.dialog_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     message.suggested_response.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (message.edited_response && message.edited_response.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -202,6 +295,97 @@ const Messages = () => {
     }
   };
 
+  // Render message table
+  const renderMessageTable = (messages: Response[], isPending: boolean) => (
+    <TableContainer component={Paper} sx={{ mt: 2 }}>
+      <Table size="medium">
+        <TableHead>
+          <TableRow>
+            <TableCell>Dialog</TableCell>
+            <TableCell>Suggested Response</TableCell>
+            {!isPending && <TableCell>Status</TableCell>}
+            <TableCell>Actions</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {messages.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={isPending ? 3 : 4} align="center">
+                {loading ? (
+                  <CircularProgress size={24} />
+                ) : (
+                  <Typography variant="body2" color="textSecondary">
+                    {isPending 
+                      ? "No pending responses found. All caught up!" 
+                      : "No response history found."}
+                  </Typography>
+                )}
+              </TableCell>
+            </TableRow>
+          ) : (
+            messages.map((message) => (
+              <TableRow key={message.id}>
+                <TableCell>{message.dialog_name}</TableCell>
+                <TableCell>
+                  <Typography variant="body2" sx={{ maxWidth: 300, whiteSpace: 'pre-wrap' }}>
+                    {message.edited_response || message.suggested_response}
+                  </Typography>
+                </TableCell>
+                {!isPending && <TableCell>{getStatusChip(message.status)}</TableCell>}
+                <TableCell>
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    {isPending && (
+                      <>
+                        <Tooltip title="Approve">
+                          <IconButton 
+                            size="small" 
+                            color="success" 
+                            onClick={() => handleApprove(message.id)}
+                          >
+                            <CheckCircleIcon />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Reject">
+                          <IconButton 
+                            size="small" 
+                            color="error" 
+                            onClick={() => handleReject(message.id)}
+                          >
+                            <CancelIcon />
+                          </IconButton>
+                        </Tooltip>
+                      </>
+                    )}
+                    <Tooltip title="Edit">
+                      <IconButton 
+                        size="small" 
+                        color="primary" 
+                        onClick={() => handleOpenEditDialog(message)}
+                      >
+                        <EditIcon />
+                      </IconButton>
+                    </Tooltip>
+                    {message.status === ResponseStatus.APPROVED && (
+                      <Tooltip title="Send">
+                        <IconButton 
+                          size="small" 
+                          color="primary" 
+                          onClick={() => handleSend(message.id)}
+                        >
+                          <SendIcon />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                  </Box>
+                </TableCell>
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
+    </TableContainer>
+  );
+
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h4" gutterBottom>
@@ -214,236 +398,148 @@ const Messages = () => {
         </Alert>
       )}
       
-      {/* Filters */}
-      <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
-        <TextField
-          label="Search"
-          placeholder="Search by dialog or content"
-          variant="outlined"
-          size="small"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          sx={{ minWidth: 200 }}
-          InputProps={{
-            endAdornment: <SearchIcon color="action" />,
-          }}
-        />
-        
-        <FormControl size="small" sx={{ minWidth: 150 }}>
-          <InputLabel id="status-filter-label">Status</InputLabel>
-          <Select
-            labelId="status-filter-label"
-            value={statusFilter}
-            label="Status"
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            <MenuItem value="all">All</MenuItem>
-            <MenuItem value="pending_approval">Pending</MenuItem>
-            <MenuItem value="approved">Approved</MenuItem>
-            <MenuItem value="rejected">Rejected</MenuItem>
-            <MenuItem value="sent">Sent</MenuItem>
-            <MenuItem value="failed">Failed</MenuItem>
-          </Select>
-        </FormControl>
-        
-        <Button
-          variant="outlined"
-          startIcon={<RefreshIcon />}
-          onClick={fetchMessages}
-          disabled={loading}
+      {/* Tabs */}
+      <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+        <Tabs 
+          value={tabValue} 
+          onChange={handleTabChange} 
+          aria-label="message response tabs"
         >
-          Refresh
-        </Button>
+          <Tab 
+            icon={<PendingIcon />} 
+            iconPosition="start" 
+            label="Pending Responses" 
+            id="messages-tab-0" 
+            aria-controls="messages-tabpanel-0" 
+          />
+          <Tab 
+            icon={<HistoryIcon />} 
+            iconPosition="start" 
+            label="Response History" 
+            id="messages-tab-1" 
+            aria-controls="messages-tabpanel-1" 
+          />
+        </Tabs>
       </Box>
       
-      {/* Loading indicator */}
-      {loading ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
-          <CircularProgress />
-        </Box>
-      ) : messages.length === 0 ? (
-        <Alert severity="info">
-          No messages found. {statusFilter !== 'all' ? 'Try changing the status filter.' : ''}
-        </Alert>
-      ) : (
-        <>
-          {/* Messages Table */}
-          <TableContainer component={Paper}>
-            <Table sx={{ minWidth: 650 }} aria-label="messages table">
-              <TableHead>
-                <TableRow>
-                  <TableCell>Dialog</TableCell>
-                  <TableCell>Response</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell>Timestamp</TableCell>
-                  <TableCell align="right">Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {filteredMessages.map((message) => (
-                  <TableRow key={message.id}>
-                    <TableCell component="th" scope="row">
-                      {message.dialog_name}
-                    </TableCell>
-                    <TableCell>
-                      {message.edited_response && message.status !== ResponseStatus.PENDING_APPROVAL
-                        ? message.edited_response
-                        : message.suggested_response}
-                    </TableCell>
-                    <TableCell>{getStatusChip(message.status)}</TableCell>
-                    <TableCell>
-                      {new Date(message.processed_at).toLocaleString()}
-                    </TableCell>
-                    <TableCell align="right">
-                      <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-                        {message.status === ResponseStatus.PENDING_APPROVAL && (
-                          <>
-                            <Tooltip title="Approve">
-                              <IconButton 
-                                color="success" 
-                                size="small"
-                                onClick={() => handleApprove(message.id)}
-                              >
-                                <CheckCircleIcon />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Edit">
-                              <IconButton 
-                                color="primary" 
-                                size="small"
-                                onClick={() => handleOpenEditDialog(message)}
-                              >
-                                <EditIcon />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Reject">
-                              <IconButton 
-                                color="error" 
-                                size="small"
-                                onClick={() => handleReject(message.id)}
-                              >
-                                <CancelIcon />
-                              </IconButton>
-                            </Tooltip>
-                          </>
-                        )}
-                        
-                        {message.status === ResponseStatus.APPROVED && (
-                          <>
-                            <Tooltip title="Edit">
-                              <IconButton 
-                                color="primary" 
-                                size="small"
-                                onClick={() => handleOpenEditDialog(message)}
-                              >
-                                <EditIcon />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Send">
-                              <IconButton 
-                                color="info" 
-                                size="small"
-                                onClick={() => handleSend(message.id)}
-                              >
-                                <SendIcon />
-                              </IconButton>
-                            </Tooltip>
-                          </>
-                        )}
-                        
-                        {(message.status === ResponseStatus.SENT || 
-                          message.status === ResponseStatus.REJECTED || 
-                          message.status === ResponseStatus.FAILED) && (
-                          <>
-                            <Tooltip title="View">
-                              <IconButton 
-                                color="primary" 
-                                size="small"
-                                onClick={() => handleOpenEditDialog(message)}
-                              >
-                                <EditIcon />
-                              </IconButton>
-                            </Tooltip>
-                          </>
-                        )}
-                      </Box>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-          
-          <TablePagination
-            rowsPerPageOptions={[5, 10, 25]}
-            component="div"
-            count={totalMessages}
-            rowsPerPage={rowsPerPage}
-            page={page}
-            onPageChange={handleChangePage}
-            onRowsPerPageChange={handleChangeRowsPerPage}
+      {/* Pending Responses Tab */}
+      <TabPanel value={tabValue} index={0}>
+        <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+          <TextField
+            label="Search"
+            placeholder="Search by dialog or content"
+            variant="outlined"
+            size="small"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            sx={{ minWidth: 200 }}
+            InputProps={{
+              endAdornment: <SearchIcon color="action" />,
+            }}
           />
-        </>
-      )}
+          
+          <Button
+            variant="outlined"
+            startIcon={<RefreshIcon />}
+            onClick={fetchPendingMessages}
+          >
+            Refresh
+          </Button>
+        </Box>
+        
+        {renderMessageTable(filteredPendingMessages, true)}
+        
+        <TablePagination
+          component="div"
+          count={totalPendingMessages}
+          page={pendingPage}
+          onPageChange={handlePendingPageChange}
+          rowsPerPage={rowsPerPage}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+          rowsPerPageOptions={[5, 10, 25, 50]}
+        />
+      </TabPanel>
+      
+      {/* Response History Tab */}
+      <TabPanel value={tabValue} index={1}>
+        <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+          <TextField
+            label="Search"
+            placeholder="Search by dialog or content"
+            variant="outlined"
+            size="small"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            sx={{ minWidth: 200 }}
+            InputProps={{
+              endAdornment: <SearchIcon color="action" />,
+            }}
+          />
+          
+          <FormControl size="small" sx={{ minWidth: 150 }}>
+            <InputLabel id="status-filter-label">Status</InputLabel>
+            <Select
+              labelId="status-filter-label"
+              value={statusFilter}
+              label="Status"
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <MenuItem value="all">All</MenuItem>
+              <MenuItem value={ResponseStatus.APPROVED}>Approved</MenuItem>
+              <MenuItem value={ResponseStatus.REJECTED}>Rejected</MenuItem>
+              <MenuItem value={ResponseStatus.SENT}>Sent</MenuItem>
+              <MenuItem value={ResponseStatus.FAILED}>Failed</MenuItem>
+            </Select>
+          </FormControl>
+          
+          <Button
+            variant="outlined"
+            startIcon={<RefreshIcon />}
+            onClick={fetchHistoryMessages}
+          >
+            Refresh
+          </Button>
+        </Box>
+        
+        {renderMessageTable(filteredHistoryMessages, false)}
+        
+        <TablePagination
+          component="div"
+          count={totalHistoryMessages}
+          page={historyPage}
+          onPageChange={handleHistoryPageChange}
+          rowsPerPage={rowsPerPage}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+          rowsPerPageOptions={[5, 10, 25, 50]}
+        />
+      </TabPanel>
       
       {/* Edit Dialog */}
-      <Dialog 
-        open={openEditDialog} 
-        onClose={handleCloseEditDialog}
-        fullWidth
-        maxWidth="md"
-      >
-        <DialogTitle>
-          {selectedMessage?.status === ResponseStatus.PENDING_APPROVAL ? 'Edit Response' : 'View Response'}
-        </DialogTitle>
+      <Dialog open={openEditDialog} onClose={handleCloseEditDialog} maxWidth="md" fullWidth>
+        <DialogTitle>Edit Response</DialogTitle>
         <DialogContent>
-          <DialogContentText sx={{ mb: 2 }}>
-            Dialog with: {selectedMessage?.dialog_name}
+          <DialogContentText>
+            Edit the suggested response below:
           </DialogContentText>
-          
-          <Typography variant="subtitle2" gutterBottom>
-            AI Suggested Response:
-          </Typography>
-          <Paper 
-            variant="outlined" 
-            sx={{ p: 2, mb: 3, bgcolor: 'background.default' }}
-          >
-            <Typography>{selectedMessage?.suggested_response}</Typography>
-          </Paper>
-          
-          <Typography variant="subtitle2" gutterBottom>
-            {selectedMessage?.status === ResponseStatus.PENDING_APPROVAL || selectedMessage?.status === ResponseStatus.APPROVED
-              ? 'Your Edited Response:'
-              : 'Response:'}
-          </Typography>
-          
-          {(selectedMessage?.status === ResponseStatus.PENDING_APPROVAL || selectedMessage?.status === ResponseStatus.APPROVED) ? (
-            <TextField
-              fullWidth
-              multiline
-              rows={4}
-              value={editedText}
-              onChange={(e) => setEditedText(e.target.value)}
-              variant="outlined"
-            />
-          ) : (
-            <Paper 
-              variant="outlined" 
-              sx={{ p: 2, bgcolor: 'background.default' }}
-            >
-              <Typography>
-                {selectedMessage?.edited_response || selectedMessage?.suggested_response}
-              </Typography>
-            </Paper>
-          )}
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Response"
+            fullWidth
+            multiline
+            rows={6}
+            value={editedText}
+            onChange={(e) => setEditedText(e.target.value)}
+            variant="outlined"
+          />
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseEditDialog}>Cancel</Button>
-          {(selectedMessage?.status === ResponseStatus.PENDING_APPROVAL || selectedMessage?.status === ResponseStatus.APPROVED) && (
-            <Button onClick={handleSaveEdit} variant="contained" color="primary">
-              Save
-            </Button>
-          )}
+          <Button onClick={handleCloseEditDialog} color="primary">
+            Cancel
+          </Button>
+          <Button onClick={handleSaveEdit} color="primary" variant="contained">
+            Save
+          </Button>
         </DialogActions>
       </Dialog>
       
