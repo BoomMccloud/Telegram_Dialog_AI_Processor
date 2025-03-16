@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, security
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any
 from pydantic import BaseModel
 from datetime import datetime
+from fastapi import Query
 
 from app.db.models.schemas import MessageResponse, DialogListResponse
-from app.db.models.message import Message
+from app.db.models.message import Message as DBMessage
 from app.middleware.session import verify_session_dependency, SessionData
 from app.services.telegram import get_dialogs, get_recent_messages, send_message
 from app.core.exceptions import ValidationError, TelegramError, DatabaseError
@@ -15,19 +16,20 @@ logger = get_logger(__name__)
 # Define MessageSend model since it's not in schemas.py
 class MessageSend(BaseModel):
     """Schema for sending a message"""
-    dialog_id: str
+    dialog_id: int
     text: str
 
-# Define Message model for API responses
-class Message(BaseModel):
-    """Schema for message data"""
-    id: Optional[str] = None
+# Define TelegramMessage model for API responses that matches the structure returned by the Telegram service
+class TelegramMessage(BaseModel):
+    """Schema for Telegram message data"""
+    message_id: int
     text: str
-    sender_id: str
-    sender_name: str
-    date: datetime
+    sender: Dict[str, Any]
+    date: str
     is_outgoing: bool = False
-    dialog_id: Optional[str] = None
+    is_unread: bool = False
+    dialog_id: int
+    dialog_name: Optional[str] = None
 
 # Define custom models for Telegram dialogs that match the actual returned format
 class TelegramDialog(BaseModel):
@@ -81,10 +83,10 @@ async def list_dialogs(
         raise TelegramError("Failed to fetch dialogs", details={"error": str(e)})
 
 @router.get(
-    "/messages", 
-    response_model=List[Message],
-    summary="Get recent messages",
-    description="Get recent messages from all dialogs. Requires authentication.",
+    "/messages/dialog/{dialog_id}", 
+    response_model=List[TelegramMessage],
+    summary="Get messages from a specific dialog",
+    description="Get messages from a specific dialog with pagination. Requires authentication.",
     responses={
         401: {"description": "Invalid or expired session"},
         403: {"description": "Not authenticated"}
@@ -93,30 +95,43 @@ async def list_dialogs(
         "security": [{"BearerAuth": []}]
     }
 )
-async def list_messages(
-    limit: int = 20,
+async def list_dialog_messages(
+    dialog_id: int,
+    limit: int = Query(25, description="Number of messages to return", enum=[25, 50, 75]),
     session: SessionData = Depends(verify_session_dependency)
-) -> List[Message]:
+) -> List[TelegramMessage]:
     """
-    Get recent messages from all dialogs
+    Get messages from a specific dialog
     
     Args:
-        limit: Maximum number of messages to return (default: 20)
+        dialog_id: ID of the dialog to fetch messages from
+        limit: Maximum number of messages to return (default: 25, allowed values: 25, 50, 75)
         
     Returns:
-        List of recent messages
+        List of messages from the specified dialog
         
     Note:
         Requires authentication via Bearer token in Authorization header
     """
     try:
-        messages = await get_recent_messages(session.token, limit)
-        return messages
+        # Pass dialog_id as an integer to get_recent_messages
+        messages = await get_recent_messages(session.token, limit, dialog_id)
+        
+        # Validate the messages against the TelegramMessage model
+        validated_messages = []
+        for msg in messages:
+            try:
+                validated_msg = TelegramMessage(**msg)
+                validated_messages.append(validated_msg)
+            except Exception as e:
+                logger.warning(f"Failed to validate message: {str(e)}, message: {msg}")
+                
+        return validated_messages
     except ValueError as e:
         raise ValidationError(str(e))
     except Exception as e:
-        logger.error(f"Failed to list messages: {str(e)}", exc_info=True)
-        raise TelegramError("Failed to fetch messages", details={"error": str(e)})
+        logger.error(f"Failed to list messages for dialog {dialog_id}: {str(e)}", exc_info=True)
+        raise TelegramError(f"Failed to fetch messages for dialog {dialog_id}", details={"error": str(e)})
 
 @router.post(
     "/messages/send", 
@@ -148,7 +163,9 @@ async def create_message(
         Requires authentication via Bearer token in Authorization header
     """
     try:
-        result = await send_message(session.token, message.dialog_id, message.text)
+        # Ensure dialog_id is an integer
+        dialog_id = message.dialog_id
+        result = await send_message(session.token, dialog_id, message.text)
         return MessageResponse(**result)
     except ValueError as e:
         raise ValidationError(str(e))
