@@ -160,6 +160,107 @@
     </ImplementationGuidance>
 
     <!-- ========================================================= -->
+    <!-- TEMPORARY MESSAGE STORAGE                                -->
+    <!-- ========================================================= -->
+    <TemporaryMessageStorage>
+        <Overview>
+            For temporarily storing messages during processing, we'll use a file-based approach that organizes
+            messages by user, dialog, and processing run. This approach provides robustness, clear organization,
+            and easy cleanup while avoiding database overhead for temporary data.
+        </Overview>
+        
+        <FileStructure>
+            <Structure>
+                <![CDATA[
+                /tmp/telegram_processor/
+                  ├── {user_id}/
+                  │   ├── {dialog_id}/
+                  │   │   ├── processing_{timestamp}/
+                  │   │   │   ├── metadata.json       # Processing run metadata
+                  │   │   │   └── messages.json       # All messages from this fetch
+                  │   │   ├── processing_{timestamp2}/
+                  │   │   │   ├── metadata.json
+                  │   │   │   └── messages.json
+                  │   │   └── latest -> processing_{timestamp2}  # Symlink to latest run
+                ]]>
+            </Structure>
+        </FileStructure>
+        
+        <Components>
+            <Component name="Message Model">
+                <Description>
+                    Enhanced Pydantic model for message data with serialization support:
+                    - JSON serialization/deserialization capabilities
+                    - Datetime validation for proper handling in JSON
+                    - Unique ID generation for each message
+                </Description>
+            </Component>
+            
+            <Component name="ProcessingRunMetadata">
+                <Description>
+                    Metadata model for tracking processing runs:
+                    - Run ID and timestamp
+                    - User and dialog identifiers
+                    - Message count
+                    - Processing status (in_progress, completed, failed)
+                    - Error information if applicable
+                </Description>
+            </Component>
+            
+            <Component name="MessageFileStorage">
+                <Description>
+                    Utility class for managing message files:
+                    - Creating and organizing directory structure
+                    - Saving and loading messages
+                    - Tracking processing run status
+                    - Managing "latest" symlinks for easy access
+                    - Cleaning up old processing runs
+                </Description>
+            </Component>
+        </Components>
+        
+        <Benefits>
+            <Benefit name="Clear Organization">
+                Hierarchical structure makes it easy to find files and understand the processing history.
+            </Benefit>
+            
+            <Benefit name="Atomic Operations">
+                Complete files are written at once, reducing the risk of data corruption.
+            </Benefit>
+            
+            <Benefit name="Recovery">
+                If a process crashes, incomplete runs can be detected by checking the status in metadata.
+            </Benefit>
+            
+            <Benefit name="Latest Access">
+                Symlinks provide easy access to the most recent data without needing to sort by timestamp.
+            </Benefit>
+            
+            <Benefit name="Cleanup">
+                Old processing runs can be easily identified and removed based on age or status.
+            </Benefit>
+        </Benefits>
+        
+        <Implementation>
+            <Step>
+                Create enhanced Message Pydantic model with serialization support
+            </Step>
+            <Step>
+                Implement ProcessingRunMetadata model for tracking run status
+            </Step>
+            <Step>
+                Develop MessageFileStorage utility for file management
+            </Step>
+            <Step>
+                Integrate with DialogProcessor to save fetched messages
+            </Step>
+            <Step>
+                Add cleanup mechanism to remove old processing runs
+            </Step>
+        </Implementation>
+    </TemporaryMessageStorage>
+
+    <!-- ========================================================= -->
     <!-- INTEGRATION WITH EXISTING DATABASE                        -->
     <!-- ========================================================= -->
     <DatabaseIntegration>

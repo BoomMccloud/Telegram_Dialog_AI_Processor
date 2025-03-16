@@ -21,6 +21,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.database import async_session
 from app.db.models.dialog import Dialog
+from app.db.models.user import User
+from app.db.models.session import Session
+from app.services.dialog_processor import DialogProcessor
 from app.utils.logging import get_logger
 
 # Configure main logger
@@ -85,48 +88,64 @@ class DialogWorker:
                 logger.error(f"Error fetching processing-enabled dialogs: {str(e)}", exc_info=True)
                 return []
     
-    async def log_dialog_count(self):
+    async def process_dialogs(self, dialogs: list):
         """
-        Log the count of processing-enabled dialogs to a file
+        Process a list of dialogs
+        
+        Args:
+            dialogs: List of dialogs to process
         """
-        try:
-            # Get current timestamp
-            timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            
-            # Get dialog count
-            dialogs = await self.get_processing_enabled_dialogs()
-            dialog_count = len(dialogs)
-            
-            # Format message
-            message = f"{timestamp} - Found {dialog_count} dialogs with processing enabled\n"
-            
-            # Log to file
-            count_log_path = log_dir / "dialog_count.log"
-            with open(count_log_path, "a") as f:
-                f.write(message)
+        async with async_session() as session:
+            try:
+                # Create dialog processor
+                processor = DialogProcessor(session)
                 
-            logger.info(f"Logged dialog count ({dialog_count}) to {count_log_path}")
-            
-            # Also log some details about the dialogs
-            if dialog_count > 0:
-                for i, dialog in enumerate(dialogs[:5]):  # Limit to first 5 for brevity
-                    # Use dialog_metadata property if available, otherwise display empty dict
-                    metadata_str = getattr(dialog, 'dialog_metadata', {}) or {}
-                    
-                    # Log info about unread_count and last_message
-                    unread_count = getattr(dialog, 'unread_count', 0) or 0
-                    last_message_info = "No messages" if not getattr(dialog, 'last_message', None) else "Has last message"
-                    
-                    logger.info(f"Dialog {i+1}: ID={dialog.id}, Title={dialog.title}, "
-                               f"Type={dialog.type}, Unread={unread_count}, "
-                               f"Last processed: {dialog.last_processed_at}, "
-                               f"Metadata: {metadata_str}")
+                # Group dialogs by user to process them efficiently
+                dialogs_by_user = {}
+                for dialog in dialogs:
+                    if dialog.user_id not in dialogs_by_user:
+                        dialogs_by_user[dialog.user_id] = []
+                    dialogs_by_user[dialog.user_id].append(dialog)
                 
-                if dialog_count > 5:
-                    logger.info(f"... and {dialog_count - 5} more dialogs")
+                # Process dialogs for each user
+                total_success_count = 0
+                for user_id, user_dialogs in dialogs_by_user.items():
+                    # Get user
+                    user_query = select(User).where(User.id == user_id)
+                    user_result = await session.execute(user_query)
+                    user = user_result.scalar_one_or_none()
                     
-        except Exception as e:
-            logger.error(f"Error logging dialog count: {str(e)}", exc_info=True)
+                    if not user:
+                        logger.error(f"User not found for ID {user_id}")
+                        continue
+                    
+                    # Get user's active session token
+                    session_query = select(Session).where(
+                        Session.user_id == user_id
+                    ).order_by(Session.last_activity.desc())
+                    session_result = await session.execute(session_query)
+                    user_session = session_result.scalar_one_or_none()
+                    
+                    if not user_session or not user_session.token:
+                        logger.error(f"No valid session token found for user {user_id}")
+                        continue
+                        
+                    # Process dialogs for this user
+                    results = await processor.process_dialogs(user_dialogs, user_session.token)
+                    
+                    # Log results
+                    success_count = sum(1 for success in results.values() if success)
+                    total_success_count += success_count
+                    logger.info(
+                        f"Processed {success_count}/{len(results)} dialogs successfully "
+                        f"for user {user_id}"
+                    )
+                
+                return total_success_count
+                    
+            except Exception as e:
+                logger.error(f"Error processing dialogs: {str(e)}", exc_info=True)
+                return 0
     
     async def run_once(self):
         """
@@ -142,10 +161,15 @@ class DialogWorker:
                 logger.info("Starting processing cycle")
                 self.last_run_time = datetime.datetime.now()
                 
-                # Perform the main worker tasks
-                await self.log_dialog_count()
+                # Get dialogs to process
+                dialogs = await self.get_processing_enabled_dialogs()
                 
-                # Later phases will add more processing logic here
+                if dialogs:
+                    # Process the dialogs
+                    success_count = await self.process_dialogs(dialogs)
+                    logger.info(f"Processed {success_count} dialogs successfully")
+                else:
+                    logger.info("No dialogs to process")
                 
                 cycle_time = (datetime.datetime.now() - self.last_run_time).total_seconds()
                 logger.info(f"Processing cycle completed in {cycle_time:.2f} seconds")
@@ -189,7 +213,7 @@ async def main():
     signal.signal(signal.SIGTERM, handle_signal)
     
     # Create and run worker
-    worker = DialogWorker(interval_seconds=60)  # Run every minute for testing
+    worker = DialogWorker(interval_seconds=600)  # Run every 10 minutes
     await worker.run_forever()
 
 if __name__ == "__main__":
