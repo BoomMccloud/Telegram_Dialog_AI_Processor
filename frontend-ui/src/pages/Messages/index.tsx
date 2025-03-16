@@ -36,10 +36,9 @@ import CancelIcon from '@mui/icons-material/Cancel';
 import EditIcon from '@mui/icons-material/Edit';
 import SendIcon from '@mui/icons-material/Send';
 import SearchIcon from '@mui/icons-material/Search';
-import HistoryIcon from '@mui/icons-material/History';
-import PendingIcon from '@mui/icons-material/Pending';
 import PersonIcon from '@mui/icons-material/Person';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
+import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import AuthRequiredDialog from '../../components/Auth/AuthRequiredDialog';
 import { api } from '../../services/api';
 import { Response, ResponseStatus } from '../../types';
@@ -362,58 +361,72 @@ const Messages = () => {
 
   // Render dialog list
   const renderDialogList = (responses: Response[], isPending: boolean) => (
-    <List sx={{ width: '100%', bgcolor: 'background.paper', overflow: 'auto', height: 'calc(100vh - 220px)' }}>
-      {responses.length === 0 ? (
-        <ListItem>
-          <ListItemText 
-            primary={loading ? "Loading..." : isPending ? "No pending responses" : "No response history"} 
-            secondary={loading ? "Please wait..." : isPending ? "All caught up!" : "Try changing filters"} 
-          />
-        </ListItem>
+    <List sx={{ 
+      bgcolor: 'background.paper', 
+      borderRadius: 1,
+      height: '100%',
+      overflow: 'auto',
+      maxHeight: '500px'
+    }}>
+      {loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
+          <CircularProgress />
+        </Box>
+      ) : responses.length === 0 ? (
+        <Box sx={{ textAlign: 'center', my: 4 }}>
+          <Typography variant="body2" color="text.secondary">
+            {isPending ? 'No pending responses' : 'No responses in history'}
+          </Typography>
+        </Box>
       ) : (
-        responses.map((response) => (
-          <ListItemButton
-            key={response.id}
-            selected={selectedResponse?.id === response.id}
-            onClick={() => handleSelectResponse(response)}
-            sx={{
-              borderLeft: selectedResponse?.id === response.id ? 4 : 0,
-              borderColor: 'primary.main',
-              '&:hover': { bgcolor: 'action.hover' }
-            }}
+        responses.map(response => (
+          <ListItem 
+            key={response.id} 
+            disablePadding
+            divider
           >
-            <ListItemAvatar>
-              <Badge 
-                overlap="circular"
-                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-                badgeContent={
-                  isPending ? 
-                    <PendingIcon color="warning" fontSize="small" /> : 
-                    response.status === ResponseStatus.APPROVED ? 
-                      <CheckCircleIcon color="info" fontSize="small" /> :
-                      response.status === ResponseStatus.SENT ?
-                        <SendIcon color="success" fontSize="small" /> :
-                        <CancelIcon color="error" fontSize="small" />
-                }
-              >
-                <Avatar>{response.dialog_name.charAt(0).toUpperCase()}</Avatar>
-              </Badge>
-            </ListItemAvatar>
-            <ListItemText 
-              primary={response.dialog_name} 
-              secondary={
-                <Typography
-                  sx={{ display: 'inline', color: 'text.secondary' }}
-                  component="span"
-                  variant="body2"
-                  noWrap
+            <ListItemButton
+              selected={selectedResponse?.id === response.id}
+              onClick={() => handleSelectResponse(response)}
+              sx={{
+                borderLeft: selectedResponse?.id === response.id ? 3 : 0,
+                borderColor: 'primary.main',
+                '&:hover': { bgcolor: 'action.hover' }
+              }}
+            >
+              <ListItemAvatar>
+                <Badge 
+                  overlap="circular"
+                  anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                  badgeContent={
+                    isPending ? 
+                      <HourglassEmptyIcon color="warning" fontSize="small" /> : 
+                      response.status === ResponseStatus.APPROVED ? 
+                        <CheckCircleIcon color="info" fontSize="small" /> :
+                        response.status === ResponseStatus.SENT ?
+                          <SendIcon color="success" fontSize="small" /> :
+                          <CancelIcon color="error" fontSize="small" />
+                  }
                 >
-                  {new Date(response.processed_at).toLocaleString()} 
-                  {!isPending && ` · ${response.status}`}
-                </Typography>
-              }
-            />
-          </ListItemButton>
+                  <Avatar>{response.dialog_name.charAt(0).toUpperCase()}</Avatar>
+                </Badge>
+              </ListItemAvatar>
+              <ListItemText 
+                primary={response.dialog_name} 
+                secondary={
+                  <Typography
+                    sx={{ display: 'inline', color: 'text.secondary' }}
+                    component="span"
+                    variant="body2"
+                    noWrap
+                  >
+                    {new Date(response.processed_at).toLocaleString()} 
+                    {!isPending && ` · ${response.status}`}
+                  </Typography>
+                }
+              />
+            </ListItemButton>
+          </ListItem>
         ))
       )}
     </List>
@@ -466,34 +479,22 @@ const Messages = () => {
   const renderConversationView = () => {
     if (!selectedResponse) {
       return (
-        <Box sx={{ 
+        <Paper sx={{ 
+          height: '100%', 
           display: 'flex', 
-          flexDirection: 'column', 
-          justifyContent: 'center', 
           alignItems: 'center', 
-          height: 'calc(100vh - 180px)',
-          bgcolor: 'background.default',
-          borderRadius: 1
+          justifyContent: 'center',
+          p: 4
         }}>
-          <Typography variant="h6" color="text.secondary">
-            Select a response to view the conversation
+          <Typography variant="body1" color="text.secondary">
+            Select a dialog to view the conversation
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            The conversation history will appear here
-          </Typography>
-        </Box>
+        </Paper>
       );
     }
-
+    
     return (
-      <Box sx={{ 
-        display: 'flex', 
-        flexDirection: 'column', 
-        height: 'calc(100vh - 180px)',
-        bgcolor: 'background.default',
-        borderRadius: 1,
-        p: 2
-      }}>
+      <Paper sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
         {/* Dialog header */}
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
           <Avatar sx={{ mr: 1 }}>{selectedResponse.dialog_name.charAt(0).toUpperCase()}</Avatar>
@@ -516,7 +517,8 @@ const Messages = () => {
           overflow: 'auto',
           mb: 2,
           display: 'flex',
-          flexDirection: 'column'
+          flexDirection: 'column',
+          minHeight: '200px'
         }}>
           {loadingMessages ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
@@ -607,12 +609,12 @@ const Messages = () => {
             )}
           </CardActions>
         </Card>
-      </Box>
+      </Paper>
     );
   };
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Box>
       <Typography variant="h4" gutterBottom>
         Message Responses
       </Typography>
@@ -627,28 +629,32 @@ const Messages = () => {
       <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
         <Tabs 
           value={tabValue} 
-          onChange={handleTabChange} 
-          aria-label="message response tabs"
+          onChange={handleTabChange}
+          aria-label="message tabs"
         >
           <Tab 
-            icon={<PendingIcon />} 
-            iconPosition="start" 
-            label={`Pending Responses (${totalPendingResponses})`}
-            id="messages-tab-0" 
-            aria-controls="messages-tabpanel-0" 
+            label={
+              <Badge badgeContent={totalPendingResponses} color="error" max={99}>
+                Pending Approval
+              </Badge>
+            } 
+            id="messages-tab-0"
+            aria-controls="messages-tabpanel-0"
           />
           <Tab 
-            icon={<HistoryIcon />} 
-            iconPosition="start" 
-            label={`Response History (${totalHistoryResponses})`}
-            id="messages-tab-1" 
-            aria-controls="messages-tabpanel-1" 
+            label={
+              <Badge badgeContent={totalHistoryResponses} color="primary" max={99}>
+                History
+              </Badge>
+            } 
+            id="messages-tab-1"
+            aria-controls="messages-tabpanel-1"
           />
         </Tabs>
       </Box>
       
       {/* Main content */}
-      <Box sx={{ display: 'flex', mt: 2, height: 'calc(100vh - 180px)' }}>
+      <Box sx={{ display: 'flex', mt: 2 }}>
         {/* Left panel - Dialog list */}
         <Box sx={{ width: 320, mr: 2 }}>
           <Box sx={{ mb: 2 }}>
