@@ -309,3 +309,29 @@
 2025-03-16 18:55:35,470 - app.services.worker - INFO - Found existing response in database for dialog AgenticAngel
 2025-03-16 18:55:35,471 - app.services.worker - INFO - Generated responses for 5 dialogs successfully
 2025-03-16 18:55:35,471 - app.services.worker - INFO - Processing cycle completed in 0.63 seconds
+2025-03-16 19:05:36,103 - app.services.worker - INFO - Starting processing cycle
+2025-03-16 19:05:36,125 - app.services.worker - INFO - Found 7 dialogs with processing enabled
+2025-03-16 19:05:36,519 - app.services.worker - INFO - Processed 7/7 dialogs successfully for user 7a9acff9-cf8b-4f7a-8b4a-dee4a5870155
+2025-03-16 19:05:36,519 - app.services.worker - INFO - Fetched messages for 7 dialogs successfully
+2025-03-16 19:05:36,523 - app.services.worker - INFO - Found existing response in database for dialog Telegram
+2025-03-16 19:05:36,524 - app.services.worker - INFO - Found existing response in database for dialog @RawDataBot
+2025-03-16 19:05:36,526 - app.services.worker - INFO - Found existing response in database for dialog KK, Jason, Sarah, Journey
+2025-03-16 19:05:36,527 - app.services.worker - INFO - Found existing response in database for dialog userinfobot
+2025-03-16 19:05:36,528 - app.services.worker - INFO - Found existing response in database for dialog AgenticAngel
+2025-03-16 19:05:43,372 - app.services.worker - INFO - Generated response for dialog Wallet and saved to both file and database
+2025-03-16 19:05:47,806 - app.services.worker - INFO - Generated response for dialog Jason X (UTC+8) and saved to both file and database
+2025-03-16 19:05:47,807 - app.services.worker - INFO - Generated responses for 7 dialogs successfully
+2025-03-16 19:05:47,807 - app.services.worker - INFO - Processing cycle completed in 11.70 seconds
+2025-03-16 19:15:48,438 - app.services.worker - INFO - Starting processing cycle
+2025-03-16 19:15:48,448 - app.services.worker - INFO - Found 7 dialogs with processing enabled
+2025-03-16 19:15:48,803 - app.services.worker - INFO - Processed 7/7 dialogs successfully for user 7a9acff9-cf8b-4f7a-8b4a-dee4a5870155
+2025-03-16 19:15:48,803 - app.services.worker - INFO - Fetched messages for 7 dialogs successfully
+2025-03-16 19:15:48,806 - app.services.worker - INFO - Found existing response in database for dialog Telegram
+2025-03-16 19:15:48,808 - app.services.worker - INFO - Found existing response in database for dialog @RawDataBot
+2025-03-16 19:15:48,811 - app.services.worker - INFO - Found existing response in database for dialog KK, Jason, Sarah, Journey
+2025-03-16 19:15:48,813 - app.services.worker - INFO - Found existing response in database for dialog userinfobot
+2025-03-16 19:15:48,813 - app.services.worker - INFO - Found existing response in database for dialog AgenticAngel
+2025-03-16 19:15:48,815 - app.services.worker - INFO - Found existing response in database for dialog Wallet
+2025-03-16 19:15:48,816 - app.services.worker - INFO - Found existing response in database for dialog Jason X (UTC+8)
+2025-03-16 19:15:48,817 - app.services.worker - INFO - Generated responses for 7 dialogs successfully
+2025-03-16 19:15:48,817 - app.services.worker - INFO - Processing cycle completed in 0.38 seconds
