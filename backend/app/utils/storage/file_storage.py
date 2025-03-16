@@ -17,18 +17,26 @@ from app.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
+# Get the project root directory
+PROJECT_ROOT = Path(__file__).parent.parent.parent.parent.parent.absolute()
+
 class MessageFileStorage:
     """Utility for managing temporary message files"""
     
-    def __init__(self, base_dir: str = "/tmp/telegram_processor"):
+    def __init__(self, base_dir: str = None):
         """
         Initialize the file storage utility
         
         Args:
             base_dir: Base directory for storing message files
         """
+        if base_dir is None:
+            # Use a directory within the project by default
+            base_dir = str(PROJECT_ROOT / "message_storage")
+            
         self.base_dir = Path(base_dir)
         self._ensure_base_dir()
+        logger.info(f"Message storage initialized at: {self.base_dir}")
     
     def _ensure_base_dir(self) -> None:
         """Ensure the base directory exists"""

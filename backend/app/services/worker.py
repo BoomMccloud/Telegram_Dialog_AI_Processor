@@ -1,7 +1,7 @@
 """
 Background worker for processing Telegram dialogs.
 
-This module implements a standalone worker that periodically checks
+This module implements a worker that periodically checks
 the database for user-selected dialogs and processes them.
 """
 
@@ -42,9 +42,6 @@ file_handler.setFormatter(
     logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 )
 logger.addHandler(file_handler)
-
-# Global flag for graceful shutdown
-should_exit = False
 
 class DialogWorker:
     """Worker process for dialog processing"""
@@ -131,7 +128,7 @@ class DialogWorker:
                         continue
                         
                     # Process dialogs for this user
-                    results = await processor.process_dialogs(user_dialogs, user_session.token)
+                    results = await processor.process_dialogs(user_dialogs, user_session.token, session)
                     
                     # Log results
                     success_count = sum(1 for success in results.values() if success)
@@ -174,55 +171,4 @@ class DialogWorker:
                 cycle_time = (datetime.datetime.now() - self.last_run_time).total_seconds()
                 logger.info(f"Processing cycle completed in {cycle_time:.2f} seconds")
             except Exception as e:
-                logger.error(f"Error in processing cycle: {str(e)}", exc_info=True)
-    
-    async def run_forever(self):
-        """
-        Run the worker in an infinite loop until signaled to stop
-        """
-        logger.info("Starting worker process")
-        
-        while not should_exit:
-            try:
-                await self.run_once()
-            except Exception as e:
-                logger.error(f"Unexpected error in worker cycle: {str(e)}", exc_info=True)
-                
-            # Sleep until next interval
-            for _ in range(int(self.interval_seconds)):
-                if should_exit:
-                    break
-                await asyncio.sleep(1)
-                
-        logger.info("Worker process shutting down")
-
-def handle_signal(sig, frame):
-    """
-    Handle termination signals
-    """
-    global should_exit
-    logger.info(f"Received signal {sig}, shutting down gracefully...")
-    should_exit = True
-
-async def main():
-    """
-    Main entry point for the worker
-    """
-    # Register signal handlers
-    signal.signal(signal.SIGINT, handle_signal)
-    signal.signal(signal.SIGTERM, handle_signal)
-    
-    # Create and run worker
-    worker = DialogWorker(interval_seconds=120)  # Run every 2 minutes for testing
-    await worker.run_forever()
-
-if __name__ == "__main__":
-    try:
-        # Run the main async function
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        logger.info("Worker terminated by keyboard interrupt")
-    except Exception as e:
-        logger.error(f"Unhandled exception in worker: {str(e)}", exc_info=True)
-        sys.exit(1)
-    sys.exit(0) 
+                logger.error(f"Error in processing cycle: {str(e)}", exc_info=True) 

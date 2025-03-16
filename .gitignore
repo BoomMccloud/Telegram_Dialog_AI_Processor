@@ -78,3 +78,7 @@ test_token_logs/
 backend/sessions/
 backend/server.log
 sessions/
+
+# Message storage
+message_storage/
+backend/message_storage/

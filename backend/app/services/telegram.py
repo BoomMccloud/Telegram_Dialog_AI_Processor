@@ -16,12 +16,13 @@ logger = logging.getLogger(__name__)
 IS_DEVELOPMENT = os.getenv("ENV", "development") == "development"
 USE_MOCK = os.getenv("USE_MOCK_TELEGRAM", "false").lower() == "true"
 
-async def get_or_reload_client(token: str) -> TelegramClient:
+async def get_or_reload_client(token: str, db_session=None) -> TelegramClient:
     """
     Get a client from memory or reload it from a session file
     
     Args:
         token: JWT token for the session
+        db_session: Optional database session (for standalone worker)
         
     Returns:
         TelegramClient instance
@@ -136,7 +137,7 @@ async def get_dialogs(token: str) -> List[Dict]:
     
     return dialogs
 
-async def get_recent_messages(token: str, limit: int = 20, dialog_id: Optional[int] = None) -> List[Dict]:
+async def get_recent_messages(token: str, limit: int = 20, dialog_id: Optional[int] = None, db_session=None) -> List[Dict]:
     """
     Get recent messages from a specific dialog or all dialogs
     
@@ -144,6 +145,7 @@ async def get_recent_messages(token: str, limit: int = 20, dialog_id: Optional[i
         token: JWT token for the session
         limit: Maximum number of messages to return
         dialog_id: Optional dialog ID to filter messages
+        db_session: Optional database session (for standalone worker)
         
     Returns:
         List of message dictionaries
@@ -154,7 +156,7 @@ async def get_recent_messages(token: str, limit: int = 20, dialog_id: Optional[i
         return await mock_telegram.get_messages("all", limit)
     
     # Get or reload client
-    client = await get_or_reload_client(token)
+    client = await get_or_reload_client(token, db_session)
 
     messages = []
     
@@ -167,6 +169,11 @@ async def get_recent_messages(token: str, limit: int = 20, dialog_id: Optional[i
             if hasattr(sender, 'last_name') and sender.last_name:
                 sender_name += f" {sender.last_name}"
                 
+            # Check if is_unread attribute exists before accessing it
+            is_unread = False
+            if hasattr(message, 'is_unread'):
+                is_unread = message.is_unread
+                
             messages.append({
                 "dialog_id": dialog_id,
                 "message_id": message.id,
@@ -177,7 +184,7 @@ async def get_recent_messages(token: str, limit: int = 20, dialog_id: Optional[i
                 },
                 "text": message.text or "",
                 "is_outgoing": message.out,
-                "is_unread": message.is_unread
+                "is_unread": is_unread
             })
     else:
         # Get messages from all dialogs
@@ -191,6 +198,11 @@ async def get_recent_messages(token: str, limit: int = 20, dialog_id: Optional[i
                 if hasattr(sender, 'last_name') and sender.last_name:
                     sender_name += f" {sender.last_name}"
                     
+                # Check if is_unread attribute exists before accessing it
+                is_unread = False
+                if hasattr(message, 'is_unread'):
+                    is_unread = message.is_unread
+                    
                 dialog_messages.append({
                     "dialog_id": dialog.id,
                     "dialog_name": dialog.name,
@@ -202,7 +214,7 @@ async def get_recent_messages(token: str, limit: int = 20, dialog_id: Optional[i
                     },
                     "text": message.text or "",
                     "is_outgoing": message.out,
-                    "is_unread": message.is_unread
+                    "is_unread": is_unread
                 })
             
             messages.extend(dialog_messages)

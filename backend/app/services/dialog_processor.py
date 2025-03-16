@@ -37,13 +37,14 @@ class DialogProcessor:
         backoff=2.0,
         exceptions=(ValueError, Exception)
     )
-    async def fetch_messages(self, dialog: Dialog, token: str) -> List[Dict]:
+    async def fetch_messages(self, dialog: Dialog, token: str, db_session=None) -> List[Dict]:
         """
         Fetch recent messages for a dialog with retry logic
         
         Args:
             dialog: Dialog to fetch messages for
             token: User's session token
+            db_session: Optional database session for standalone worker
             
         Returns:
             List of message dictionaries
@@ -74,20 +75,21 @@ class DialogProcessor:
             )
             raise
             
-    async def process_dialog(self, dialog: Dialog, token: str) -> bool:
+    async def process_dialog(self, dialog: Dialog, token: str, db_session=None) -> bool:
         """
         Process a single dialog by fetching and storing its messages
         
         Args:
             dialog: Dialog to process
             token: User's session token
+            db_session: Optional database session for standalone worker
             
         Returns:
             True if processing was successful, False otherwise
         """
         try:
             # Fetch messages with retry logic
-            raw_messages = await self.fetch_messages(dialog, token)
+            raw_messages = await self.fetch_messages(dialog, token, db_session)
             
             if not raw_messages:
                 logger.info(f"No messages found for dialog {dialog.title}")
@@ -142,20 +144,21 @@ class DialogProcessor:
             await self.db_session.rollback()
             return False
             
-    async def process_dialogs(self, dialogs: List[Dialog], token: str) -> Dict[str, bool]:
+    async def process_dialogs(self, dialogs: List[Dialog], token: str, db_session=None) -> Dict[str, bool]:
         """
         Process multiple dialogs
         
         Args:
             dialogs: List of dialogs to process
             token: User's session token
+            db_session: Optional database session for standalone worker
             
         Returns:
             Dictionary mapping dialog IDs to success status
         """
         results = {}
         for dialog in dialogs:
-            success = await self.process_dialog(dialog, token)
+            success = await self.process_dialog(dialog, token, db_session)
             results[dialog.id] = success
         
         # Schedule cleanup of old runs

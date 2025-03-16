@@ -3,6 +3,7 @@ FastAPI application entry point
 """
 
 import os
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,6 +22,7 @@ from .db.models.base import Base
 from .db.init_db import init_db
 from .services.background_tasks import BackgroundTaskManager
 from .services.cleanup import run_periodic_cleanup
+from .services.worker import DialogWorker
 from .middleware.session import SessionMiddleware
 from .core.exceptions import ValidationError, TelegramError, DatabaseError
 from .core.error_handlers import (
@@ -60,6 +62,12 @@ async def lifespan(app: FastAPI):
     logger.info("Starting up FastAPI application...")
     logger.info(f"Connecting to database: {DATABASE_URL}")
     
+    # Flag to signal worker to stop
+    app.state.should_exit = False
+    
+    # Worker task reference
+    worker_task = None
+    
     try:
         # Create database engine with retries
         engine = create_async_engine(
@@ -98,36 +106,68 @@ async def lifespan(app: FastAPI):
         try:
             async with engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
-            logger.info("Database tables created successfully")
         except Exception as e:
             logger.error(f"Failed to create database tables: {str(e)}", exc_info=True)
             raise DatabaseError("Failed to create database tables", details={"error": str(e)})
             
-        # Start periodic cleanup task
-        cleanup_interval = int(os.getenv("CLEANUP_INTERVAL_SECONDS", "3600"))
-        app.state.background_tasks.add_task(
-            run_periodic_cleanup(app.state.db_pool, cleanup_interval)
-        )
-        logger.info(f"Started periodic cleanup task with interval {cleanup_interval} seconds")
-        
         # Initialize session middleware
-        session_middleware = SessionMiddleware(app)
+        app.state.session_middleware = SessionMiddleware(app)
         
-        # Store instances in app state
-        app.state.session_middleware = session_middleware
+        # Start periodic cleanup task
+        cleanup_coro = run_periodic_cleanup(app.state.db_pool)
+        app.state.background_tasks.add_task(cleanup_coro)
         
+        # Start dialog worker
+        worker = DialogWorker(interval_seconds=600)  # Run every 10 minutes
+        
+        async def run_worker():
+            """Run the worker in a background task"""
+            logger.info("Starting dialog worker...")
+            while not app.state.should_exit:
+                try:
+                    await worker.run_once()
+                except Exception as e:
+                    logger.error(f"Error in worker cycle: {str(e)}", exc_info=True)
+                
+                # Sleep until next interval
+                for _ in range(int(worker.interval_seconds)):
+                    if app.state.should_exit:
+                        break
+                    await asyncio.sleep(1)
+        
+        # Start worker in background task
+        worker_task = asyncio.create_task(run_worker())
+        logger.info("Dialog worker started")
+        
+        # Yield control back to FastAPI
         yield
         
-        # Clean up background tasks
-        await app.state.background_tasks.cleanup()
-        
-        # Clean up database
-        await engine.dispose()
+        # Shutdown tasks
         logger.info("Shutting down FastAPI application...")
         
+        # Signal worker to stop
+        app.state.should_exit = True
+        
+        # Wait for worker to stop
+        if worker_task:
+            logger.info("Waiting for dialog worker to stop...")
+            try:
+                await asyncio.wait_for(worker_task, timeout=30.0)
+                logger.info("Dialog worker stopped")
+            except asyncio.TimeoutError:
+                logger.warning("Dialog worker did not stop gracefully, cancelling...")
+                worker_task.cancel()
+        
+        # Stop background tasks
+        await app.state.background_tasks.shutdown()
+        logger.info("Background tasks stopped")
+        
     except Exception as e:
-        logger.error(f"Failed to initialize application: {str(e)}", exc_info=True)
-        raise DatabaseError("Failed to initialize application", details={"error": str(e)})
+        logger.error(f"Error during application startup: {str(e)}", exc_info=True)
+        # Clean up any tasks if startup failed
+        if worker_task and not worker_task.done():
+            worker_task.cancel()
+        raise
 
 app = FastAPI(
     title="Telegram Dialog AI Processor", 
@@ -206,9 +246,6 @@ app.swagger_ui_init_oauth = {
     "clientId": "swagger-ui",
     "scopes": ["read", "write"]
 }
-
-# Add session middleware
-app.add_middleware(SessionMiddleware)
 
 # Register error handlers
 app.add_exception_handler(ValidationError, validation_error_handler)

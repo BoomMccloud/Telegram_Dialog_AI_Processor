@@ -43,6 +43,10 @@ class BackgroundTaskManager:
         await asyncio.gather(*self._tasks, return_exceptions=True)
         self._tasks.clear()
         
+    async def shutdown(self):
+        """Alias for cleanup for better naming consistency"""
+        await self.cleanup()
+        
     async def _run_and_cleanup(self, coro: Coroutine) -> Any:
         """
         Run a coroutine and clean up the task when done
