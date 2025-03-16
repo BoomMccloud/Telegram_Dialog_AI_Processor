@@ -56,6 +56,17 @@ export const pollSessionStatus = async (
       const response = await api.auth.verifySession();
       console.log(`[Auth Debug] Session status: ${response.status}`, response);
       
+      // Store tokens if they're in the response
+      if (response.access_token) {
+        console.log('[Auth Debug] Storing access token from poll response');
+        localStorage.setItem('accessToken', response.access_token);
+        
+        if (response.refresh_token) {
+          console.log('[Auth Debug] Storing refresh token from poll response');
+          localStorage.setItem('refreshToken', response.refresh_token);
+        }
+      }
+      
       callback(response.status);
       
       if (response.status === SessionStatus.AUTHENTICATED) {

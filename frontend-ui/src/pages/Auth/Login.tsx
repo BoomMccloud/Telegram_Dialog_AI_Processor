@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { initiateQRAuthentication, pollSessionStatus, devLogin } from '../../services/auth';
 import { SessionStatus } from '../../types';
 import PhoneAuth from '../../components/Auth/PhoneAuth';
+import { api } from '../../services/api';
 
 // Import the CSS file
 import './Login.css';
@@ -104,7 +105,22 @@ const Login: React.FC = () => {
         }
         
         if (status === SessionStatus.AUTHENTICATED) {
-          navigate(getRedirectPath());
+          // Ensure we have the latest token before redirecting
+          api.auth.verifySession()
+            .then(sessionResponse => {
+              if (sessionResponse.access_token) {
+                localStorage.setItem('accessToken', sessionResponse.access_token);
+                if (sessionResponse.refresh_token) {
+                  localStorage.setItem('refreshToken', sessionResponse.refresh_token);
+                }
+                console.log('[Auth Debug] Tokens updated before redirect');
+              }
+              navigate(getRedirectPath());
+            })
+            .catch(err => {
+              console.error('Failed to verify session before redirect:', err);
+              navigate(getRedirectPath());
+            });
         }
       });
     } catch (err) {
@@ -129,6 +145,19 @@ const Login: React.FC = () => {
       const success = await devLogin(telegramId);
       
       if (success) {
+        // Ensure we have the latest token before redirecting
+        try {
+          const sessionResponse = await api.auth.verifySession();
+          if (sessionResponse.access_token) {
+            localStorage.setItem('accessToken', sessionResponse.access_token);
+            if (sessionResponse.refresh_token) {
+              localStorage.setItem('refreshToken', sessionResponse.refresh_token);
+            }
+            console.log('[Auth Debug] Tokens updated before redirect (dev login)');
+          }
+        } catch (verifyErr) {
+          console.error('Failed to verify session before redirect (dev login):', verifyErr);
+        }
         navigate(getRedirectPath());
       } else {
         setError('Development login failed');
@@ -142,7 +171,22 @@ const Login: React.FC = () => {
   };
   
   const handlePhoneAuthSuccess = () => {
-    navigate(getRedirectPath());
+    // Ensure we have the latest token before redirecting
+    api.auth.verifySession()
+      .then(sessionResponse => {
+        if (sessionResponse.access_token) {
+          localStorage.setItem('accessToken', sessionResponse.access_token);
+          if (sessionResponse.refresh_token) {
+            localStorage.setItem('refreshToken', sessionResponse.refresh_token);
+          }
+          console.log('[Auth Debug] Tokens updated before redirect (phone auth)');
+        }
+        navigate(getRedirectPath());
+      })
+      .catch(err => {
+        console.error('Failed to verify session before redirect (phone auth):', err);
+        navigate(getRedirectPath());
+      });
   };
   
   // Add function to handle switching to selection screen
