@@ -10,7 +10,7 @@ import os
 import json
 from telethon import TelegramClient
 from datetime import datetime, timedelta
-from typing import Optional, Dict
+from typing import Optional, Dict, Tuple
 import asyncio
 import logging
 from fastapi import Request
@@ -47,6 +47,85 @@ async def create_telegram_client() -> tuple[TelegramClient, str]:
     await client.connect()
     
     return client, session_id
+
+async def load_telegram_client_from_session(session_file: str) -> Optional[TelegramClient]:
+    """
+    Load a Telegram client from an existing session file
+    
+    Args:
+        session_file: Path to the session file
+        
+    Returns:
+        TelegramClient if successful, None otherwise
+    """
+    try:
+        api_id = os.getenv("TELEGRAM_API_ID")
+        api_hash = os.getenv("TELEGRAM_API_HASH")
+        
+        if not api_id or not api_hash:
+            logger.error("TELEGRAM_API_ID and TELEGRAM_API_HASH environment variables are required")
+            return None
+            
+        # Check if session file exists
+        if not Path(session_file).exists():
+            logger.error(f"Session file not found: {session_file}")
+            return None
+            
+        logger.info(f"Loading Telegram client from session file: {session_file}")
+        client = TelegramClient(session_file, int(api_id), api_hash)
+        
+        # Connect to Telegram
+        await client.connect()
+        
+        # Verify the client is authorized
+        if not await client.is_user_authorized():
+            logger.error(f"Client loaded from {session_file} is not authorized")
+            await client.disconnect()
+            return None
+            
+        logger.info(f"Successfully loaded authorized client from {session_file}")
+        return client
+    except Exception as e:
+        logger.error(f"Error loading Telegram client from session file: {str(e)}", exc_info=True)
+        return None
+
+async def find_session_file_for_user(telegram_id: int) -> Optional[str]:
+    """
+    Find a session file for a specific user
+    
+    Args:
+        telegram_id: Telegram user ID
+        
+    Returns:
+        Path to session file if found, None otherwise
+    """
+    try:
+        # Look for session files in the sessions directory
+        for file in SESSIONS_DIR.glob("*.session"):
+            # Try to extract user info from the session file name
+            # This is a heuristic and might need adjustment based on your naming convention
+            if f"_{telegram_id}" in file.name:
+                return str(file)
+                
+        # If no specific match found, look for any valid session file
+        session_files = list(SESSIONS_DIR.glob("*.session"))
+        if session_files:
+            # Try to load each session and check if it's for the right user
+            for file in session_files:
+                client = await load_telegram_client_from_session(str(file))
+                if client:
+                    try:
+                        me = await client.get_me()
+                        if me and me.id == telegram_id:
+                            await client.disconnect()
+                            return str(file)
+                    finally:
+                        await client.disconnect()
+                        
+        return None
+    except Exception as e:
+        logger.error(f"Error finding session file for user {telegram_id}: {str(e)}", exc_info=True)
+        return None
 
 async def create_auth_session() -> Dict:
     """Create a new QR code authentication session"""

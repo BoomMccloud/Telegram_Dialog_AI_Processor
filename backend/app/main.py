@@ -12,6 +12,7 @@ from typing import List
 import time
 from sqlalchemy.sql import text
 from fastapi.openapi.utils import get_openapi
+from datetime import datetime, timezone
 
 from .api import auth, messages, dialogs
 from .utils.logging import get_logger
@@ -226,9 +227,97 @@ async def startup_event():
     try:
         await init_db()
         logger.info("Database initialized successfully")
+        
+        # Load existing Telethon sessions
+        await load_existing_sessions()
     except Exception as e:
         logger.error(f"Failed to initialize database: {e}", exc_info=True)
         raise
+
+async def load_existing_sessions():
+    """Load existing Telethon sessions into memory"""
+    try:
+        from app.services.auth import SESSIONS_DIR, load_telegram_client_from_session, client_sessions
+        from app.db.models.user import User
+        from app.db.models.session import Session, SessionStatus
+        from sqlalchemy import select
+        
+        # Get all session files
+        session_files = list(SESSIONS_DIR.glob("*.session"))
+        if not session_files:
+            logger.info("No Telethon session files found")
+            return
+            
+        logger.info(f"Found {len(session_files)} Telethon session files")
+        
+        # Get all authenticated users
+        async with app.state.db_pool() as db:
+            stmt = select(User).where(User.telegram_id.is_not(None))
+            result = await db.execute(stmt)
+            users = result.scalars().all()
+            
+            if not users:
+                logger.info("No authenticated users found in database")
+                return
+                
+            logger.info(f"Found {len(users)} authenticated users in database")
+            
+            # Get active sessions for these users
+            stmt = select(Session).where(
+                Session.user_id.in_([user.id for user in users]),
+                Session.status == SessionStatus.AUTHENTICATED,
+                Session.expires_at > datetime.now(timezone.utc)
+            )
+            result = await db.execute(stmt)
+            active_sessions = result.scalars().all()
+            
+            if not active_sessions:
+                logger.info("No active sessions found in database")
+                return
+                
+            logger.info(f"Found {len(active_sessions)} active sessions in database")
+            
+            # Try to load each session
+            loaded_count = 0
+            for session_file in session_files:
+                try:
+                    client = await load_telegram_client_from_session(str(session_file))
+                    if client:
+                        # Get the user ID from the client
+                        me = await client.get_me()
+                        if not me:
+                            await client.disconnect()
+                            continue
+                            
+                        # Find the user in our database
+                        user = next((u for u in users if u.telegram_id == me.id), None)
+                        if not user:
+                            await client.disconnect()
+                            continue
+                            
+                        # Find active sessions for this user
+                        user_sessions = [s for s in active_sessions if s.user_id == user.id]
+                        if not user_sessions:
+                            await client.disconnect()
+                            continue
+                            
+                        # Store the client in memory for each active session
+                        for session in user_sessions:
+                            client_sessions[session.token] = {
+                                "client": client,
+                                "status": "authenticated",
+                                "telegram_id": user.telegram_id
+                            }
+                            loaded_count += 1
+                            
+                        logger.info(f"Loaded Telethon session for user {me.id} ({me.username})")
+                except Exception as e:
+                    logger.error(f"Error loading session file {session_file}: {str(e)}", exc_info=True)
+                    
+            logger.info(f"Successfully loaded {loaded_count} Telethon sessions")
+    except Exception as e:
+        logger.error(f"Error loading existing sessions: {str(e)}", exc_info=True)
+        # Don't raise the exception to allow the application to start
 
 @app.get("/health")
 async def health_check():
