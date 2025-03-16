@@ -149,11 +149,11 @@ async def select_dialog(
                 result = await conn.fetchrow(
                     """
                     INSERT INTO dialogs (
-                        telegram_dialog_id, user_id, title, type, 
+                        id, telegram_dialog_id, user_id, title, type, 
                         is_processing_enabled, auto_send_enabled, updated_at
                     )
                     VALUES (
-                        $1, (SELECT id FROM users WHERE telegram_id = $2), $3, $4, $5, $6, $7
+                        $1, $2, (SELECT id FROM users WHERE telegram_id = $3), $4, $5, $6, $7, $8
                     )
                     RETURNING 
                         id as selection_id,
@@ -165,6 +165,7 @@ async def select_dialog(
                         created_at,
                         updated_at
                     """,
+                    uuid.uuid4(),  # Generate a new UUID for id
                     dialog_id_str,
                     user_id,
                     dialog.dialog_name,
