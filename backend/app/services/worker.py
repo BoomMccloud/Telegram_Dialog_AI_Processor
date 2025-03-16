@@ -24,6 +24,7 @@ from app.db.models.dialog import Dialog
 from app.db.models.user import User
 from app.db.models.session import Session
 from app.services.dialog_processor import DialogProcessor
+from app.services.response_generator import ResponseGenerator
 from app.utils.logging import get_logger
 
 # Configure main logger
@@ -106,6 +107,8 @@ class DialogWorker:
                 
                 # Process dialogs for each user
                 total_success_count = 0
+                processed_dialogs = []
+                
                 for user_id, user_dialogs in dialogs_by_user.items():
                     # Get user
                     user_query = select(User).where(User.id == user_id)
@@ -133,15 +136,67 @@ class DialogWorker:
                     # Log results
                     success_count = sum(1 for success in results.values() if success)
                     total_success_count += success_count
+                    
+                    # Add successfully processed dialogs to the list
+                    for dialog in user_dialogs:
+                        if results.get(dialog.id, False):
+                            processed_dialogs.append(dialog)
+                    
                     logger.info(
                         f"Processed {success_count}/{len(results)} dialogs successfully "
                         f"for user {user_id}"
                     )
                 
-                return total_success_count
+                return processed_dialogs, total_success_count
                     
             except Exception as e:
                 logger.error(f"Error processing dialogs: {str(e)}", exc_info=True)
+                return [], 0
+    
+    async def generate_responses(self, dialogs: list):
+        """
+        Generate responses for a list of dialogs
+        
+        Args:
+            dialogs: List of dialogs to generate responses for
+            
+        Returns:
+            Number of successfully generated responses
+        """
+        async with async_session() as session:
+            try:
+                # Create response generator with database session
+                generator = ResponseGenerator(db_session=session)
+                
+                # Generate responses for each dialog
+                total_success_count = 0
+                
+                for dialog in dialogs:
+                    try:
+                        # Generate response
+                        response = await generator.generate_response(dialog, db_session=session)
+                        
+                        if response:
+                            total_success_count += 1
+                            
+                            # Log different messages based on where the response came from
+                            if "db_response" in response and response["db_response"]:
+                                if response.get("metadata"):
+                                    logger.info(f"Generated response for dialog {dialog.title} and saved to both file and database")
+                                else:
+                                    logger.info(f"Found existing response in database for dialog {dialog.title}")
+                            else:
+                                logger.info(f"Generated response for dialog {dialog.title} and saved to file only")
+                        else:
+                            logger.warning(f"Failed to generate response for dialog {dialog.title}")
+                            
+                    except Exception as e:
+                        logger.error(f"Error generating response for dialog {dialog.title}: {str(e)}", exc_info=True)
+                
+                return total_success_count
+                
+            except Exception as e:
+                logger.error(f"Error generating responses: {str(e)}", exc_info=True)
                 return 0
     
     async def run_once(self):
@@ -162,9 +217,16 @@ class DialogWorker:
                 dialogs = await self.get_processing_enabled_dialogs()
                 
                 if dialogs:
-                    # Process the dialogs
-                    success_count = await self.process_dialogs(dialogs)
-                    logger.info(f"Processed {success_count} dialogs successfully")
+                    # Process the dialogs (fetch messages)
+                    processed_dialogs, fetch_success_count = await self.process_dialogs(dialogs)
+                    logger.info(f"Fetched messages for {fetch_success_count} dialogs successfully")
+                    
+                    if processed_dialogs:
+                        # Generate responses for successfully processed dialogs
+                        response_success_count = await self.generate_responses(processed_dialogs)
+                        logger.info(f"Generated responses for {response_success_count} dialogs successfully")
+                    else:
+                        logger.info("No dialogs were successfully processed, skipping response generation")
                 else:
                     logger.info("No dialogs to process")
                 
