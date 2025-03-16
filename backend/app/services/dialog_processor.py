@@ -13,6 +13,7 @@ from app.db.models.message import Message
 from app.services.telegram import get_recent_messages
 from app.utils.retry import async_retry
 from app.utils.logging import get_logger
+from app.utils.storage import MessageFileStorage, ProcessingRunMetadata
 
 logger = get_logger(__name__)
 
@@ -28,6 +29,7 @@ class DialogProcessor:
         """
         self.db_session = db_session
         self.message_limit = 20  # Number of messages to fetch per dialog
+        self.file_storage = MessageFileStorage()
         
     @async_retry(
         max_retries=3,
@@ -74,22 +76,35 @@ class DialogProcessor:
         """
         try:
             # Fetch messages with retry logic
-            messages = await self.fetch_messages(dialog, token)
+            raw_messages = await self.fetch_messages(dialog, token)
             
-            if not messages:
+            if not raw_messages:
                 logger.info(f"No new messages found for dialog {dialog.title}")
                 return True
                 
             # Update dialog's last processed message
-            latest_message = messages[0]  # Messages are sorted newest first
+            latest_message = raw_messages[0]  # Messages are sorted newest first
             dialog.last_processed_message_id = str(latest_message.get("message_id"))
             dialog.last_processed_at = datetime.utcnow()
             
-            # Store messages in database
-            for msg in messages:
+            # Create a new processing run
+            metadata = self.file_storage.create_processing_run(
+                user_id=str(dialog.user_id),
+                dialog_id=str(dialog.id)
+            )
+            
+            # Create run directory path
+            run_dir = self.file_storage.get_dialog_dir(
+                str(dialog.user_id), 
+                str(dialog.id)
+            ) / f"processing_{metadata.timestamp.strftime('%Y%m%d_%H%M%S')}_{metadata.run_id}"
+            
+            # Convert raw messages to Message objects
+            messages = []
+            for msg in raw_messages:
                 message = Message(
                     telegram_message_id=str(msg.get("message_id")),
-                    dialog_id=dialog.id,
+                    dialog_id=str(dialog.id),
                     text=msg.get("text", ""),
                     sender_id=str(msg.get("sender", {}).get("id", "")),
                     sender_name=msg.get("sender", {}).get("name", "Unknown"),
@@ -97,9 +112,14 @@ class DialogProcessor:
                     is_outgoing=msg.get("is_outgoing", False),
                     metadata=msg.get("metadata", {})
                 )
-                self.db_session.add(message)
-                
+                messages.append(message)
+            
+            # Save messages to file
+            self.file_storage.save_messages(run_dir, messages)
+            
+            # Update dialog in database
             await self.db_session.commit()
+            
             logger.info(f"Successfully processed {len(messages)} messages for dialog {dialog.title}")
             return True
             
@@ -126,4 +146,28 @@ class DialogProcessor:
         for dialog in dialogs:
             success = await self.process_dialog(dialog, token)
             results[dialog.id] = success
-        return results 
+        
+        # Schedule cleanup of old runs
+        try:
+            deleted_count = await self.file_storage.cleanup_old_runs(max_age_days=7)
+            if deleted_count > 0:
+                logger.info(f"Cleaned up {deleted_count} old processing runs")
+        except Exception as e:
+            logger.error(f"Error cleaning up old runs: {str(e)}")
+        
+        return results
+        
+    def get_latest_messages(self, dialog: Dialog) -> List[Message]:
+        """
+        Get the latest messages for a dialog from file storage
+        
+        Args:
+            dialog: Dialog to get messages for
+            
+        Returns:
+            List of messages
+        """
+        return self.file_storage.get_latest_messages(
+            user_id=str(dialog.user_id),
+            dialog_id=str(dialog.id)
+        ) 
