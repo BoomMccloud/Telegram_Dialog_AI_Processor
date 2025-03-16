@@ -28,3 +28,9 @@
 2025-03-16 17:36:46,843 - app.services.worker - INFO - Processed 5/5 dialogs successfully for user 7a9acff9-cf8b-4f7a-8b4a-dee4a5870155
 2025-03-16 17:36:46,843 - app.services.worker - INFO - Processed 5 dialogs successfully
 2025-03-16 17:36:46,843 - app.services.worker - INFO - Processing cycle completed in 0.83 seconds
+2025-03-16 17:41:38,777 - app.services.worker - INFO - Worker initialized with 600s interval
+2025-03-16 17:41:38,785 - app.services.worker - INFO - Starting processing cycle
+2025-03-16 17:41:38,850 - app.services.worker - INFO - Found 5 dialogs with processing enabled
+2025-03-16 17:41:39,727 - app.services.worker - INFO - Processed 5/5 dialogs successfully for user 7a9acff9-cf8b-4f7a-8b4a-dee4a5870155
+2025-03-16 17:41:39,727 - app.services.worker - INFO - Processed 5 dialogs successfully
+2025-03-16 17:41:39,728 - app.services.worker - INFO - Processing cycle completed in 0.94 seconds
