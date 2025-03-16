@@ -83,7 +83,7 @@ async def list_dialogs(
         raise TelegramError("Failed to fetch dialogs", details={"error": str(e)})
 
 @router.get(
-    "/messages/dialog/{dialog_id}", 
+    "/dialog/{dialog_id}", 
     response_model=List[TelegramMessage],
     summary="Get messages from a specific dialog",
     description="Get messages from a specific dialog with pagination. Requires authentication.",
