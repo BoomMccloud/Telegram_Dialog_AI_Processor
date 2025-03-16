@@ -251,13 +251,6 @@ async def verify_session_status(
                 else:
                     refresh_token = session.refresh_token
                 
-                # Store client in memory for future use
-                client_sessions[access_token] = {
-                    "client": client,
-                    "status": "authenticated",
-                    "telegram_id": user.telegram_id
-                }
-                
                 # Save the session file with a consistent name for easier retrieval
                 try:
                     # Create a new session file with a consistent name
@@ -265,11 +258,11 @@ async def verify_session_status(
                     
                     # If the file already exists, we'll use the existing one
                     if not Path(user_session_file).exists():
-                        # Copy the current session file to the new location
-                        shutil.copy2(session_file, user_session_file)
-                        logger.info(f"Saved Telethon session file for user {user.id} as {user_session_file}")
+                        # We don't have a session file to copy here, so we'll just log this
+                        logger.info(f"No session file to copy for user {user.id}")
+                        # The session file will be created when needed by the get_or_reload_client function
                 except Exception as e:
-                    logger.error(f"Error saving session file for user {user.id}: {str(e)}", exc_info=True)
+                    logger.error(f"Error handling session file for user {user.id}: {str(e)}", exc_info=True)
                     # Continue anyway, this is not critical
                 
                 return {
@@ -374,15 +367,14 @@ async def monitor_qr_login(
             # If the file already exists, we'll use the existing one
             if not Path(user_session_file).exists():
                 # Get the current session file path
-                current_session_file = SESSIONS_DIR / f'session_{session_id}'
+                current_session_file = SESSIONS_DIR / f'session_{session.id}'
                 
-                # Copy the current session file to the new location
+                # Copy the current session file to the new location if it exists
                 if current_session_file.exists():
                     shutil.copy2(str(current_session_file), user_session_file)
                     logger.info(f"Saved Telethon session file for user {permanent_user.id} as {user_session_file}")
         except Exception as e:
             logger.error(f"Error saving session file for user {permanent_user.id}: {str(e)}", exc_info=True)
-            # Continue anyway, this is not critical
         
         # Delete temporary user if it exists and has no other sessions
         if temp_user and temp_user.telegram_id is None:
@@ -650,24 +642,6 @@ async def verify_phone_code(
             
             await db.commit()
             
-            # Update client in client_sessions with new token
-            client_sessions[access_token] = {
-                "client": client,
-                "status": "authenticated",
-                "telegram_id": permanent_user.telegram_id
-            }
-            # Remove the old session entry
-            client_sessions.pop(str(session.id), None)
-            
-            logger.info(f"Updated client in client_sessions with token: {access_token[:10]}...")
-            
-            # Store client in memory for future use
-            client_sessions[access_token] = {
-                "client": client,
-                "status": "authenticated",
-                "telegram_id": permanent_user.telegram_id
-            }
-            
             # Save the session file with a consistent name for easier retrieval
             try:
                 # Create a new session file with a consistent name
@@ -675,9 +649,13 @@ async def verify_phone_code(
                 
                 # If the file already exists, we'll use the existing one
                 if not Path(user_session_file).exists():
-                    # Copy the current session file to the new location
-                    shutil.copy2(session_file, user_session_file)
-                    logger.info(f"Saved Telethon session file for user {permanent_user.id} as {user_session_file}")
+                    # Get the current session file path
+                    current_session_file = SESSIONS_DIR / f'session_{session.id}'
+                    
+                    # Copy the current session file to the new location if it exists
+                    if current_session_file.exists():
+                        shutil.copy2(str(current_session_file), user_session_file)
+                        logger.info(f"Saved Telethon session file for user {permanent_user.id} as {user_session_file}")
             except Exception as e:
                 logger.error(f"Error saving session file for user {permanent_user.id}: {str(e)}", exc_info=True)
             

@@ -213,7 +213,7 @@ async def main():
     signal.signal(signal.SIGTERM, handle_signal)
     
     # Create and run worker
-    worker = DialogWorker(interval_seconds=600)  # Run every 10 minutes
+    worker = DialogWorker(interval_seconds=120)  # Run every 2 minutes for testing
     await worker.run_forever()
 
 if __name__ == "__main__":

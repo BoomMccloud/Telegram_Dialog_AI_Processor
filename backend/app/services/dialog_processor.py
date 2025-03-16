@@ -49,13 +49,24 @@ class DialogProcessor:
             List of message dictionaries
         """
         try:
-            messages = await get_recent_messages(token, self.message_limit)
-            # Filter messages for this dialog
-            dialog_messages = [
-                msg for msg in messages 
-                if str(msg.get("dialog_id")) == dialog.telegram_dialog_id
-            ]
-            return dialog_messages
+            logger.info(f"Fetching last {self.message_limit} messages for dialog {dialog.title} (ID: {dialog.telegram_dialog_id})")
+            
+            # Convert telegram_dialog_id to int
+            dialog_id = int(dialog.telegram_dialog_id)
+            
+            # Fetch messages for this specific dialog
+            messages = await get_recent_messages(
+                token, 
+                limit=self.message_limit,
+                dialog_id=dialog_id
+            )
+            
+            if not messages:
+                logger.info(f"No messages found for dialog {dialog.title} (ID: {dialog.telegram_dialog_id})")
+            else:
+                logger.info(f"Found {len(messages)} messages for dialog {dialog.title}")
+                
+            return messages
         except Exception as e:
             logger.error(
                 f"Error fetching messages for dialog {dialog.title}: {str(e)}",
@@ -79,7 +90,7 @@ class DialogProcessor:
             raw_messages = await self.fetch_messages(dialog, token)
             
             if not raw_messages:
-                logger.info(f"No new messages found for dialog {dialog.title}")
+                logger.info(f"No messages found for dialog {dialog.title}")
                 return True
                 
             # Update dialog's last processed message

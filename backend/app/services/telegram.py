@@ -136,8 +136,18 @@ async def get_dialogs(token: str) -> List[Dict]:
     
     return dialogs
 
-async def get_recent_messages(token: str, limit: int = 20) -> List[Dict]:
-    """Get recent messages from all dialogs"""
+async def get_recent_messages(token: str, limit: int = 20, dialog_id: Optional[int] = None) -> List[Dict]:
+    """
+    Get recent messages from a specific dialog or all dialogs
+    
+    Args:
+        token: JWT token for the session
+        limit: Maximum number of messages to return
+        dialog_id: Optional dialog ID to filter messages
+        
+    Returns:
+        List of message dictionaries
+    """
     # Use mock service in development mode if configured
     if IS_DEVELOPMENT and USE_MOCK:
         logger.info("Using mock telegram service for messages")
@@ -147,23 +157,55 @@ async def get_recent_messages(token: str, limit: int = 20) -> List[Dict]:
     client = await get_or_reload_client(token)
 
     messages = []
-    async for dialog in client.iter_dialogs():
-        # Get messages from the last 24 hours
-        since = datetime.now() - timedelta(days=1)
-        
-        async for message in client.iter_messages(dialog, limit=limit):
-            if message.date < since:
-                break
+    
+    if dialog_id:
+        # Get messages from a specific dialog
+        logger.info(f"Fetching {limit} messages from dialog {dialog_id}")
+        async for message in client.iter_messages(dialog_id, limit=limit):
+            sender = await message.get_sender()
+            sender_name = getattr(sender, 'first_name', 'Unknown')
+            if hasattr(sender, 'last_name') and sender.last_name:
+                sender_name += f" {sender.last_name}"
                 
             messages.append({
-                "dialog_id": dialog.id,
-                "dialog_name": dialog.name,
+                "dialog_id": dialog_id,
                 "message_id": message.id,
                 "date": message.date.isoformat(),
-                "sender": message.sender_id,
-                "text": message.text,
+                "sender": {
+                    "id": sender.id if sender else None,
+                    "name": sender_name
+                },
+                "text": message.text or "",
+                "is_outgoing": message.out,
                 "is_unread": message.is_unread
             })
+    else:
+        # Get messages from all dialogs
+        logger.info(f"Fetching messages from all dialogs (limit: {limit})")
+        async for dialog in client.iter_dialogs():
+            # Get messages from each dialog
+            dialog_messages = []
+            async for message in client.iter_messages(dialog, limit=limit):
+                sender = await message.get_sender()
+                sender_name = getattr(sender, 'first_name', 'Unknown')
+                if hasattr(sender, 'last_name') and sender.last_name:
+                    sender_name += f" {sender.last_name}"
+                    
+                dialog_messages.append({
+                    "dialog_id": dialog.id,
+                    "dialog_name": dialog.name,
+                    "message_id": message.id,
+                    "date": message.date.isoformat(),
+                    "sender": {
+                        "id": sender.id if sender else None,
+                        "name": sender_name
+                    },
+                    "text": message.text or "",
+                    "is_outgoing": message.out,
+                    "is_unread": message.is_unread
+                })
+            
+            messages.extend(dialog_messages)
     
     # Sort messages by date, newest first
     messages.sort(key=lambda x: x["date"], reverse=True)
