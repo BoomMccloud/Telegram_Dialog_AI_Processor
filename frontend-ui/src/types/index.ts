@@ -58,4 +58,35 @@ export interface Dialog extends BaseDialog {
 
 export interface DialogListResponse {
   dialogs: BaseDialog[]; // Use BaseDialog for the response, will be enhanced in the component
+}
+
+// Response types
+export enum ResponseStatus {
+  PENDING_APPROVAL = "pending_approval",
+  APPROVED = "approved",
+  REJECTED = "rejected",
+  SENT = "sent",
+  FAILED = "failed"
+}
+
+export interface Response {
+  id: string;
+  dialog_id: string;
+  dialog_name: string;
+  last_message_id: string;
+  last_message_timestamp: string;
+  suggested_response: string;
+  edited_response: string | null;
+  status: string;
+  model_name: string;
+  processed_at: string;
+}
+
+export interface ResponseListResponse {
+  responses: Response[];
+  total: number;
+}
+
+export interface ResponseUpdateRequest {
+  edited_response: string;
 } 

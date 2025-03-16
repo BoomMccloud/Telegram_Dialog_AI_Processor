@@ -1,5 +1,5 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
-import { QRAuthResponse, SessionVerifyResponse, DialogListResponse, SessionStatus } from '../../types';
+import { QRAuthResponse, SessionVerifyResponse, DialogListResponse, SessionStatus, Response, ResponseListResponse, ResponseUpdateRequest } from '../../types';
 
 // Create a base API instance
 const apiClient: AxiosInstance = axios.create({
@@ -261,36 +261,52 @@ export const api = {
   
   // Response endpoints
   responses: {
-    getPending: () => 
-      apiRequest({
+    getPending: (skip: number = 0, limit: number = 10) => 
+      apiRequest<ResponseListResponse>({
         method: 'GET',
-        url: '/responses/pending',
+        url: `/responses/pending?skip=${skip}&limit=${limit}`,
       }),
-    approve: (id: number) => 
-      apiRequest({
-        method: 'POST',
-        url: `/responses/${id}/approve`,
+    
+    getHistory: (skip: number = 0, limit: number = 10, statusFilter?: string) => {
+      let url = `/responses/history?skip=${skip}&limit=${limit}`;
+      if (statusFilter && statusFilter !== 'all') {
+        url += `&status_filter=${statusFilter}`;
+      }
+      return apiRequest<ResponseListResponse>({
+        method: 'GET',
+        url,
+      });
+    },
+    
+    getById: (responseId: string) => 
+      apiRequest<Response>({
+        method: 'GET',
+        url: `/responses/${responseId}`,
       }),
-    reject: (id: number) => 
-      apiRequest({
-        method: 'POST',
-        url: `/responses/${id}/reject`,
-      }),
-    update: (id: number, data: { edited_response: string }) => 
-      apiRequest({
+    
+    update: (responseId: string, data: ResponseUpdateRequest) => 
+      apiRequest<Response>({
         method: 'PUT',
-        url: `/responses/${id}`,
+        url: `/responses/${responseId}`,
         data,
       }),
-    send: (id: number) => 
-      apiRequest({
+    
+    approve: (responseId: string) => 
+      apiRequest<Response>({
         method: 'POST',
-        url: `/responses/${id}/send`,
+        url: `/responses/${responseId}/approve`,
       }),
-    getHistory: () => 
-      apiRequest({
-        method: 'GET',
-        url: '/responses/history',
+    
+    reject: (responseId: string) => 
+      apiRequest<Response>({
+        method: 'POST',
+        url: `/responses/${responseId}/reject`,
+      }),
+    
+    send: (responseId: string) => 
+      apiRequest<Response>({
+        method: 'POST',
+        url: `/responses/${responseId}/send`,
       }),
   },
   

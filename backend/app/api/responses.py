@@ -22,7 +22,7 @@ from app.db.models.types import ProcessingStatus
 from app.utils.logging import get_logger
 from app.services.response_sender import ResponseSender
 
-router = APIRouter(prefix="/api/responses", tags=["responses"])
+router = APIRouter(prefix="/responses", tags=["responses"])
 logger = get_logger(__name__)
 
 # Response models

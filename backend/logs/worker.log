@@ -286,3 +286,26 @@
 2025-03-16 18:40:37,197 - app.services.worker - INFO - Found existing response in database for dialog AgenticAngel
 2025-03-16 18:40:37,197 - app.services.worker - INFO - Generated responses for 5 dialogs successfully
 2025-03-16 18:40:37,197 - app.services.worker - INFO - Processing cycle completed in 0.69 seconds
+2025-03-16 18:50:37,910 - app.services.worker - INFO - Starting processing cycle
+2025-03-16 18:50:37,914 - app.services.worker - INFO - Found 5 dialogs with processing enabled
+2025-03-16 18:50:38,101 - app.services.worker - INFO - Processed 5/5 dialogs successfully for user 7a9acff9-cf8b-4f7a-8b4a-dee4a5870155
+2025-03-16 18:50:38,101 - app.services.worker - INFO - Fetched messages for 5 dialogs successfully
+2025-03-16 18:50:38,105 - app.services.worker - INFO - Found existing response in database for dialog Telegram
+2025-03-16 18:50:38,106 - app.services.worker - INFO - Found existing response in database for dialog @RawDataBot
+2025-03-16 18:50:38,107 - app.services.worker - INFO - Found existing response in database for dialog KK, Jason, Sarah, Journey
+2025-03-16 18:50:38,108 - app.services.worker - INFO - Found existing response in database for dialog userinfobot
+2025-03-16 18:50:38,109 - app.services.worker - INFO - Found existing response in database for dialog AgenticAngel
+2025-03-16 18:50:38,109 - app.services.worker - INFO - Generated responses for 5 dialogs successfully
+2025-03-16 18:50:38,110 - app.services.worker - INFO - Processing cycle completed in 0.20 seconds
+2025-03-16 18:55:34,840 - app.services.worker - INFO - Worker initialized with 600s interval
+2025-03-16 18:55:34,845 - app.services.worker - INFO - Starting processing cycle
+2025-03-16 18:55:34,878 - app.services.worker - INFO - Found 5 dialogs with processing enabled
+2025-03-16 18:55:35,452 - app.services.worker - INFO - Processed 5/5 dialogs successfully for user 7a9acff9-cf8b-4f7a-8b4a-dee4a5870155
+2025-03-16 18:55:35,453 - app.services.worker - INFO - Fetched messages for 5 dialogs successfully
+2025-03-16 18:55:35,466 - app.services.worker - INFO - Found existing response in database for dialog Telegram
+2025-03-16 18:55:35,467 - app.services.worker - INFO - Found existing response in database for dialog @RawDataBot
+2025-03-16 18:55:35,468 - app.services.worker - INFO - Found existing response in database for dialog KK, Jason, Sarah, Journey
+2025-03-16 18:55:35,469 - app.services.worker - INFO - Found existing response in database for dialog userinfobot
+2025-03-16 18:55:35,470 - app.services.worker - INFO - Found existing response in database for dialog AgenticAngel
+2025-03-16 18:55:35,471 - app.services.worker - INFO - Generated responses for 5 dialogs successfully
+2025-03-16 18:55:35,471 - app.services.worker - INFO - Processing cycle completed in 0.63 seconds
