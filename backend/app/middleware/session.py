@@ -7,7 +7,7 @@ for handling user authentication in the FastAPI application.
 
 import os
 from datetime import datetime, timedelta, timezone
-from typing import Dict, Optional
+from typing import Dict, Optional, Any, Tuple
 import uuid
 
 import jwt
@@ -38,6 +38,7 @@ def utcnow() -> datetime:
 class SessionData(BaseModel):
     """Data structure for session information"""
     id: uuid.UUID
+    user_id: Optional[uuid.UUID] = None
     telegram_id: Optional[int] = None
     status: str
     token: str
@@ -311,6 +312,7 @@ async def verify_session_dependency(
             # Convert Session DB model to SessionData DTO
             session_data = SessionData(
                 id=session_db.id,
+                user_id=session_db.user_id,
                 telegram_id=telegram_id,
                 status=session_db.status,
                 token=session_db.token,

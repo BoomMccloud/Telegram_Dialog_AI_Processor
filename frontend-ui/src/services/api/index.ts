@@ -282,6 +282,11 @@ export const api = {
         url: `/responses/${id}`,
         data,
       }),
+    send: (id: number) => 
+      apiRequest({
+        method: 'POST',
+        url: `/responses/${id}/send`,
+      }),
     getHistory: () => 
       apiRequest({
         method: 'GET',

@@ -15,7 +15,7 @@ from sqlalchemy.sql import text
 from fastapi.openapi.utils import get_openapi
 from datetime import datetime, timezone
 
-from .api import auth, messages, dialogs
+from .api import auth, messages, dialogs, responses
 from .utils.logging import get_logger
 from .db.database import get_db, DATABASE_URL
 from .db.models.base import Base
@@ -176,7 +176,8 @@ app = FastAPI(
     openapi_tags=[
         {"name": "auth", "description": "Authentication operations"},
         {"name": "messages", "description": "Message operations"},
-        {"name": "dialogs", "description": "Dialog operations"}
+        {"name": "dialogs", "description": "Dialog operations"},
+        {"name": "responses", "description": "Response operations"}
     ],
     swagger_ui_parameters={
         "defaultModelsExpandDepth": -1,
@@ -257,6 +258,7 @@ app.add_exception_handler(TelethonError, telethon_error_handler)
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(messages.router, prefix="/api/messages", tags=["messages"])
 app.include_router(dialogs.router, prefix="/api", tags=["dialogs"])
+app.include_router(responses.router, prefix="/api", tags=["responses"])
 
 @app.on_event("startup")
 async def startup_event():
