@@ -559,3 +559,75 @@
 2025-03-16 21:01:22,237 - app.services.worker - INFO - Found existing response in database for dialog Jason X (UTC+8)
 2025-03-16 21:01:22,238 - app.services.worker - INFO - Generated responses for 7 dialogs successfully
 2025-03-16 21:01:22,238 - app.services.worker - INFO - Processing cycle completed in 1.02 seconds
+2025-03-18 18:19:30,615 - app.services.worker - INFO - Worker initialized with 600s interval
+2025-03-18 18:19:30,621 - app.services.worker - INFO - Starting processing cycle
+2025-03-18 18:19:30,653 - app.services.worker - INFO - Found 7 dialogs with processing enabled
+2025-03-18 18:19:31,790 - app.services.worker - INFO - Processed 7/7 dialogs successfully for user 7a9acff9-cf8b-4f7a-8b4a-dee4a5870155
+2025-03-18 18:19:31,790 - app.services.worker - INFO - Fetched messages for 7 dialogs successfully
+2025-03-18 18:19:31,802 - app.services.worker - INFO - Found existing response in database for dialog Telegram
+2025-03-18 18:19:31,804 - app.services.worker - INFO - Found existing response in database for dialog @RawDataBot
+2025-03-18 18:19:31,805 - app.services.worker - INFO - Found existing response in database for dialog KK, Jason, Sarah, Journey
+2025-03-18 18:19:31,806 - app.services.worker - INFO - Found existing response in database for dialog userinfobot
+2025-03-18 18:19:31,806 - app.services.worker - INFO - Found existing response in database for dialog AgenticAngel
+2025-03-18 18:19:31,807 - app.services.worker - INFO - Found existing response in database for dialog Wallet
+2025-03-18 18:19:31,808 - app.services.worker - INFO - Found existing response in database for dialog Jason X (UTC+8)
+2025-03-18 18:19:31,809 - app.services.worker - INFO - Generated responses for 7 dialogs successfully
+2025-03-18 18:19:31,809 - app.services.worker - INFO - Processing cycle completed in 1.19 seconds
+2025-03-18 18:29:32,452 - app.services.worker - INFO - Starting processing cycle
+2025-03-18 18:29:32,462 - app.services.worker - INFO - Found 7 dialogs with processing enabled
+2025-03-18 18:29:32,819 - app.services.worker - INFO - Processed 7/7 dialogs successfully for user 7a9acff9-cf8b-4f7a-8b4a-dee4a5870155
+2025-03-18 18:29:32,819 - app.services.worker - INFO - Fetched messages for 7 dialogs successfully
+2025-03-18 18:29:32,823 - app.services.worker - INFO - Found existing response in database for dialog Telegram
+2025-03-18 18:29:32,825 - app.services.worker - INFO - Found existing response in database for dialog @RawDataBot
+2025-03-18 18:29:32,826 - app.services.worker - INFO - Found existing response in database for dialog KK, Jason, Sarah, Journey
+2025-03-18 18:29:32,827 - app.services.worker - INFO - Found existing response in database for dialog userinfobot
+2025-03-18 18:29:32,828 - app.services.worker - INFO - Found existing response in database for dialog AgenticAngel
+2025-03-18 18:29:32,829 - app.services.worker - INFO - Found existing response in database for dialog Wallet
+2025-03-18 18:29:32,829 - app.services.worker - INFO - Found existing response in database for dialog Jason X (UTC+8)
+2025-03-18 18:29:32,830 - app.services.worker - INFO - Generated responses for 7 dialogs successfully
+2025-03-18 18:29:32,830 - app.services.worker - INFO - Processing cycle completed in 0.38 seconds
+2025-03-18 18:39:33,660 - app.services.worker - INFO - Starting processing cycle
+2025-03-18 18:39:33,669 - app.services.worker - INFO - Found 7 dialogs with processing enabled
+2025-03-18 18:39:34,637 - app.services.worker - INFO - Processed 7/7 dialogs successfully for user 7a9acff9-cf8b-4f7a-8b4a-dee4a5870155
+2025-03-18 18:39:34,638 - app.services.worker - INFO - Fetched messages for 7 dialogs successfully
+2025-03-18 18:39:34,641 - app.services.worker - INFO - Found existing response in database for dialog Telegram
+2025-03-18 18:39:34,643 - app.services.worker - INFO - Found existing response in database for dialog @RawDataBot
+2025-03-18 18:39:34,644 - app.services.worker - INFO - Found existing response in database for dialog KK, Jason, Sarah, Journey
+2025-03-18 18:39:34,645 - app.services.worker - INFO - Found existing response in database for dialog userinfobot
+2025-03-18 18:39:34,646 - app.services.worker - INFO - Found existing response in database for dialog AgenticAngel
+2025-03-18 18:39:34,647 - app.services.worker - INFO - Found existing response in database for dialog Wallet
+2025-03-18 18:39:34,648 - app.services.worker - INFO - Found existing response in database for dialog Jason X (UTC+8)
+2025-03-18 18:39:34,649 - app.services.worker - INFO - Generated responses for 7 dialogs successfully
+2025-03-18 18:39:34,649 - app.services.worker - INFO - Processing cycle completed in 0.99 seconds
+2025-03-18 18:49:39,925 - app.services.worker - INFO - Starting processing cycle
+2025-03-18 18:49:39,932 - app.services.worker - INFO - Found 7 dialogs with processing enabled
+2025-03-18 18:49:39,939 - app.services.worker - ERROR - Error processing dialogs: Multiple rows were found when one or none was required
+Traceback (most recent call last):
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/backend/app/services/worker.py", line 127, in process_dialogs
+    user_session = session_result.scalar_one_or_none()
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/engine/result.py", line 1487, in scalar_one_or_none
+    return self._only_one_row(
+           ^^^^^^^^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/engine/result.py", line 805, in _only_one_row
+    raise exc.MultipleResultsFound(
+sqlalchemy.exc.MultipleResultsFound: Multiple rows were found when one or none was required
+2025-03-18 18:49:39,944 - app.services.worker - INFO - Fetched messages for 0 dialogs successfully
+2025-03-18 18:49:39,944 - app.services.worker - INFO - No dialogs were successfully processed, skipping response generation
+2025-03-18 18:49:39,944 - app.services.worker - INFO - Processing cycle completed in 0.02 seconds
+2025-03-18 18:59:40,573 - app.services.worker - INFO - Starting processing cycle
+2025-03-18 18:59:40,580 - app.services.worker - INFO - Found 7 dialogs with processing enabled
+2025-03-18 18:59:40,586 - app.services.worker - ERROR - Error processing dialogs: Multiple rows were found when one or none was required
+Traceback (most recent call last):
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/backend/app/services/worker.py", line 127, in process_dialogs
+    user_session = session_result.scalar_one_or_none()
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/engine/result.py", line 1487, in scalar_one_or_none
+    return self._only_one_row(
+           ^^^^^^^^^^^^^^^^^^^
+  File "/Users/jasonbxu/Documents/GitHub/Telegram_Dialog_AI_Processor/.venv/lib/python3.11/site-packages/sqlalchemy/engine/result.py", line 805, in _only_one_row
+    raise exc.MultipleResultsFound(
+sqlalchemy.exc.MultipleResultsFound: Multiple rows were found when one or none was required
+2025-03-18 18:59:40,588 - app.services.worker - INFO - Fetched messages for 0 dialogs successfully
+2025-03-18 18:59:40,588 - app.services.worker - INFO - No dialogs were successfully processed, skipping response generation
+2025-03-18 18:59:40,588 - app.services.worker - INFO - Processing cycle completed in 0.01 seconds

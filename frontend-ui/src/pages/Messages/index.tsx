@@ -30,6 +30,7 @@ import {
   Card,
   CardContent,
   CardActions,
+  LinearProgress,
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
@@ -41,7 +42,8 @@ import SmartToyIcon from '@mui/icons-material/SmartToy';
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import AuthRequiredDialog from '../../components/Auth/AuthRequiredDialog';
 import { api } from '../../services/api';
-import { Response, ResponseStatus } from '../../types';
+import { Response, ResponseStatus, Message } from '../../types';
+import RefreshIcon from '@mui/icons-material/Refresh';
 
 // Tab interface
 interface TabPanelProps {
@@ -72,16 +74,60 @@ function TabPanel(props: TabPanelProps) {
 }
 
 // Mock interface for dialog messages - replace with actual API types
-interface DialogMessage {
-  id: string;
-  text: string;
-  sender: {
-    id: string;
-    name: string;
-    is_self: boolean;
-  };
-  timestamp: string;
+interface DialogMessage extends Message {}
+
+// Progress tracking interface
+interface ProcessingProgress {
+  totalDialogs: number;
+  processedDialogs: number;
+  currentDialogName: string;
+  currentOperation: string;
+  error: string | null;
 }
+
+// Progress dialog props interface
+interface ProcessingDialogProps {
+  open: boolean;
+  progress: ProcessingProgress;
+  onCancel: () => void;
+}
+
+// Processing dialog component
+const ProcessingDialog: React.FC<ProcessingDialogProps> = ({ open, progress, onCancel }) => {
+  return (
+    <Dialog open={open} onClose={onCancel}>
+      <DialogTitle>Processing Messages</DialogTitle>
+      <DialogContent>
+        <Box sx={{ width: '100%', mt: 2 }}>
+          <Typography variant="body2" color="text.secondary" gutterBottom>
+            {progress.currentOperation}
+          </Typography>
+          <Typography variant="body2" color="text.secondary" gutterBottom>
+            Processing dialog: {progress.currentDialogName}
+          </Typography>
+          <LinearProgress 
+            variant="determinate" 
+            value={(progress.processedDialogs / progress.totalDialogs) * 100} 
+            sx={{ mt: 2, mb: 1 }}
+          />
+          <Typography variant="body2" color="text.secondary" align="center">
+            {progress.processedDialogs} of {progress.totalDialogs} dialogs processed
+          </Typography>
+          {progress.error && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {progress.error}
+            </Alert>
+          )}
+        </Box>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onCancel} color="primary">
+          Cancel
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+};
 
 const Messages = () => {
   // Tab state
@@ -110,6 +156,16 @@ const Messages = () => {
   
   // Auth required dialog
   const [showAuthDialog, setShowAuthDialog] = useState(false);
+  
+  // Processing state
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingProgress, setProcessingProgress] = useState<ProcessingProgress>({
+    totalDialogs: 0,
+    processedDialogs: 0,
+    currentDialogName: '',
+    currentOperation: '',
+    error: null
+  });
 
   // Handle tab change
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
@@ -613,11 +669,142 @@ const Messages = () => {
     );
   };
 
+  // Function to handle manual refresh
+  const handleRefresh = async () => {
+    console.log('Starting refresh process...');
+    setIsProcessing(true);
+    setProcessingProgress({
+      totalDialogs: 0,
+      processedDialogs: 0,
+      currentDialogName: '',
+      currentOperation: 'Fetching dialogs...',
+      error: null
+    });
+
+    try {
+      console.log('Attempting to fetch dialogs from API...');
+      // Fetch all dialogs
+      const dialogsResponse = await api.telegram.getDialogs();
+      console.log('Received dialogs response:', dialogsResponse);
+      
+      // Filter dialogs based on criteria
+      const filteredDialogs = dialogsResponse.dialogs.filter(dialog => {
+        console.log('Checking dialog:', { 
+          id: dialog.id, 
+          name: dialog.name, 
+          is_user: dialog.is_user, 
+          unread_count: dialog.unread_count,
+          type: dialog.type 
+        });
+        return (dialog.is_user && dialog.unread_count > 0) || // Unread private messages
+               (!dialog.is_user && dialog.unread_count > 0 && dialog.type === 'group'); // Unread group messages
+      });
+
+      console.log('Filtered dialogs:', filteredDialogs.length, 'matches found');
+
+      setProcessingProgress(prev => ({
+        ...prev,
+        totalDialogs: filteredDialogs.length,
+        currentOperation: 'Processing dialogs...'
+      }));
+
+      // Process each dialog
+      for (const dialog of filteredDialogs) {
+        try {
+          console.log(`Processing dialog: ${dialog.name} (ID: ${dialog.id})`);
+          setProcessingProgress(prev => ({
+            ...prev,
+            currentDialogName: dialog.name,
+            currentOperation: `Fetching messages for ${dialog.name}...`
+          }));
+
+          // Fetch messages for the dialog
+          console.log('Fetching messages with params:', {
+            dialogId: dialog.id.toString(),
+            unread_only: dialog.is_user,
+            mentions_only: !dialog.is_user
+          });
+          
+          const messages = await api.messages.getByDialogId(
+            dialog.id.toString(),
+            {
+              limit: 50,
+              unread_only: dialog.is_user,
+              mentions_only: !dialog.is_user
+            }
+          );
+          console.log(`Retrieved ${messages.messages?.length || 0} messages for dialog ${dialog.name}`);
+
+          setProcessingProgress(prev => ({
+            ...prev,
+            currentOperation: `Generating responses for ${dialog.name}...`
+          }));
+
+          // Generate responses for the messages
+          console.log('Generating responses for messages:', {
+            dialog_id: dialog.id.toString(),
+            message_count: messages.messages?.length || 0
+          });
+          
+          await api.responses.generate({
+            dialog_id: dialog.id.toString(),
+            messages: messages.messages
+          });
+          console.log(`Successfully generated responses for dialog ${dialog.name}`);
+
+          setProcessingProgress(prev => ({
+            ...prev,
+            processedDialogs: prev.processedDialogs + 1
+          }));
+        } catch (dialogError) {
+          console.error(`Error processing dialog ${dialog.name}:`, dialogError);
+          console.error('Full error details:', {
+            dialog_id: dialog.id,
+            dialog_name: dialog.name,
+            error: dialogError
+          });
+          setProcessingProgress(prev => ({
+            ...prev,
+            error: `Failed to process dialog ${dialog.name}. Continuing with next dialog...`
+          }));
+        }
+      }
+
+      console.log('All dialogs processed, refreshing view...');
+      // Refresh the responses list
+      refreshCurrentView();
+    } catch (err) {
+      console.error('Error during refresh:', err);
+      console.error('Full error details:', {
+        error: err,
+        stack: err instanceof Error ? err.stack : undefined
+      });
+      setProcessingProgress(prev => ({
+        ...prev,
+        error: 'Failed to fetch or process dialogs. Please try again.'
+      }));
+    } finally {
+      console.log('Refresh process completed');
+      setIsProcessing(false);
+    }
+  };
+
   return (
     <Box>
-      <Typography variant="h4" gutterBottom>
-        Message Responses
-      </Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Typography variant="h4">
+          Message Responses
+        </Typography>
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={handleRefresh}
+          disabled={isProcessing}
+          startIcon={<RefreshIcon />}
+        >
+          Refresh Messages
+        </Button>
+      </Box>
       
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
@@ -736,6 +923,13 @@ const Messages = () => {
         open={showAuthDialog} 
         onClose={() => setShowAuthDialog(false)}
         action="view message responses"
+      />
+      
+      {/* Processing Dialog */}
+      <ProcessingDialog 
+        open={isProcessing} 
+        progress={processingProgress} 
+        onCancel={() => setIsProcessing(false)}
       />
     </Box>
   );

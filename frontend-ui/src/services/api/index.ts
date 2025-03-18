@@ -1,5 +1,5 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
-import { QRAuthResponse, SessionVerifyResponse, DialogListResponse, SessionStatus, Response, ResponseListResponse, ResponseUpdateRequest } from '../../types';
+import { QRAuthResponse, SessionVerifyResponse, DialogListResponse, SessionStatus, Response, ResponseListResponse, ResponseUpdateRequest, MessageListResponse, MessageFetchOptions, ResponseGenerateRequest } from '../../types';
 
 // Create a base API instance
 const apiClient: AxiosInstance = axios.create({
@@ -259,6 +259,16 @@ export const api = {
     },
   },
   
+  // Message endpoints
+  messages: {
+    getByDialogId: (dialogId: string, options?: MessageFetchOptions) => 
+      apiRequest<MessageListResponse>({
+        method: 'GET',
+        url: `/messages/dialog/${dialogId}`,
+        params: options
+      }),
+  },
+  
   // Response endpoints
   responses: {
     getPending: (skip: number = 0, limit: number = 10) => 
@@ -307,6 +317,13 @@ export const api = {
       apiRequest<Response>({
         method: 'POST',
         url: `/responses/${responseId}/send`,
+      }),
+    
+    generate: (data: ResponseGenerateRequest) => 
+      apiRequest<Response>({
+        method: 'POST',
+        url: '/responses/generate',
+        data,
       }),
   },
   

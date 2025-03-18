@@ -138,9 +138,8 @@ The Telegram Dialog AI Processor is a web application that enables users to proc
 
 1. **Backend Features**:
    - Telegram integration via Telethon API for message retrieval
-   - QR code-based authentication for secure login
    - Dialog selection for processing specific conversations
-   - AI-powered message analysis and response generation using Claude
+   - AI-powered message analysis and response generation
    - Database storage for messages, processing results, and user preferences
    - Background worker for asynchronous message processing (Current Priority)
 
@@ -152,261 +151,192 @@ The Telegram Dialog AI Processor is a web application that enables users to proc
 
 The system is designed to help users efficiently manage Telegram conversations by using AI to generate context-aware responses, which users can then review before sending. The MVP will use Claude as the primary LLM, with plans to support multiple models in the future.
 
+### Current Task: Message Fetch & Process Enhancement
+
+The current task is to modify the Messages page (frontend-ui/src/pages/Messages/index.tsx) to:
+
+1. Implement a manual refresh button that triggers the process
+2. Fetch all dialog metadata and filter for:
+   - Unread private messages
+   - Unread group dialogs where the user is mentioned
+3. For each filtered dialog, fetch 50 messages starting from:
+   - The earliest unread message (for private chats)
+   - The earliest user mention (for group chats with multiple mentions)
+4. Generate AI responses for these messages using the existing generation pipeline
+5. Store these responses and display them in the UI using existing components
+6. Provide user feedback through a progress dialog and prevent multiple operations
+
+This represents a significant enhancement to the current workflow, moving from passive response management to active message fetching and processing.
+
 ## Key Challenges and Analysis
 
-### Background Worker Implementation (Current Priority)
+Based on the planner's analysis, here are the key components we need to modify:
 
-1. **Current Architecture Assessment**:
-   - Partial implementation of background task management exists in BackgroundTaskManager class
-   - Queue management is incomplete with placeholder functions in QueueManager
-   - Dialog processing service has basic structure but lacks full implementation
-   - Test infrastructure exists but needs expansion for TDD approach
+### Plan for Modifying the Messages Page
 
-2. **Implementation Requirements**:
-   - Complete task queue system with proper persistence
-   - Robust background worker process with error handling
-   - Task monitoring and management API
-   - Comprehensive test coverage for all components
+1. **Add Manual Refresh Functionality**:
+   - Implement a button in the UI that allows users to manually refresh the message list.
 
-3. **Technical Approach**:
-   - Test-driven development to ensure code quality and reliability
-   - Modular design to separate concerns (queue, worker, processor)
-   - Integration testing to verify full workflow functionality
-   - Mock data for consistent testing environment
+2. **Fetch Dialog Metadata and Filter**:
+   - Retrieve dialog metadata using an API call to the backend.
+   - Filter dialogs for unread private messages and group messages where the user is mentioned.
 
-### Future Improvements (Pending)
+3. **Fetch Messages**:
+   - For each filtered dialog, fetch 50 messages starting from the earliest unread message or user mention.
 
-1. **Critical Security Fixes**:
-   - Configure restrictive CORS settings with specific allowed origins
-   - Implement rate limiting middleware
-   - Complete JWT token validation and refresh mechanism
-   - Add request validation middleware
+4. **Generate AI Responses**:
+   - Use the existing AI response generation pipeline to process these messages.
 
-2. **Critical Stability Fixes**:
-   - Configure database connection pooling
-   - Implement connection retry mechanisms
-   - Add connection timeout handling
-   - Add database health checks
-   - Implement graceful connection recovery
+5. **Store and Display Responses**:
+   - Store generated responses in the existing database structure.
+   - Display generated responses using existing UI components.
 
-## Verifiable Success Criteria
+6. **Error Handling and User Feedback**:
+   - Implement comprehensive error handling with retry logic and exponential backoff
+   - Capture and log specific error responses for debugging
+   - Provide feedback at each step of the process, including visual progress indicators and notifications
+   - Allow cancellation of the operation and handle scenarios with no new messages effectively
+   - Address edge cases such as multiple mentions and time zone differences in message processing
 
-1. **Background Worker System**:
-   - Task queue system successfully stores and retrieves tasks
-   - Worker process executes tasks without data loss
-   - Error handling recovers from common failure scenarios
-   - Test coverage exceeds 80% for worker components
-   - System handles concurrent task processing correctly
+### Component and State Changes Required
 
-2. **System Stability**:
-   - Zero data loss during processing
-   - Successful recovery from network interruptions
-   - Proper handling of Telegram API rate limits
-   - Graceful degradation under high load
+1. **Manual Refresh Button**:
+   - Add a button component to the Messages page that triggers the refresh process.
 
-3. **Security Requirements**:
-   - All sensitive data properly encrypted
-   - No exposure of API keys or credentials
-   - Proper session management and token validation
-   - Rate limiting prevents abuse
+2. **Progress Dialog**:
+   - Implement a modal dialog with visual progress bar and estimated time remaining
+   - Add tooltips and help icons for user guidance
+   - Display actionable error messages and success notifications
+
+3. **Processing State Management**:
+   - Add state for tracking processing status (isProcessing: boolean)
+   - Track progress metrics (totalDialogs, processedDialogs, currentDialogName)
+   - Implement retry logic with exponential backoff for failed operations
+   - Cache frequently accessed data to improve performance
+
+4. **API Integration**:
+   - Fetch dialog metadata with rate limiting and batching
+   - Filter dialogs based on criteria (unread, mentions)
+   - Fetch messages for each dialog with proper error handling
+   - Generate and store AI responses with progress tracking
+
+### Testing Requirements
+
+1. **Comprehensive Scenario Testing**:
+   - Test with varying message volumes (few to thousands)
+   - Simulate network interruptions and recovery
+   - Validate edge cases (multiple mentions, complex dialog structures)
+
+2. **User Interface Testing**:
+   - Conduct usability testing with real users
+   - Test accessibility features
+   - Verify progress indicators and notifications
+
+3. **Performance Testing**:
+   - Validate rate limiting and batching effectiveness
+   - Test caching mechanisms
+   - Monitor API call patterns and optimize as needed
 
 ## High-level Task Breakdown
 
-1. **Phase 1: Test Infrastructure**
-   - Create test fixtures for mock users, dialogs, and messages
-   - Write unit tests for queue management functions
-   - Set up test database with proper schema for task storage
+1. **Define New State Variables and Interfaces**:
+   - Add progress tracking state
+   - Create progress dialog component
+   - Define new API function interfaces
 
-2. **Phase 2: Queue Management**
-   - Implement task queue system with database persistence
-   - Create API endpoints for task management
-   - Add task prioritization and scheduling
+2. **Implement UI Components**:
+   - Add refresh button to the Messages page
+   - Create progress dialog with status information
+   - Update main interface to disable during processing
 
-3. **Phase 3: Worker Process**
-   - Implement worker process with proper error handling
-   - Add task execution logic
-   - Create monitoring and logging system
+3. **Implement Processing Logic**:
+   - Create a processing pipeline function
+   - Implement dialog filtering logic
+   - Handle message fetching for each dialog type
+   - Connect to response generation API
 
-4. **Phase 4: Integration**
-   - Create integration tests for the full workflow
-   - Connect frontend with worker status reporting
-   - Implement end-to-end testing
+4. **Error Handling and User Feedback**:
+   - Implement comprehensive error handling
+   - Provide feedback at each step of the process
+   - Allow cancellation of the operation
 
 ## Current Status / Progress Tracking
 
-Status: Background Worker Implementation In Progress
+Implementation progress:
 
-### Code Analysis Summary
+1. Added new interfaces and types:
+   - ProcessingProgress interface for tracking dialog processing
+   - ProcessingDialog component for showing progress
+   - Message and related interfaces for API communication
+   - Updated DialogMessage to use the new Message interface
 
-1. **Backend Implementation Status**:
-   
-   a. Core Infrastructure:
-   - [✓] FastAPI application setup with proper lifecycle management
-   - [✓] Database connection pooling and health checks
-   - [✓] Session middleware and authentication
-   - [✓] Background task manager foundation
-   - [✓] Error handling and logging
+2. Added new API endpoints:
+   - messages.getByDialogId for fetching messages with filtering options
+   - responses.generate for generating AI responses
 
-   b. API Layer (backend/app/api/):
-   - [✓] auth.py: Complete authentication endpoints (275 lines)
-   - [✓] dependencies.py: API dependencies (138 lines)
-   - [✓] dialogs.py: Dialog management (289 lines)
-   - [✓] messages.py: Message handling (106 lines)
-   - [~] responses.py: Partial implementation (24 lines)
-   - [✗] settings.py: Missing implementation
+3. Added UI components:
+   - Refresh button in the Messages page header
+   - Progress dialog with status information
+   - Processing state management
 
-   c. Services Layer (backend/app/services/):
-   - [✓] auth.py: Authentication service (190 lines)
-   - [✓] background_tasks.py: Task management (66 lines)
-   - [✓] cleanup.py: Session cleanup (66 lines)
-   - [✓] telegram.py: Telegram integration (116 lines)
-   - [✓] telegram_bot.py: Bot functionality (122 lines)
-   - [✓] dialog_processor.py: Dialog processing service (NEW)
-   - [✓] worker.py: Background worker implementation (NEW)
-   - [✓] retry.py: Retry utility for API calls (NEW)
-   - [✗] processing.py: Missing implementation
-   - [✗] response.py: Missing implementation
-   - [✗] user.py: Missing implementation
+4. Implemented core processing logic:
+   - Dialog fetching and filtering
+   - Message retrieval with unread/mention filtering
+   - Response generation pipeline
+   - Progress tracking and error handling
 
-   d. Database Layer:
-   - [✓] Complete schema with proper migrations
-   - [✓] Model definitions and relationships
-   - [✓] Connection management and pooling
-   - [✓] Health checks and error handling
+5. Verified backend API endpoints:
+   - `/dialogs` and `/dialog/{dialog_id}` for fetching dialogs and messages
+   - `/responses/*` endpoints for managing AI-generated responses
+   - `/dialogs/select` and related endpoints for managing dialog processing
+   - All required endpoints are available and support the needed functionality
 
-2. **Frontend Implementation Status**:
-
-   a. Core Structure:
-   - [✓] Next.js 14 setup with TypeScript
-   - [✓] Component organization
-   - [✓] State management
-   - [✓] API service integration
-
-   b. Components:
-   - [✓] Auth/: Authentication components
-   - [✓] Layout/: Page layouts and navigation
-   - [✓] Dashboard/: Main dashboard view
-   - [✓] Dialogs/: Dialog management UI
-   - [✓] Messages/: Message display and interaction
-   - [✓] Models/: AI model selection and configuration
-
-   c. Services:
-   - [✓] API integration layer
-   - [✓] Authentication service
-   - [~] WebSocket integration (pending)
-
-3. **Background Worker Progress**:
-
-   a. Completed Components:
-   - [✓] BackgroundTaskManager class with basic task management
-   - [✓] Task cleanup and error handling
-   - [✓] Integration with FastAPI lifecycle
-   - [✓] DialogProcessor for fetching and storing messages
-   - [✓] Worker process implementation with error handling
-   - [✓] Retry utility with exponential backoff
-   - [✓] Test coverage for worker, dialog processor, and retry utility
-
-   b. Missing Components:
-   - [✗] Queue persistence for failed tasks
-   - [✗] Task prioritization logic
-   - [✗] Response generation worker
-   - [✗] Response sender worker
-   - [✗] Health monitoring API
-
-4. **Test Coverage**:
-   - [✓] Basic test infrastructure in place
-   - [✓] Database fixtures and utilities
-   - [✓] Worker service tests
-   - [✓] Dialog processor service tests
-   - [✓] Retry utility tests
-   - [✗] API endpoint tests
-   - [✗] Integration tests
-
-### Recent Progress:
-
-1. **Background Worker Implementation**:
-   - Created a robust retry utility with exponential backoff for API calls
-   - Implemented a dialog processor service to fetch and store messages
-   - Enhanced the worker to fetch processing-enabled dialogs
-   - Added error handling and transaction management
-   - Implemented message filtering by dialog
-   - Grouped dialog processing by user for efficiency
-   - Created comprehensive test suites for all components
-   - Verified worker functionality with processing-enabled dialogs
-
-2. **Technical Improvements**:
-   - Added detailed logging throughout the worker process
-   - Implemented proper error handling with database transaction management
-   - Created async retry mechanism with configurable parameters
-   - Added graceful shutdown handling for the worker
-
-### Technical Debt:
-
-1. **Security**:
-   - Missing CORS configuration
-   - Incomplete rate limiting
-   - Basic JWT validation needs enhancement
-
-2. **Stability**:
-   - Database connection retry logic needs improvement
-   - Missing health check endpoints for worker status
-
-3. **Documentation**:
-   - API documentation incomplete
-   - Missing deployment guides
-   - Configuration documentation needed
-
-## Next Steps and Action Items
-
-### Immediate Focus: Complete Background Worker and Message Processing
-
-1. **Phase 1: Add Response Generation**
-   - Create AI service for generating responses to messages
-   - Implement prompt formatting for different conversation contexts
-   - Add rate limiting for AI API calls
-   - Create test fixtures for AI response generation
-
-2. **Phase 2: Queue Management**
-   - Implement persistent queue for failed tasks
-   - Add retry mechanism for failed processing tasks
-   - Create API endpoints for task status monitoring
-   - Implement task prioritization based on dialog importance
-
-3. **Phase 3: Auto-send Functionality**
-   - Create response sender worker for auto-approved messages
-   - Implement configurable auto-approval rules
-   - Add safeguards to prevent duplicate responses
-   - Create logging for sent responses
-
-4. **Phase 4: Frontend Integration**
-   - Create worker status dashboard
-   - Implement real-time status updates via WebSockets
-   - Add manual task management controls
-   - Create visualization for processing statistics
+Next steps:
+1. Test the implementation with various scenarios
+2. Handle edge cases and error conditions
+3. Add loading states and user feedback
+4. Implement cancellation functionality
 
 ## Executor's Feedback or Assistance Requests
 
-I've completed the implementation of the background worker system with the following components:
+1. Need to verify the API endpoints are implemented correctly on the backend:
+   - /messages/{dialogId} with filtering options
+   - /responses/generate for AI response generation
 
-1. **Retry Utility**: Created `backend/app/utils/retry.py` with an async retry decorator that implements exponential backoff for handling temporary failures in API calls. The utility supports customizable retry parameters and specific exception handling.
+2. Need to test the dialog filtering logic:
+   - Verify unread message detection
+   - Verify user mention detection in group chats
 
-2. **Dialog Processor**: Implemented `backend/app/services/dialog_processor.py` which handles:
-   - Fetching messages for a dialog with retry logic
-   - Storing messages in the database
-   - Updating dialog processing status
-   - Transaction management with proper commit/rollback
+3. Consider adding rate limiting or batching for message processing to prevent overload
 
-3. **Worker Process**: Enhanced `backend/app/services/worker.py` to:
-   - Retrieve processing-enabled dialogs from the database
-   - Process dialogs efficiently by grouping them by user
-   - Handle errors gracefully with detailed logging
-   - Run on a configurable interval (currently set to 10 minutes)
+## Next Steps and Action Items
 
-4. **Tests**: Created comprehensive test suites for all components:
-   - `backend/tests/test_utils/test_retry.py`
-   - `backend/tests/test_services/test_dialog_processor.py`
-   - `backend/tests/test_services/test_worker.py`
+1. **Enhance Error Handling**:
+   - Implement retry logic with exponential backoff for API calls
+   - Add error logging and monitoring
+   - Create user-friendly error messages
+   - Handle edge cases for message processing
 
-The worker is now operational and successfully finding processing-enabled dialogs as shown in the logs. The retry mechanism ensures robustness against temporary API failures, and the transaction management prevents data corruption during processing failures.
+2. **Improve User Experience**:
+   - Add visual progress bar to the progress dialog
+   - Implement estimated time remaining calculation
+   - Create tooltips and help icons
+   - Add success/error notifications
 
-Next, I recommend focusing on the response generation component to complete the full message processing pipeline.
+3. **Optimize Performance**:
+   - Implement rate limiting for API calls
+   - Add request batching for dialog processing
+   - Set up caching for frequently accessed data
+   - Add lazy loading for message data
+
+4. **Testing and Validation**:
+   - Create test scenarios for different message volumes
+   - Test network interruption handling
+   - Validate edge case handling
+   - Conduct accessibility testing
+
+Priority order:
+1. Error handling and retry logic
+2. Progress dialog improvements
+3. Performance optimizations
+4. Testing implementation

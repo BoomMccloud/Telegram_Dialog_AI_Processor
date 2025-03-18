@@ -89,4 +89,35 @@ export interface ResponseListResponse {
 
 export interface ResponseUpdateRequest {
   edited_response: string;
+}
+
+// Message types
+export interface Message {
+  id: string;
+  dialog_id: string;
+  text: string;
+  timestamp: string;
+  is_unread: boolean;
+  has_mention: boolean;
+  sender: {
+    id: string;
+    name: string;
+    is_self: boolean;
+  };
+}
+
+export interface MessageListResponse {
+  messages: Message[];
+  total: number;
+}
+
+export interface MessageFetchOptions {
+  limit?: number;
+  unread_only?: boolean;
+  mentions_only?: boolean;
+}
+
+export interface ResponseGenerateRequest {
+  dialog_id: string;
+  messages: Message[];
 } 
