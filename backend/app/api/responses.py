@@ -24,6 +24,7 @@ from app.services.response_sender import ResponseSender
 from app.services.telegram import get_recent_messages
 from app.db.models.message import Message
 from app.api.messages import list_dialog_messages
+from app.services.llm_api import query_llm
 
 router = APIRouter(prefix="/responses", tags=["responses"])
 logger = get_logger(__name__)
@@ -869,7 +870,7 @@ async def _generate_response(
 
 async def generate_ai_response(messages: List[Message], dialog: Dialog) -> str:
     """
-    Generate AI response for the given messages
+    Generate AI response for the given messages using LLM API
     
     Args:
         messages: List of messages to process
@@ -878,6 +879,25 @@ async def generate_ai_response(messages: List[Message], dialog: Dialog) -> str:
     Returns:
         Generated response text
     """
-    # TODO: Implement actual AI response generation
-    # For now, return a placeholder
-    return f"This is a placeholder response for dialog: {dialog.title}" 
+    try:
+        # Format messages into a conversation prompt
+        prompt = f"You are having a conversation in a Telegram chat with {dialog.title}. Here are the recent messages:\n\n"
+        
+        for msg in messages:
+            sender = "You" if msg.is_outgoing else msg.sender_name
+            prompt += f"{sender}: {msg.text}\n"
+        
+        prompt += "\nPlease provide a natural and contextually appropriate response to continue this conversation."
+        
+        # Call LLM API
+        response = query_llm(prompt, provider="anthropic")  # Using Claude for better conversation
+        
+        if not response:
+            logger.error("Failed to get response from LLM API")
+            return "I apologize, but I'm having trouble generating a response right now. Please try again later."
+            
+        return response.strip()
+        
+    except Exception as e:
+        logger.error(f"Error generating AI response: {str(e)}", exc_info=True)
+        return "I apologize, but I encountered an error while generating a response. Please try again later."
