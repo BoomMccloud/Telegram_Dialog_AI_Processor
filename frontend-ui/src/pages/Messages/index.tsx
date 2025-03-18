@@ -715,41 +715,22 @@ const Messages = () => {
           setProcessingProgress(prev => ({
             ...prev,
             currentDialogName: dialog.name,
-            currentOperation: `Fetching messages for ${dialog.name}...`
+            currentOperation: `Processing ${dialog.name}...`
           }));
 
-          // Fetch messages for the dialog
-          console.log('Fetching messages with params:', {
-            dialogId: dialog.id.toString(),
-            unread_only: dialog.is_user,
-            mentions_only: !dialog.is_user
+          // Generate responses for the dialog
+          console.log('Generating responses for dialog:', {
+            dialog_id: dialog.id.toString(),
+            is_user: dialog.is_user,
+            type: dialog.type
           });
           
-          const messages = await api.messages.getByDialogId(
-            dialog.id.toString(),
-            {
-              limit: 50,
-              unread_only: dialog.is_user,
-              mentions_only: !dialog.is_user
-            }
-          );
-          console.log(`Retrieved ${messages.messages?.length || 0} messages for dialog ${dialog.name}`);
-
-          setProcessingProgress(prev => ({
-            ...prev,
-            currentOperation: `Generating responses for ${dialog.name}...`
-          }));
-
-          // Generate responses for the messages
-          console.log('Generating responses for messages:', {
-            dialog_id: dialog.id.toString(),
-            message_count: messages.messages?.length || 0
-          });
-          
-          await api.responses.generate({
-            dialog_id: dialog.id.toString(),
-            messages: messages.messages
-          });
+          // Call the appropriate endpoint based on dialog type
+          if (dialog.is_user) {
+            await api.responses.generate.private(dialog.id.toString());
+          } else {
+            await api.responses.generate.group(dialog.id.toString());
+          }
           console.log(`Successfully generated responses for dialog ${dialog.name}`);
 
           setProcessingProgress(prev => ({

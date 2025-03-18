@@ -1,5 +1,5 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
-import { QRAuthResponse, SessionVerifyResponse, DialogListResponse, SessionStatus, Response, ResponseListResponse, ResponseUpdateRequest, MessageListResponse, MessageFetchOptions, ResponseGenerateRequest } from '../../types';
+import { QRAuthResponse, SessionVerifyResponse, DialogListResponse, SessionStatus, Response, ResponseListResponse, ResponseUpdateRequest, MessageListResponse, MessageFetchOptions, ResponseGenerateRequest, ResponseWithDialog } from '../../types';
 
 // Create a base API instance
 const apiClient: AxiosInstance = axios.create({
@@ -319,12 +319,20 @@ export const api = {
         url: `/responses/${responseId}/send`,
       }),
     
-    generate: (data: ResponseGenerateRequest) => 
-      apiRequest<Response>({
-        method: 'POST',
-        url: '/responses/generate',
-        data,
-      }),
+    generate: {
+      private: (dialog_id: string) =>
+        apiRequest<ResponseWithDialog>({
+          method: 'POST',
+          url: '/responses/generate/private',
+          data: { telegram_dialog_id: dialog_id }
+        }),
+      group: (dialog_id: string) =>
+        apiRequest<ResponseWithDialog>({
+          method: 'POST',
+          url: '/responses/generate/group',
+          data: { telegram_dialog_id: dialog_id }
+        })
+    },
   },
   
   // Settings endpoints

@@ -117,7 +117,7 @@ export interface MessageFetchOptions {
   mentions_only?: boolean;
 }
 
-export interface ResponseGenerateRequest {
-  dialog_id: string;
-  messages: Message[];
+export interface ResponseWithDialog extends Response {
+  dialog_name: string;
+  last_message_timestamp: string;
 } 

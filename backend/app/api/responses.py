@@ -21,6 +21,9 @@ from app.db.models.dialog import Dialog
 from app.db.models.types import ProcessingStatus
 from app.utils.logging import get_logger
 from app.services.response_sender import ResponseSender
+from app.services.telegram import get_recent_messages
+from app.db.models.message import Message
+from app.api.messages import list_dialog_messages
 
 router = APIRouter(prefix="/responses", tags=["responses"])
 logger = get_logger(__name__)
@@ -53,6 +56,10 @@ class ResponseList(BaseModel):
     """Response model for list of responses"""
     responses: List[ResponseWithDialog]
     total: int
+
+class GenerateRequest(BaseModel):
+    """Request model for generating responses"""
+    telegram_dialog_id: str
 
 @router.get(
     "/pending",
@@ -665,4 +672,212 @@ async def send_response(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to send response"
-        ) 
+        )
+
+@router.post(
+    "/generate/private",
+    response_model=ResponseWithDialog,
+    summary="Generate response for private chat",
+    description="Generate AI response for a private chat dialog. Requires authentication.",
+    responses={
+        401: {"description": "Invalid or expired session"},
+        403: {"description": "Not authenticated"},
+        404: {"description": "Dialog not found"}
+    },
+    openapi_extra={
+        "security": [{"BearerAuth": []}]
+    }
+)
+async def generate_private_chat_response(
+    request: GenerateRequest,
+    session: SessionData = Depends(verify_session),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Generate response for a private chat dialog
+    
+    Args:
+        request: Generate request with dialog ID
+        session: Session data from authentication
+        db: Database session
+        
+    Returns:
+        Generated response with dialog information
+    """
+    return await _generate_response(request.telegram_dialog_id, session, db, is_group=False)
+
+@router.post(
+    "/generate/group",
+    response_model=ResponseWithDialog,
+    summary="Generate response for group chat",
+    description="Generate AI response for a group chat dialog. Requires authentication.",
+    responses={
+        401: {"description": "Invalid or expired session"},
+        403: {"description": "Not authenticated"},
+        404: {"description": "Dialog not found"}
+    },
+    openapi_extra={
+        "security": [{"BearerAuth": []}]
+    }
+)
+async def generate_group_chat_response(
+    request: GenerateRequest,
+    session: SessionData = Depends(verify_session),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Generate response for a group chat dialog
+    
+    Args:
+        request: Generate request with dialog ID
+        session: Session data from authentication
+        db: Database session
+        
+    Returns:
+        Generated response with dialog information
+    """
+    return await _generate_response(request.telegram_dialog_id, session, db, is_group=True)
+
+async def _generate_response(
+    telegram_dialog_id: str,
+    session: SessionData,
+    db: AsyncSession,
+    is_group: bool
+) -> Dict[str, Any]:
+    """
+    Shared logic for generating responses for both private and group chats
+    
+    Args:
+        telegram_dialog_id: Telegram ID of the dialog to generate response for
+        session: Session data from authentication
+        db: Database session
+        is_group: Whether this is a group chat (for future differentiation)
+        
+    Returns:
+        Generated response with dialog information
+    """
+    try:
+        # Get dialog and validate ownership
+        query = (
+            select(Dialog)
+            .where(
+                Dialog.telegram_dialog_id == telegram_dialog_id,
+                Dialog.user_id == session.user_id
+            )
+        )
+        result = await db.execute(query)
+        dialog = result.scalar_one_or_none()
+        
+        if not dialog:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Dialog not found"
+            )
+
+        # TODO: Investigate Telethon's iter_messages parameters to:
+        # 1. Find the first unread message
+        # 2. Fetch N messages before that point for better context
+        # 3. Consider using dialog.unread_count to optimize fetching
+        # For now, we'll fetch the most recent 50 messages
+        messages = await get_recent_messages(
+            token=session.token,
+            limit=50,
+            dialog_id=int(telegram_dialog_id)
+        )
+        
+        if not messages:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No messages found in dialog"
+            )
+
+        # Convert raw messages to our Message model
+        processed_messages = []
+        for msg in messages:
+            processed_messages.append(Message(
+                telegram_message_id=str(msg['message_id']),
+                dialog_id=telegram_dialog_id,
+                text=msg['text'],
+                sender_id=str(msg['sender']['id']),
+                sender_name=msg['sender'].get('name', 'Unknown'),
+                date=datetime.fromisoformat(msg['date']),
+                is_outgoing=msg.get('is_outgoing', False)
+            ))
+
+        # Generate AI response
+        # TODO: Pass is_group to the AI service when implementing different behaviors
+        response_text = await generate_ai_response(processed_messages, dialog)
+        
+        # Create or update response in database
+        # Since UI is locked during generation, we can safely overwrite any existing response
+        query = (
+            select(ProcessedResponse)
+            .where(ProcessedResponse.dialog_id == dialog.id)
+        )
+        result = await db.execute(query)
+        existing_response = result.scalar_one_or_none()
+        
+        last_message = processed_messages[-1]
+        
+        if existing_response:
+            # Update existing response
+            existing_response.suggested_response = response_text
+            existing_response.status = ProcessingStatus.PENDING_APPROVAL
+            existing_response.last_message_id = last_message.telegram_message_id
+            existing_response.last_message_timestamp = last_message.date
+            existing_response.model_name = "gpt-4"  # TODO: Make configurable
+            existing_response.processed_at = datetime.utcnow()
+            response = existing_response
+        else:
+            # Create new response
+            response = ProcessedResponse(
+                dialog_id=dialog.id,
+                suggested_response=response_text,
+                status=ProcessingStatus.PENDING_APPROVAL,
+                last_message_id=last_message.telegram_message_id,
+                last_message_timestamp=last_message.date,
+                model_name="gpt-4",  # TODO: Make configurable
+                processed_at=datetime.utcnow()
+            )
+            db.add(response)
+        
+        await db.commit()
+        await db.refresh(response)
+        
+        # Format response with dialog information
+        return {
+            "id": response.id,
+            "dialog_id": response.dialog_id,
+            "dialog_name": dialog.title,
+            "last_message_id": response.last_message_id,
+            "last_message_timestamp": response.last_message_timestamp,
+            "suggested_response": response.suggested_response,
+            "edited_response": response.edited_response,
+            "status": response.status,
+            "model_name": response.model_name,
+            "processed_at": response.processed_at
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating response for dialog {telegram_dialog_id}: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to generate response"
+        )
+
+async def generate_ai_response(messages: List[Message], dialog: Dialog) -> str:
+    """
+    Generate AI response for the given messages
+    
+    Args:
+        messages: List of messages to process
+        dialog: Dialog information
+        
+    Returns:
+        Generated response text
+    """
+    # TODO: Implement actual AI response generation
+    # For now, return a placeholder
+    return f"This is a placeholder response for dialog: {dialog.title}" 
