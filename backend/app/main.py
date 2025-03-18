@@ -118,7 +118,8 @@ async def lifespan(app: FastAPI):
         app.state.background_tasks.add_task(cleanup_coro)
         
         # Start dialog worker
-        worker = DialogWorker(interval_seconds=600)  # Run every 10 minutes
+        # Temporarily commented out for troubleshooting
+        # worker = DialogWorker(interval_seconds=600)  # Run every 10 minutes
         
         async def run_worker():
             """Run the worker in a background task"""
@@ -135,9 +136,10 @@ async def lifespan(app: FastAPI):
                         break
                     await asyncio.sleep(1)
         
-        # Start worker in background task
-        worker_task = asyncio.create_task(run_worker())
-        logger.info("Dialog worker started")
+        # Temporarily commented out worker task
+        # worker_task = asyncio.create_task(run_worker())
+        # logger.info("Dialog worker started")
+        worker_task = None  # Set to None since we're not starting it
         
         # Yield control back to FastAPI
         yield
@@ -149,7 +151,7 @@ async def lifespan(app: FastAPI):
         app.state.should_exit = True
         
         # Wait for worker to stop
-        if worker_task:
+        if worker_task:  # This check will now be False since worker_task is None
             logger.info("Waiting for dialog worker to stop...")
             try:
                 await asyncio.wait_for(worker_task, timeout=30.0)
