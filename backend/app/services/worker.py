@@ -120,16 +120,20 @@ class DialogWorker:
                         continue
                     
                     # Get user's active session token
+                    logger.debug(f"Fetching most recent active session for user {user_id}")
                     session_query = select(Session).where(
-                        Session.user_id == user_id
-                    ).order_by(Session.last_activity.desc())
+                        Session.user_id == user_id,
+                        Session.token.isnot(None)  # Ensure token exists
+                    ).order_by(Session.last_activity.desc()).limit(1)  # Get most recent session
                     session_result = await session.execute(session_query)
                     user_session = session_result.scalar_one_or_none()
                     
                     if not user_session or not user_session.token:
-                        logger.error(f"No valid session token found for user {user_id}")
+                        logger.error(f"No valid session token found for user {user_id} - last activity: {user_session.last_activity if user_session else 'N/A'}")
                         continue
-                        
+                    
+                    logger.debug(f"Found valid session for user {user_id} from {user_session.last_activity}")
+                    
                     # Process dialogs for this user
                     results = await processor.process_dialogs(user_dialogs, user_session.token, session)
                     
