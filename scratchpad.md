@@ -26,17 +26,3 @@ modify query_llm to use model_settings.json
 
 frontend-ui/src/pages/Models/index.tsx
 Add new endpoints for config management:
-
-Re FastAPI app:
- @app.get("/api/config")
-def get_model_config():
-    """Get the current model configuration"""
-    from app.services.llm_api import get_config
-    return get_config()
-
-@app.post("/api/config")
-def update_model_config(config: dict):
-    """Update the model configuration"""
-    from app.services.llm_api import save_config
-    save_config(config)
-    return {"status": "success", "config": config}
