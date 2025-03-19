@@ -670,8 +670,8 @@ const Data = () => {
 
   return (
     <Box>
-      <Typography variant="h4" gutterBottom>
-        Telegram Dialogs
+      <Typography variant="h4" component="h1" sx={{ mb: 2 }}>
+        Data Management
       </Typography>
       
       {authError && (

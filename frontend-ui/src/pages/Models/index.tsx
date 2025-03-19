@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Container,
-  Typography,
   Box,
+  Typography,
   Grid,
   Paper,
   Alert,
@@ -127,27 +126,27 @@ const ModelsPage: React.FC = () => {
 
   if (loading) {
     return (
-      <Container>
+      <Box>
         <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
           <CircularProgress />
         </Box>
-      </Container>
+      </Box>
     );
   }
 
   if (error) {
     return (
-      <Container>
+      <Box>
         <Alert severity="error">{error}</Alert>
-      </Container>
+      </Box>
     );
   }
 
   if (!providers || !settings) {
     return (
-      <Container>
+      <Box>
         <Alert severity="error">Failed to load model configuration. Please refresh the page to try again.</Alert>
-      </Container>
+      </Box>
     );
   }
 
@@ -156,15 +155,15 @@ const ModelsPage: React.FC = () => {
 
   if (!activeProvider || !activeProviderSettings) {
     return (
-      <Container>
+      <Box>
         <Alert severity="error">Invalid provider configuration. Please contact support.</Alert>
-      </Container>
+      </Box>
     );
   }
 
   return (
-    <Container>
-      <Typography variant="h4" component="h1" gutterBottom>
+    <Box>
+      <Typography variant="h4" component="h1" sx={{ mb: 2 }}>
         Model Configuration
       </Typography>
 
@@ -240,7 +239,7 @@ const ModelsPage: React.FC = () => {
           {error}
         </Alert>
       </Snackbar>
-    </Container>
+    </Box>
   );
 };
 
