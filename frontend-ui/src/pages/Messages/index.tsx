@@ -39,14 +39,12 @@ import SendIcon from '@mui/icons-material/Send';
 import SearchIcon from '@mui/icons-material/Search';
 import PersonIcon from '@mui/icons-material/Person';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
-import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import LoginIcon from '@mui/icons-material/Login';
 import LogoutIcon from '@mui/icons-material/Logout';
 import DeleteIcon from '@mui/icons-material/Delete';
-import AuthRequiredDialog from '../../components/Auth/AuthRequiredDialog';
 import { api } from '../../services/api';
-import { Response, ResponseStatus, Message, SessionStatus } from '../../types';
+import { Response, ResponseStatus, Message, SessionStatus, BaseDialog } from '../../types';
 import { checkAuthentication } from '../../services/auth';
 import PhoneAuth from '../../components/Auth/PhoneAuth';
 
@@ -141,7 +139,9 @@ const Messages = () => {
   // Tab state
   const [tabValue, setTabValue] = useState(0);
   
-  // State for responses
+  // State for dialogs and responses
+  const [dialogs, setDialogs] = useState<BaseDialog[]>([]);
+  const [selectedDialog, setSelectedDialog] = useState<BaseDialog | null>(null);
   const [pendingResponses, setPendingResponses] = useState<Response[]>([]);
   const [historyResponses, setHistoryResponses] = useState<Response[]>([]);
   const [loading, setLoading] = useState(true);
@@ -455,7 +455,7 @@ const Messages = () => {
   };
 
   // Render dialog list
-  const renderDialogList = (responses: Response[], isPending: boolean) => (
+  const renderDialogList = (isPending: boolean) => (
     <List sx={{ 
       bgcolor: 'background.paper', 
       borderRadius: 1,
@@ -467,62 +467,123 @@ const Messages = () => {
         <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
           <CircularProgress />
         </Box>
-      ) : responses.length === 0 ? (
-        <Box sx={{ textAlign: 'center', my: 4 }}>
-          <Typography variant="body2" color="text.secondary">
-            {isPending ? 'No pending responses' : 'No responses in history'}
-          </Typography>
-        </Box>
+      ) : isPending ? (
+        // Show dialogs in pending tab
+        dialogs.length === 0 ? (
+          <Box sx={{ textAlign: 'center', my: 4 }}>
+            <Typography variant="body2" color="text.secondary">
+              No unread dialogs
+            </Typography>
+          </Box>
+        ) : (
+          dialogs
+            .filter(dialog => 
+              dialog.name.toLowerCase().includes(searchQuery.toLowerCase())
+            )
+            .map(dialog => (
+              <ListItem 
+                key={dialog.id} 
+                disablePadding
+                divider
+              >
+                <ListItemButton
+                  selected={selectedDialog?.id === dialog.id}
+                  onClick={() => handleDialogSelect(dialog)}
+                  sx={{
+                    borderLeft: selectedDialog?.id === dialog.id ? 3 : 0,
+                    borderColor: 'primary.main',
+                    '&:hover': { bgcolor: 'action.hover' }
+                  }}
+                >
+                  <ListItemAvatar>
+                    <Badge 
+                      overlap="circular"
+                      anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                      badgeContent={dialog.unread_count}
+                      color="error"
+                    >
+                      <Avatar>{dialog.name.charAt(0).toUpperCase()}</Avatar>
+                    </Badge>
+                  </ListItemAvatar>
+                  <ListItemText 
+                    primary={dialog.name} 
+                    secondary={
+                      <Typography
+                        sx={{ display: 'inline', color: 'text.secondary' }}
+                        component="span"
+                        variant="body2"
+                        noWrap
+                      >
+                        {dialog.type} · {dialog.unread_count} unread
+                      </Typography>
+                    }
+                  />
+                </ListItemButton>
+              </ListItem>
+            ))
+        )
       ) : (
-        responses.map(response => (
-          <ListItem 
-            key={response.id} 
-            disablePadding
-            divider
-          >
-            <ListItemButton
-              selected={selectedResponse?.id === response.id}
-              onClick={() => handleSelectResponse(response)}
-              sx={{
-                borderLeft: selectedResponse?.id === response.id ? 3 : 0,
-                borderColor: 'primary.main',
-                '&:hover': { bgcolor: 'action.hover' }
-              }}
+        // Show responses in history tab
+        !selectedDialog ? (
+          <Box sx={{ textAlign: 'center', my: 4 }}>
+            <Typography variant="body2" color="text.secondary">
+              Select a dialog to view responses
+            </Typography>
+          </Box>
+        ) : (isPending ? filteredPendingResponses : filteredHistoryResponses).length === 0 ? (
+          <Box sx={{ textAlign: 'center', my: 4 }}>
+            <Typography variant="body2" color="text.secondary">
+              No {isPending ? 'pending' : 'history'} responses
+            </Typography>
+          </Box>
+        ) : (
+          (isPending ? filteredPendingResponses : filteredHistoryResponses).map(response => (
+            <ListItem 
+              key={response.id} 
+              disablePadding
+              divider
             >
-              <ListItemAvatar>
-                <Badge 
-                  overlap="circular"
-                  anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-                  badgeContent={
-                    isPending ? 
-                      <HourglassEmptyIcon color="warning" fontSize="small" /> : 
+              <ListItemButton
+                selected={selectedResponse?.id === response.id}
+                onClick={() => handleSelectResponse(response)}
+                sx={{
+                  borderLeft: selectedResponse?.id === response.id ? 3 : 0,
+                  borderColor: 'primary.main',
+                  '&:hover': { bgcolor: 'action.hover' }
+                }}
+              >
+                <ListItemAvatar>
+                  <Badge 
+                    overlap="circular"
+                    anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                    badgeContent={
                       response.status === ResponseStatus.APPROVED ? 
                         <CheckCircleIcon color="info" fontSize="small" /> :
                         response.status === ResponseStatus.SENT ?
                           <SendIcon color="success" fontSize="small" /> :
                           <CancelIcon color="error" fontSize="small" />
-                  }
-                >
-                  <Avatar>{response.dialog_name.charAt(0).toUpperCase()}</Avatar>
-                </Badge>
-              </ListItemAvatar>
-              <ListItemText 
-                primary={response.dialog_name} 
-                secondary={
-                  <Typography
-                    sx={{ display: 'inline', color: 'text.secondary' }}
-                    component="span"
-                    variant="body2"
-                    noWrap
+                    }
                   >
-                    {new Date(response.processed_at).toLocaleString()} 
-                    {!isPending && ` · ${response.status}`}
-                  </Typography>
-                }
-              />
-            </ListItemButton>
-          </ListItem>
-        ))
+                    <Avatar>{selectedDialog.name.charAt(0).toUpperCase()}</Avatar>
+                  </Badge>
+                </ListItemAvatar>
+                <ListItemText 
+                  primary={new Date(response.processed_at).toLocaleString()} 
+                  secondary={
+                    <Typography
+                      sx={{ display: 'inline', color: 'text.secondary' }}
+                      component="span"
+                      variant="body2"
+                      noWrap
+                    >
+                      {response.status}
+                    </Typography>
+                  }
+                />
+              </ListItemButton>
+            </ListItem>
+          ))
+        )
       )}
     </List>
   );
@@ -721,91 +782,130 @@ const Messages = () => {
     });
 
     try {
-      console.log('Attempting to fetch dialogs from API...');
       // Fetch all dialogs
       const dialogsResponse = await api.telegram.getDialogs();
-      console.log('Received dialogs response:', dialogsResponse);
+      console.log('Received dialogs:', dialogsResponse);
       
       // Filter dialogs based on criteria
       const filteredDialogs = dialogsResponse.dialogs.filter(dialog => {
-        console.log('Checking dialog:', { 
-          id: dialog.id, 
-          name: dialog.name, 
-          is_user: dialog.is_user, 
-          unread_count: dialog.unread_count,
-          type: dialog.type 
-        });
         return (dialog.is_user && dialog.unread_count > 0) || // Unread private messages
                (!dialog.is_user && dialog.unread_count > 0 && dialog.type === 'group'); // Unread group messages
       });
 
-      console.log('Filtered dialogs:', filteredDialogs.length, 'matches found');
-
+      console.log('Filtered dialogs:', filteredDialogs);
+      
+      // Update state with filtered dialogs
+      setDialogs(filteredDialogs);
+      
+      // Update progress
       setProcessingProgress(prev => ({
         ...prev,
         totalDialogs: filteredDialogs.length,
         currentOperation: 'Processing dialogs...'
       }));
 
-      // Process each dialog
+      // Process each dialog and generate responses
       for (const dialog of filteredDialogs) {
         try {
-          console.log(`Processing dialog: ${dialog.name} (ID: ${dialog.id})`);
           setProcessingProgress(prev => ({
             ...prev,
             currentDialogName: dialog.name,
-            currentOperation: `Processing ${dialog.name}...`
+            currentOperation: `Generating responses for ${dialog.name}...`
           }));
 
-          // Generate responses for the dialog
-          console.log('Generating responses for dialog:', {
-            dialog_id: dialog.id.toString(),
-            is_user: dialog.is_user,
-            type: dialog.type
-          });
-          
-          // Call the appropriate endpoint based on dialog type
+          // Generate responses based on dialog type
           if (dialog.is_user) {
             await api.responses.generate.private(dialog.id.toString());
           } else {
             await api.responses.generate.group(dialog.id.toString());
           }
-          console.log(`Successfully generated responses for dialog ${dialog.name}`);
 
           setProcessingProgress(prev => ({
             ...prev,
             processedDialogs: prev.processedDialogs + 1
           }));
+
         } catch (dialogError) {
           console.error(`Error processing dialog ${dialog.name}:`, dialogError);
-          console.error('Full error details:', {
-            dialog_id: dialog.id,
-            dialog_name: dialog.name,
-            error: dialogError
-          });
           setProcessingProgress(prev => ({
             ...prev,
-            error: `Failed to process dialog ${dialog.name}. Continuing with next dialog...`
+            error: `Failed to process ${dialog.name}. Continuing with next dialog...`
           }));
         }
       }
 
-      console.log('All dialogs processed, refreshing view...');
-      // Refresh the responses list
-      refreshCurrentView();
+      // After all dialogs are processed, fetch all responses
+      const pendingResp = await api.responses.getPending(0, 100);
+      setPendingResponses(pendingResp.responses);
+      setTotalPendingResponses(pendingResp.total);
+
+      const historyResp = await api.responses.getHistory(0, 100);
+      setHistoryResponses(historyResp.responses);
+      setTotalHistoryResponses(historyResp.total);
+
+      setProcessingProgress(prev => ({
+        ...prev,
+        currentOperation: 'All dialogs processed successfully'
+      }));
+
     } catch (err) {
       console.error('Error during refresh:', err);
-      console.error('Full error details:', {
-        error: err,
-        stack: err instanceof Error ? err.stack : undefined
-      });
       setProcessingProgress(prev => ({
         ...prev,
         error: 'Failed to fetch or process dialogs. Please try again.'
       }));
     } finally {
-      console.log('Refresh process completed');
       setIsProcessing(false);
+    }
+  };
+
+  // Function to handle dialog selection
+  const handleDialogSelect = async (dialog: BaseDialog) => {
+    setSelectedDialog(dialog);
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // First, get the dialog details including the UUID
+      const dialogDetails = await api.dialogs.getByTelegramId(dialog.id.toString());
+      const dialogUUID = dialogDetails.selection_id; // This is the UUID we need
+      
+      console.log('Selected dialog Telegram ID:', dialog.id);
+      console.log('Mapped to dialog UUID:', dialogUUID);
+      
+      // Fetch responses for the selected dialog
+      const pendingResp = await api.responses.getPending(0, 100);
+      const historyResp = await api.responses.getHistory(0, 100);
+      
+      // Filter responses using the dialog UUID
+      const filteredPending = pendingResp.responses.filter(r => {
+        console.log('Comparing response dialog_id:', r.dialog_id, 'with dialog UUID:', dialogUUID);
+        return r.dialog_id === dialogUUID;
+      });
+      const filteredHistory = historyResp.responses.filter(r => r.dialog_id === dialogUUID);
+      
+      console.log('Filtered pending responses:', filteredPending);
+      console.log('Filtered history responses:', filteredHistory);
+      
+      setPendingResponses(filteredPending);
+      setHistoryResponses(filteredHistory);
+      setTotalPendingResponses(filteredPending.length);
+      setTotalHistoryResponses(filteredHistory.length);
+
+      // If we have a pending response, select it automatically
+      if (filteredPending.length > 0) {
+        handleSelectResponse(filteredPending[0]);
+      } else if (filteredHistory.length > 0) {
+        // If no pending responses, select the most recent history response
+        handleSelectResponse(filteredHistory[0]);
+      }
+      
+    } catch (err) {
+      console.error('Error processing dialog:', err);
+      setError('Failed to process dialog. Please try again.');
+    } finally {
+      setIsProcessing(false);
+      setLoading(false);
     }
   };
 
@@ -973,13 +1073,13 @@ const Messages = () => {
       
       {/* Main content */}
       <Box sx={{ display: 'flex', mt: 2 }}>
-        {/* Left panel - Dialog list */}
+        {/* Left panel - Dialog/Response list */}
         <Box sx={{ width: 320, mr: 2 }}>
           <Box sx={{ mb: 2 }}>
             <TextField
               fullWidth
               size="small"
-              placeholder="Search dialogs..."
+              placeholder={tabValue === 0 ? "Search dialogs..." : "Search responses..."}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               InputProps={{
@@ -989,7 +1089,7 @@ const Messages = () => {
           </Box>
           
           <TabPanel value={tabValue} index={0}>
-            {renderDialogList(filteredPendingResponses, true)}
+            {renderDialogList(true)}
           </TabPanel>
           
           <TabPanel value={tabValue} index={1}>
@@ -1010,7 +1110,7 @@ const Messages = () => {
                 </Select>
               </FormControl>
             </Box>
-            {renderDialogList(filteredHistoryResponses, false)}
+            {renderDialogList(false)}
           </TabPanel>
         </Box>
         

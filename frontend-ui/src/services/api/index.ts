@@ -1,5 +1,5 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
-import { QRAuthResponse, SessionVerifyResponse, DialogListResponse, SessionStatus, Response, ResponseListResponse, ResponseUpdateRequest, MessageListResponse, MessageFetchOptions, ResponseGenerateRequest, ResponseWithDialog } from '../../types';
+import { QRAuthResponse, SessionVerifyResponse, DialogListResponse, SessionStatus, Response, ResponseListResponse, ResponseUpdateRequest, MessageListResponse, MessageFetchOptions, ResponseGenerateRequest, ResponseWithDialog, DialogSelectionResponse } from '../../types';
 
 // Create a base API instance
 const apiClient: AxiosInstance = axios.create({
@@ -245,6 +245,11 @@ export const api = {
       apiRequest({
         method: 'GET',
         url: '/dialogs',
+      }),
+    getByTelegramId: (telegramId: string) =>
+      apiRequest<DialogSelectionResponse>({
+        method: 'GET',
+        url: `/dialogs/by-telegram-id/${telegramId}`,
       }),
     update: (id: number, data: { 
       is_processing_enabled?: boolean; 

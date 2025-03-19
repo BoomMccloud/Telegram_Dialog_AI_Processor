@@ -389,4 +389,94 @@ async def deselect_dialog(
             detail=f"Failed to deselect dialog: {str(e)}"
         )
     finally:
+        await conn.close()
+
+@router.get("/by-telegram-id/{telegram_id}", 
+    response_model=DialogSelectionResponse,
+    summary="Get dialog by Telegram ID",
+    description="Get dialog details by its Telegram ID. Requires authentication.",
+    responses={
+        401: {"description": "Invalid or expired session"},
+        403: {"description": "Not authenticated"},
+        404: {"description": "Dialog not found"}
+    },
+    openapi_extra={
+        "security": [{"BearerAuth": []}]
+    }
+)
+async def get_dialog_by_telegram_id(
+    telegram_id: str,
+    session: SessionData = Depends(verify_session_dependency),
+) -> Dict:
+    """
+    Get dialog by its Telegram ID
+    
+    Args:
+        telegram_id: The Telegram dialog ID
+        
+    Returns:
+        The dialog record if found
+        
+    Note:
+        Requires authentication via Bearer token in Authorization header
+    """
+    # Get user_id from session
+    user_id = session.telegram_id
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid session user"
+        )
+    
+    # Get db connection
+    conn = await get_raw_connection()
+    
+    try:
+        # Fetch the dialog
+        result = await conn.fetchrow(
+            """
+            SELECT 
+                id as selection_id,
+                telegram_dialog_id as dialog_id,
+                title as dialog_name,
+                true as is_active,
+                is_processing_enabled,
+                auto_send_enabled,
+                created_at,
+                updated_at
+            FROM dialogs
+            WHERE user_id = (SELECT id FROM users WHERE telegram_id = $1)
+            AND telegram_dialog_id = $2
+            """,
+            user_id,
+            str(telegram_id)  # Convert to string as telegram_dialog_id is VARCHAR
+        )
+        
+        if not result:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Dialog not found for Telegram ID: {telegram_id}"
+            )
+        
+        # Convert the record to a dictionary
+        record = dict(result)
+        
+        # Convert datetime objects to ISO format strings and UUID objects to strings
+        for key, value in record.items():
+            if isinstance(value, datetime):
+                record[key] = value.isoformat()
+            elif isinstance(value, uuid.UUID):
+                record[key] = str(value)
+        
+        return record
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to fetch dialog by Telegram ID: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch dialog: {str(e)}"
+        )
+    finally:
         await conn.close() 

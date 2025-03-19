@@ -38,7 +38,7 @@ export enum DialogType {
 }
 
 // Base Dialog interface matching backend's TelegramDialog model
-interface BaseDialog {
+export interface BaseDialog {
   id: number;
   name: string;
   unread_count: number;
@@ -120,4 +120,16 @@ export interface MessageFetchOptions {
 export interface ResponseWithDialog extends Response {
   dialog_name: string;
   last_message_timestamp: string;
+}
+
+// Dialog selection response from backend
+export interface DialogSelectionResponse {
+  selection_id: string;
+  dialog_id: string;
+  dialog_name: string;
+  is_active: boolean;
+  is_processing_enabled: boolean;
+  auto_send_enabled: boolean;
+  created_at: string;
+  updated_at: string;
 } 
