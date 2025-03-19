@@ -74,7 +74,10 @@ function TabPanel(props: TabPanelProps) {
 }
 
 // Mock interface for dialog messages - replace with actual API types
-interface DialogMessage extends Message {}
+interface DialogMessage extends Message {
+  // Extending Message interface with any dialog-specific properties
+  dialog_id: string;
+}
 
 // Progress tracking interface
 interface ProcessingProgress {
@@ -772,10 +775,10 @@ const Messages = () => {
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h4">
-          Message Responses
-        </Typography>
+      <Typography variant="h4" sx={{ mb: 2 }}>
+        Message Responses
+      </Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
         <Button
           variant="contained"
           color="primary"
