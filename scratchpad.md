@@ -21,17 +21,13 @@ Next Steps:
 
 Files to Create
 
-config/model_settings.json
-JSON file storing user-configurable model settings
-Contains active provider, model selections, and parameters
-Does NOT contain API keys or sensitive information
 
 modify query_llm to use model_settings.json
 
 frontend-ui/src/pages/Models/index.tsx
 Add new endpoints for config management:
 
- FastAPI app:
+Re FastAPI app:
  @app.get("/api/config")
 def get_model_config():
     """Get the current model configuration"""

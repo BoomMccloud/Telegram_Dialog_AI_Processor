@@ -4,7 +4,7 @@ Combines all API endpoints into a single router with proper middleware and error
 """
 
 from fastapi import APIRouter
-from . import auth, dialogs, messages, responses
+from . import auth, dialogs, messages, responses, config
 # TODO: Import settings module once implemented
 # from . import settings
 
@@ -34,6 +34,12 @@ api_router.include_router(
     responses.router,
     prefix="/responses",
     tags=["Response Management"]
+)
+
+api_router.include_router(
+    config.router,
+    prefix="/config",
+    tags=["Configuration Management"]
 )
 
 # TODO: Add settings router once implemented
