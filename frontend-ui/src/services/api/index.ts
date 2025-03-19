@@ -106,6 +106,51 @@ const apiRequest = async <T>(config: AxiosRequestConfig): Promise<T> => {
   }
 };
 
+// Types for config endpoints
+export interface ModelParameter {
+  id: string;
+  name: string;
+  description: string;
+  min?: number;
+  max?: number;
+  default: number | string;
+  step?: number;
+  options?: string[];
+  models?: string[];
+}
+
+export interface Model {
+  id: string;
+  name: string;
+  context_length: number;
+  description: string;
+}
+
+export interface Provider {
+  name: string;
+  description: string;
+  models: Model[];
+  default_model: string;
+  parameters: ModelParameter[];
+  special_parameters?: ModelParameter[];
+}
+
+export interface ProviderModels {
+  providers: Record<string, Provider>;
+}
+
+export interface ProviderSettings {
+  model: string;
+  temperature: number;
+  max_tokens: number;
+  [key: string]: number | string;
+}
+
+export interface ModelSettings {
+  active_provider: string;
+  providers: Record<string, ProviderSettings>;
+}
+
 // API endpoints
 export const api = {
   // Auth endpoints
@@ -358,6 +403,35 @@ export const api = {
         method: 'PUT',
         url: '/settings/profile',
         data,
+      }),
+  },
+
+  // Config endpoints
+  config: {
+    getProviderModels: () => 
+      apiRequest<ProviderModels>({
+        method: 'GET',
+        url: '/config/providers',
+      }),
+
+    getModelSettings: () => 
+      apiRequest<ModelSettings>({
+        method: 'GET',
+        url: '/config/settings',
+      }),
+
+    updateModelSettings: (settings: Partial<ModelSettings>) => 
+      apiRequest<ModelSettings>({
+        method: 'PATCH',
+        url: '/config/settings',
+        data: settings,
+      }),
+
+    validateApiKey: (provider: string) => 
+      apiRequest<{ valid: boolean; message?: string }>({
+        method: 'POST',
+        url: '/config/validate-key',
+        data: { provider },
       }),
   },
 };

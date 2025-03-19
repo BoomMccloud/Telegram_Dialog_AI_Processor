@@ -43,18 +43,15 @@ def get_allowed_origins() -> List[str]:
     default_origins = [
         "http://localhost:3000",  # Next.js dev server
         "http://localhost:8000",  # FastAPI dev server
+        "http://localhost:5173",  # Vite dev server
     ]
     
     # Get additional origins from environment
     env_origins = os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")
     origins = [origin.strip() for origin in env_origins if origin.strip()]
     
-    # In development, use default origins if none specified
-    if not origins and os.getenv("ENV", "development") == "development":
-        logger.warning("No CORS origins specified, using development defaults")
-        return default_origins
-        
-    return origins
+    # Combine default and environment origins
+    return default_origins + origins
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -197,7 +194,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=[
         "Authorization",
         "Content-Type",
@@ -260,8 +257,8 @@ app.add_exception_handler(TelethonError, telethon_error_handler)
 # Register routers
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(messages.router, prefix="/api/messages", tags=["messages"])
-app.include_router(dialogs.router, prefix="/api", tags=["dialogs"])
-app.include_router(responses.router, prefix="/api", tags=["responses"])
+app.include_router(dialogs.router, prefix="/api/dialogs", tags=["dialogs"])
+app.include_router(responses.router, prefix="/api/responses", tags=["responses"])
 app.include_router(config.router, prefix="/api/config", tags=["config"])
 
 @app.on_event("startup")

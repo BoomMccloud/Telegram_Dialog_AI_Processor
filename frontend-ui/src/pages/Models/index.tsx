@@ -1,200 +1,247 @@
-import React, { useState } from 'react';
-import { 
-  Box, 
-  Typography, 
-  Paper, 
-  FormControl, 
-  InputLabel, 
-  Select, 
-  MenuItem, 
-  TextField, 
-  Button, 
-  Alert,
+import React, { useEffect, useState } from 'react';
+import {
+  Container,
+  Typography,
+  Box,
   Grid,
-  Chip,
-  CircularProgress,
+  Paper,
+  Alert,
   Snackbar,
-  SelectChangeEvent,
+  CircularProgress,
+  Button,
 } from '@mui/material';
-import { 
-  Save as SaveIcon,
-} from '@mui/icons-material';
+import { Save as SaveIcon } from '@mui/icons-material';
+import { ProviderSelect } from '../../components/ModelConfig/ProviderSelect';
+import { ModelSelect } from '../../components/ModelConfig/ModelSelect';
+import { ParameterControls } from '../../components/ModelConfig/ParameterControls';
+import { api } from '../../services/api';
+import type { ProviderModels, ModelSettings } from '../../services/api';
 
-// Define available models
-interface Model {
-  id: string;
-  name: string;
-  description: string;
-  isAvailable: boolean;
-}
-
-const Models = () => {
-  // Available models - in a real app, this would come from an API
-  const availableModels: Model[] = [
-    {
-      id: 'gpt-4',
-      name: 'GPT-4',
-      description: 'Most capable model, best for complex tasks requiring deep understanding.',
-      isAvailable: true,
-    },
-    {
-      id: 'gpt-3.5-turbo',
-      name: 'GPT-3.5 Turbo',
-      description: 'Faster response times, good balance between capabilities and speed.',
-      isAvailable: true,
-    },
-    {
-      id: 'claude-3',
-      name: 'Claude 3',
-      description: 'Well-balanced model with good reasoning capabilities.',
-      isAvailable: true,
-    },
-    {
-      id: 'llama-3',
-      name: 'Llama 3',
-      description: 'Open-source model, runs locally for better privacy.',
-      isAvailable: false, // Example of an unavailable model
-    },
-  ];
-
-  // State for selected model
-  const [selectedModelId, setSelectedModelId] = useState('gpt-4');
-  
-  // State for system prompt
-  const [systemPrompt, setSystemPrompt] = useState(
-    `You are an AI assistant helping to craft responses to Telegram messages. 
-Your task is to generate thoughtful, helpful replies that sound natural and match the user's writing style.
-
-Instructions:
-1. Maintain the same tone and level of formality as the original conversation
-2. Keep responses concise and to the point
-3. Address all questions or points raised in the messages
-4. Be helpful but not overly enthusiastic
-5. Never mention that you are an AI or that this message is being processed automatically`
-  );
-  
-  // State for saving indicator
+const ModelsPage: React.FC = () => {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [providers, setProviders] = useState<ProviderModels | null>(null);
+  const [settings, setSettings] = useState<ModelSettings | null>(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  
-  // State for success notification
-  const [showSuccess, setShowSuccess] = useState(false);
+  const [success, setSuccess] = useState<string | null>(null);
 
-  // Handle model change
-  const handleModelChange = (event: SelectChangeEvent) => {
-    setSelectedModelId(event.target.value);
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const [providersData, settingsData] = await Promise.all([
+          api.config.getProviderModels(),
+          api.config.getModelSettings()
+        ]);
+        
+        setProviders(providersData);
+        setSettings(settingsData);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load model configuration');
+        console.error('Error loading model configuration:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  // Handlers
+  const handleProviderChange = (providerId: string) => {
+    if (!settings || !providers) return;
+
+    const provider = providers.providers[providerId];
+    if (!provider) return;
+
+    setSettings({
+      ...settings,
+      active_provider: providerId,
+      providers: {
+        ...settings.providers,
+        [providerId]: {
+          model: provider.default_model,
+          temperature: provider.parameters.find(p => p.id === 'temperature')?.default as number || 0.7,
+          max_tokens: provider.parameters.find(p => p.id === 'max_tokens')?.default as number || 1000,
+        },
+      },
+    });
+    setHasUnsavedChanges(true);
   };
 
-  // Handle saving settings
-  const handleSaveSettings = () => {
+  const handleModelChange = (modelId: string) => {
+    if (!settings || !providers) return;
+
+    const activeProvider = settings.active_provider;
+    setSettings({
+      ...settings,
+      providers: {
+        ...settings.providers,
+        [activeProvider]: {
+          ...settings.providers[activeProvider],
+          model: modelId,
+        },
+      },
+    });
+    setHasUnsavedChanges(true);
+  };
+
+  const handleParameterChange = (parameterId: string, value: number | string) => {
+    if (!settings) return;
+
+    const activeProvider = settings.active_provider;
+    setSettings({
+      ...settings,
+      providers: {
+        ...settings.providers,
+        [activeProvider]: {
+          ...settings.providers[activeProvider],
+          [parameterId]: value,
+        },
+      },
+    });
+    setHasUnsavedChanges(true);
+  };
+
+  const handleSave = async () => {
+    if (!settings) return;
+
     setIsSaving(true);
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      const newSettings = await api.config.updateModelSettings({
+        active_provider: settings.active_provider,
+        providers: settings.providers,
+      });
+      setSettings(newSettings);
+      setHasUnsavedChanges(false);
+      setSuccess('Settings saved successfully');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save settings');
+    } finally {
       setIsSaving(false);
-      setShowSuccess(true);
-    }, 1000);
+    }
   };
+
+  if (loading) {
+    return (
+      <Container>
+        <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
+          <CircularProgress />
+        </Box>
+      </Container>
+    );
+  }
+
+  if (error) {
+    return (
+      <Container>
+        <Alert severity="error">{error}</Alert>
+      </Container>
+    );
+  }
+
+  if (!providers || !settings) {
+    return (
+      <Container>
+        <Alert severity="error">Failed to load model configuration. Please refresh the page to try again.</Alert>
+      </Container>
+    );
+  }
+
+  const activeProvider = providers.providers[settings.active_provider];
+  const activeProviderSettings = settings.providers[settings.active_provider];
+
+  if (!activeProvider || !activeProviderSettings) {
+    return (
+      <Container>
+        <Alert severity="error">Invalid provider configuration. Please contact support.</Alert>
+      </Container>
+    );
+  }
 
   return (
-    <Box>
-      <Typography variant="h4" gutterBottom>
-        AI Model Configuration
+    <Container>
+      <Typography variant="h4" component="h1" gutterBottom>
+        Model Configuration
       </Typography>
-      
+
       <Grid container spacing={3}>
-        <Grid item xs={12} md={4}>
+        <Grid item xs={12} md={6}>
           <Paper sx={{ p: 3, height: '100%' }}>
             <Typography variant="h6" gutterBottom>
-              Select Model
+              AI Provider
             </Typography>
-            <Typography variant="body2" color="text.secondary" paragraph>
-              Choose which AI model to use for processing Telegram messages.
-            </Typography>
+            <ProviderSelect
+              providers={providers.providers}
+              activeProvider={settings.active_provider}
+              onProviderChange={handleProviderChange}
+            />
             
-            <FormControl fullWidth sx={{ mb: 3 }}>
-              <InputLabel id="model-select-label">AI Model</InputLabel>
-              <Select
-                labelId="model-select-label"
-                value={selectedModelId}
-                label="AI Model"
-                onChange={handleModelChange}
-              >
-                {availableModels.map((model) => (
-                  <MenuItem 
-                    key={model.id} 
-                    value={model.id}
-                    disabled={!model.isAvailable}
-                  >
-                    {model.name}
-                    {!model.isAvailable && (
-                      <Chip 
-                        label="Unavailable" 
-                        size="small" 
-                        color="default" 
-                        sx={{ ml: 1 }} 
-                      />
-                    )}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            
-            {/* Selected model description */}
-            <Box sx={{ mt: 2 }}>
-              {availableModels.find(model => model.id === selectedModelId)?.description}
+            <Box sx={{ mt: 4 }}>
+              <Typography variant="h6" gutterBottom>
+                Model
+              </Typography>
+              <ModelSelect
+                models={activeProvider.models}
+                selectedModel={activeProviderSettings.model}
+                onModelChange={handleModelChange}
+              />
             </Box>
           </Paper>
         </Grid>
-        
-        <Grid item xs={12} md={8}>
+
+        <Grid item xs={12} md={6}>
           <Paper sx={{ p: 3 }}>
             <Typography variant="h6" gutterBottom>
-              System Prompt
+              Parameters
             </Typography>
-            <Typography variant="body2" color="text.secondary" paragraph>
-              Define how the AI should behave when generating responses.
-            </Typography>
-            
-            <TextField
-              fullWidth
-              multiline
-              rows={10}
-              value={systemPrompt}
-              onChange={(e) => setSystemPrompt(e.target.value)}
-              variant="outlined"
-              placeholder="Enter system prompt"
-              sx={{ mb: 3 }}
+            <ParameterControls
+              parameters={[
+                ...activeProvider.parameters,
+                ...(activeProvider.special_parameters || []),
+              ]}
+              values={activeProviderSettings}
+              onChange={handleParameterChange}
             />
-            
-            <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <Button 
-                variant="contained" 
-                color="primary" 
-                startIcon={isSaving ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
-                onClick={handleSaveSettings}
-                disabled={isSaving}
+            <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={handleSave}
+                disabled={isSaving || !hasUnsavedChanges}
+                startIcon={isSaving ? <CircularProgress size={20} /> : <SaveIcon />}
               >
-                Save Settings
+                {isSaving ? 'Saving...' : 'Save Changes'}
               </Button>
             </Box>
           </Paper>
         </Grid>
-        
-        <Grid item xs={12}>
-          <Alert severity="info">
-            The selected model and system prompt will be used for all future processing. 
-            Current processing jobs will continue with their original settings.
-          </Alert>
-        </Grid>
       </Grid>
-      
+
       <Snackbar
-        open={showSuccess}
-        autoHideDuration={5000}
-        onClose={() => setShowSuccess(false)}
-        message="Settings saved successfully"
-      />
-    </Box>
+        open={!!success}
+        autoHideDuration={6000}
+        onClose={() => setSuccess(null)}
+      >
+        <Alert severity="success" onClose={() => setSuccess(null)}>
+          {success}
+        </Alert>
+      </Snackbar>
+
+      <Snackbar
+        open={!!error}
+        autoHideDuration={6000}
+        onClose={() => setError(null)}
+      >
+        <Alert severity="error" onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      </Snackbar>
+    </Container>
   );
 };
 
-export default Models; 
+export default ModelsPage; 
