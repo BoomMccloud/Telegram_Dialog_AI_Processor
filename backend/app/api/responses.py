@@ -26,7 +26,7 @@ from app.db.models.message import Message
 from app.api.messages import list_dialog_messages
 from app.services.llm_api import query_llm
 
-router = APIRouter(prefix="/responses", tags=["responses"])
+router = APIRouter(tags=["responses"])
 logger = get_logger(__name__)
 
 # Response models

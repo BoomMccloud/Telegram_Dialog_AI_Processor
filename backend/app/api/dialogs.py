@@ -53,7 +53,7 @@ class DialogSelectionResponse(BaseModel):
             raise ValueError('Invalid Telegram chat ID format')
         return v
 
-@router.post("/dialogs/select", 
+@router.post("/select", 
     response_model=DialogSelectionResponse,
     summary="Enable processing for a dialog",
     description="Enable AI processing for a specific dialog. Requires authentication.",
@@ -210,7 +210,7 @@ async def select_dialog(
     finally:
         await conn.close()
 
-@router.get("/dialogs/selected", 
+@router.get("/selected", 
     response_model=List[DialogSelectionResponse],
     summary="Get selected dialogs",
     description="Get all dialogs with processing enabled. Requires authentication.",
@@ -287,7 +287,7 @@ async def get_selected_dialogs(
     finally:
         await conn.close()
 
-@router.delete("/dialogs/selected/{dialog_id}", 
+@router.delete("/selected/{dialog_id}", 
     response_model=DialogSelectionResponse,
     summary="Disable processing for a dialog",
     description="Disable AI processing for a specific dialog. Requires authentication.",

@@ -134,7 +134,7 @@ async def list_dialog_messages(
         raise TelegramError(f"Failed to fetch messages for dialog {dialog_id}", details={"error": str(e)})
 
 @router.post(
-    "/messages/send", 
+    "/send", 
     response_model=MessageResponse,
     summary="Send a message",
     description="Send a message to a specific dialog. Requires authentication.",
