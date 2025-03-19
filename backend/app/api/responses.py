@@ -880,6 +880,29 @@ async def generate_ai_response(messages: List[Message], dialog: Dialog) -> str:
         Generated response text
     """
     try:
+        # Load current model settings with error handling
+        try:
+            from app.api.config import load_model_settings
+            model_settings = load_model_settings()
+        except Exception as e:
+            logger.warning(f"Error loading model settings, using defaults: {str(e)}")
+            # Fallback to default settings
+            model_settings = {
+                "active_provider": "anthropic",
+                "providers": {
+                    "anthropic": {
+                        "model": "claude-3-5-sonnet-20241022",
+                        "temperature": 0.7,
+                        "max_tokens": 1000
+                    }
+                }
+            }
+        
+        # Extract settings with fallbacks at each level
+        active_provider = model_settings.get("active_provider", "anthropic")
+        provider_settings = model_settings.get("providers", {}).get(active_provider, {})
+        model = provider_settings.get("model")
+        
         # Format messages into a conversation prompt
         prompt = f"You are having a conversation in a Telegram chat with {dialog.title}. Here are the recent messages:\n\n"
         
@@ -889,8 +912,19 @@ async def generate_ai_response(messages: List[Message], dialog: Dialog) -> str:
         
         prompt += "\nPlease provide a natural and contextually appropriate response to continue this conversation."
         
-        # Call LLM API
-        response = query_llm(prompt, provider="anthropic")  # Using Claude for better conversation
+        # Call LLM API with configured settings
+        response = query_llm(
+            prompt=prompt, 
+            provider=active_provider,
+            model=model,
+            # Add optional parameters via kwargs for backward compatibility
+            **{
+                k: v for k, v in {
+                    "temperature": provider_settings.get("temperature"),
+                    "max_tokens": provider_settings.get("max_tokens")
+                }.items() if v is not None
+            }
+        )
         
         if not response:
             logger.error("Failed to get response from LLM API")

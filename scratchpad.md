@@ -23,6 +23,3 @@ Files to Create
 
 
 modify query_llm to use model_settings.json
-
-frontend-ui/src/pages/Models/index.tsx
-Add new endpoints for config management:
