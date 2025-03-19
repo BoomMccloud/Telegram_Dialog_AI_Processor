@@ -102,7 +102,7 @@ export const ParameterControls: React.FC<ParameterControlsProps> = ({
                   max: parameter.max,
                   step: parameter.step,
                 }}
-                sx={{ width: 80 }}
+                sx={{ width: 120 }}
               />
             </Box>
           ) : (
