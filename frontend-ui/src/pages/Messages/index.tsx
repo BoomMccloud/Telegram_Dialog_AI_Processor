@@ -40,10 +40,15 @@ import SearchIcon from '@mui/icons-material/Search';
 import PersonIcon from '@mui/icons-material/Person';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import LoginIcon from '@mui/icons-material/Login';
+import LogoutIcon from '@mui/icons-material/Logout';
+import DeleteIcon from '@mui/icons-material/Delete';
 import AuthRequiredDialog from '../../components/Auth/AuthRequiredDialog';
 import { api } from '../../services/api';
-import { Response, ResponseStatus, Message } from '../../types';
-import RefreshIcon from '@mui/icons-material/Refresh';
+import { Response, ResponseStatus, Message, SessionStatus } from '../../types';
+import { checkAuthentication } from '../../services/auth';
+import PhoneAuth from '../../components/Auth/PhoneAuth';
 
 // Tab interface
 interface TabPanelProps {
@@ -170,6 +175,11 @@ const Messages = () => {
     error: null
   });
 
+  // Auth state
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [phoneDialogOpen, setPhoneDialogOpen] = useState(false);
+
   // Handle tab change
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
@@ -186,6 +196,32 @@ const Messages = () => {
       fetchHistoryResponses();
     }
   }, [tabValue]);
+
+  // Check for existing authentication tokens on component mount
+  useEffect(() => {
+    const checkAuthStatus = async () => {
+      setLoading(true);
+      try {
+        const isAuth = await checkAuthentication();
+        setIsAuthenticated(isAuth);
+        
+        // If authenticated, fetch responses
+        if (isAuth) {
+          if (tabValue === 0) {
+            fetchPendingResponses();
+          } else {
+            fetchHistoryResponses();
+          }
+        }
+      } catch (error) {
+        console.error('Error checking authentication status:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    checkAuthStatus();
+  }, []);  // Run once on mount
 
   // Function to fetch pending responses from API
   const fetchPendingResponses = async () => {
@@ -773,26 +809,137 @@ const Messages = () => {
     }
   };
 
+  // Handle phone authentication success
+  const handlePhoneAuthSuccess = () => {
+    console.log('[UI Debug] Phone authentication successful');
+    
+    // Check if we have the access token before proceeding
+    const accessToken = localStorage.getItem('accessToken');
+    if (!accessToken) {
+      console.warn('[UI Debug] No access token found after authentication, checking session');
+      
+      // Try to verify the session to get tokens
+      api.auth.verifySession()
+        .then(response => {
+          if (response.status === SessionStatus.AUTHENTICATED) {
+            console.log('[UI Debug] Session verified after phone auth');
+            setIsAuthenticated(true);
+            setPhoneDialogOpen(false);
+            // Now try to fetch responses
+            if (tabValue === 0) {
+              fetchPendingResponses();
+            } else {
+              fetchHistoryResponses();
+            }
+          } else {
+            setAuthError('Authentication successful but session could not be verified. Please try again.');
+            setPhoneDialogOpen(false);
+          }
+        })
+        .catch(error => {
+          console.error('[UI Debug] Failed to verify session after phone auth:', error);
+          setAuthError('Authentication successful but session could not be verified. Please try again.');
+          setPhoneDialogOpen(false);
+        });
+    } else {
+      // We have the token, proceed normally
+      setIsAuthenticated(true);
+      setPhoneDialogOpen(false);
+      if (tabValue === 0) {
+        fetchPendingResponses();
+      } else {
+        fetchHistoryResponses();
+      }
+    }
+  };
+
+  // Handle logout
+  const handleLogout = async () => {
+    setLoading(true);
+    
+    try {
+      await api.auth.logout();
+      setIsAuthenticated(false);
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      setPendingResponses([]);
+      setHistoryResponses([]);
+    } catch (error) {
+      console.error('Failed to logout:', error);
+      setError('Failed to logout. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle delete messages
+  const handleDeleteMessages = () => {
+    // TODO: Implement delete functionality
+    console.log('Delete messages functionality to be implemented');
+  };
+
   return (
     <Box>
-      <Typography variant="h4" sx={{ mb: 2 }}>
+      <Typography variant="h4" component="h1" sx={{ mb: 2 }}>
         Message Responses
       </Typography>
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={handleRefresh}
-          disabled={isProcessing}
-          startIcon={<RefreshIcon />}
-        >
-          Refresh Messages
-        </Button>
+
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mb: 2 }}>
+        {isAuthenticated ? (
+          <>
+            <Button
+              variant="contained"
+              color="error"
+              onClick={handleDeleteMessages}
+              startIcon={<DeleteIcon />}
+            >
+              Delete Messages
+            </Button>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={handleRefresh}
+              disabled={isProcessing}
+              startIcon={<RefreshIcon />}
+            >
+              Refresh Messages
+            </Button>
+            <Button
+              variant="outlined"
+              color="error"
+              startIcon={<LogoutIcon />}
+              onClick={handleLogout}
+              disabled={isProcessing}
+            >
+              Logout
+            </Button>
+          </>
+        ) : (
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<LoginIcon />}
+            onClick={() => setPhoneDialogOpen(true)}
+            disabled={isProcessing}
+          >
+            Login
+          </Button>
+        )}
       </Box>
       
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}
+        </Alert>
+      )}
+      
+      {authError && (
+        <Alert 
+          severity="warning" 
+          sx={{ mb: 2 }}
+          onClose={() => setAuthError(null)}
+        >
+          {authError}
         </Alert>
       )}
       
@@ -902,12 +1049,23 @@ const Messages = () => {
         </DialogActions>
       </Dialog>
       
-      {/* Auth Required Dialog */}
-      <AuthRequiredDialog 
-        open={showAuthDialog} 
-        onClose={() => setShowAuthDialog(false)}
-        action="view message responses"
-      />
+      {/* Phone Authentication Dialog */}
+      <Dialog 
+        open={phoneDialogOpen} 
+        onClose={() => setPhoneDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Authenticate with Telegram</DialogTitle>
+        <DialogContent>
+          <Box sx={{ p: 2 }}>
+            <PhoneAuth 
+              onSuccess={handlePhoneAuthSuccess}
+              onCancel={() => setPhoneDialogOpen(false)}
+            />
+          </Box>
+        </DialogContent>
+      </Dialog>
       
       {/* Processing Dialog */}
       <ProcessingDialog 

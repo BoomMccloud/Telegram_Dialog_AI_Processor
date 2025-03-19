@@ -18,7 +18,6 @@ import {
   Menu as MenuIcon,
   Dashboard as DashboardIcon,
   Message as MessageIcon,
-  Storage as StorageIcon,
   Psychology as PsychologyIcon,
   Brightness4 as DarkModeIcon,
   Brightness7 as LightModeIcon,
@@ -30,7 +29,6 @@ import { useThemeContext } from '../../theme/ThemeContext';
 const navItems = [
   { name: 'Dashboard', path: '/', icon: <DashboardIcon /> },
   { name: 'Messages', path: '/messages', icon: <MessageIcon /> },
-  { name: 'Data', path: '/data', icon: <StorageIcon /> },
   { name: 'Models', path: '/models', icon: <PsychologyIcon /> },
 ];
 
