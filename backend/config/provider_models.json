@@ -1,0 +1,100 @@
+{
+    "providers": {
+      "openai": {
+        "name": "OpenAI",
+        "description": "OpenAI's GPT models for general-purpose AI capabilities",
+        "models": [
+          {"id": "gpt-4o", "name": "GPT-4o", "context_length": 128000, "description": "Latest GPT-4 model with vision capabilities"},
+          {"id": "o1", "name": "o1 (Reasoning)", "context_length": 32000, "description": "Advanced reasoning model with chain-of-thought capabilities"},
+          {"id": "gpt-3.5-turbo", "name": "GPT-3.5 Turbo", "context_length": 16000, "description": "Faster, more economical model for standard tasks"}
+        ],
+        "default_model": "gpt-4o",
+        "parameters": [
+          {"id": "temperature", "name": "Temperature", "description": "Controls randomness of output", "min": 0, "max": 1, "default": 0.7, "step": 0.1},
+          {"id": "max_tokens", "name": "Max Tokens", "description": "Maximum tokens in response", "min": 100, "max": 4000, "default": 1000, "step": 100}
+        ],
+        "special_parameters": [
+          {"id": "reasoning_effort", "name": "Reasoning Effort", "description": "For o1 model only", "options": ["low", "medium", "high"], "default": "low", "models": ["o1"]}
+        ]
+      },
+      "anthropic": {
+        "name": "Anthropic",
+        "description": "Anthropic's Claude models with strong dialogue capabilities",
+        "models": [
+          {"id": "claude-3-5-sonnet-20241022", "name": "Claude 3.5 Sonnet", "context_length": 200000, "description": "Latest Claude model with improved reasoning"},
+          {"id": "claude-3-opus-20240229", "name": "Claude 3 Opus", "context_length": 200000, "description": "Most capable Claude model with advanced reasoning"},
+          {"id": "claude-3-sonnet-20240229", "name": "Claude 3 Sonnet", "context_length": 180000, "description": "Balanced Claude model for most use cases"},
+          {"id": "claude-3-haiku-20240307", "name": "Claude 3 Haiku", "context_length": 180000, "description": "Fastest Claude model for quick responses"}
+        ],
+        "default_model": "claude-3-5-sonnet-20241022",
+        "parameters": [
+          {"id": "temperature", "name": "Temperature", "description": "Controls randomness of output", "min": 0, "max": 1, "default": 0.7, "step": 0.1},
+          {"id": "max_tokens", "name": "Max Tokens", "description": "Maximum tokens in response", "min": 100, "max": 4000, "default": 1000, "step": 100}
+        ]
+      },
+      "azure": {
+        "name": "Azure OpenAI",
+        "description": "Microsoft Azure hosted OpenAI models",
+        "models": [
+          {"id": "gpt-4o-ms", "name": "GPT-4o (Azure)", "context_length": 128000, "description": "Azure-hosted GPT-4o model"},
+          {"id": "gpt-4-turbo", "name": "GPT-4 Turbo (Azure)", "context_length": 128000, "description": "Azure-hosted GPT-4 Turbo model"}
+        ],
+        "default_model": "gpt-4o-ms",
+        "parameters": [
+          {"id": "temperature", "name": "Temperature", "description": "Controls randomness of output", "min": 0, "max": 1, "default": 0.7, "step": 0.1},
+          {"id": "max_tokens", "name": "Max Tokens", "description": "Maximum tokens in response", "min": 100, "max": 4000, "default": 1000, "step": 100}
+        ]
+      },
+      "deepseek": {
+        "name": "DeepSeek",
+        "description": "DeepSeek's chat models",
+        "models": [
+          {"id": "deepseek-chat", "name": "DeepSeek Chat", "context_length": 32000, "description": "General purpose chat model from DeepSeek"}
+        ],
+        "default_model": "deepseek-chat",
+        "parameters": [
+          {"id": "temperature", "name": "Temperature", "description": "Controls randomness of output", "min": 0, "max": 1, "default": 0.7, "step": 0.1},
+          {"id": "max_tokens", "name": "Max Tokens", "description": "Maximum tokens in response", "min": 100, "max": 4000, "default": 1000, "step": 100}
+        ]
+      },
+      "gemini": {
+        "name": "Google Gemini",
+        "description": "Google's Gemini models",
+        "models": [
+          {"id": "gemini-pro", "name": "Gemini Pro", "context_length": 32000, "description": "General purpose model from Google"},
+          {"id": "gemini-2.0-flash-exp", "name": "Gemini 2.0 Flash", "context_length": 128000, "description": "Faster Gemini model"}
+        ],
+        "default_model": "gemini-pro",
+        "parameters": [
+          {"id": "temperature", "name": "Temperature", "description": "Controls randomness of output", "min": 0, "max": 1, "default": 0.7, "step": 0.1},
+          {"id": "max_tokens", "name": "Max Tokens", "description": "Maximum tokens in response", "min": 100, "max": 4000, "default": 1000, "step": 100}
+        ]
+      },
+      "local": {
+        "name": "Local LLM",
+        "description": "Self-hosted language models",
+        "models": [
+          {"id": "Qwen/Qwen2.5-32B-Instruct-AWQ", "name": "Qwen 2.5 32B", "context_length": 32000, "description": "Quantized Qwen model for local deployment"}
+        ],
+        "default_model": "Qwen/Qwen2.5-32B-Instruct-AWQ",
+        "parameters": [
+          {"id": "temperature", "name": "Temperature", "description": "Controls randomness of output", "min": 0, "max": 1, "default": 0.7, "step": 0.1},
+          {"id": "max_tokens", "name": "Max Tokens", "description": "Maximum tokens in response", "min": 100, "max": 2000, "default": 1000, "step": 100}
+        ]
+      },
+      "ollama": {
+        "name": "Ollama",
+        "description": "Local model server with various open models",
+        "models": [
+          {"id": "llama2", "name": "Llama 2", "context_length": 4096, "description": "Meta's Llama 2 model"},
+          {"id": "mistral", "name": "Mistral 7B", "context_length": 8192, "description": "Mistral AI's 7B parameter model"},
+          {"id": "phi3", "name": "Phi-3", "context_length": 4096, "description": "Microsoft's Phi-3 model"}
+        ],
+        "default_model": "llama2",
+        "parameters": [
+          {"id": "temperature", "name": "Temperature", "description": "Controls randomness of output", "min": 0, "max": 1, "default": 0.7, "step": 0.1},
+          {"id": "max_tokens", "name": "Max Tokens", "description": "Maximum tokens in response", "min": 100, "max": 2000, "default": 1000, "step": 100}
+        ]
+      }
+    }
+  }
