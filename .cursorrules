@@ -129,6 +129,7 @@ If needed, you can further use the `web_scraper.py` file to scrape the web page 
 - Use `gpt-4o` as the model name for OpenAI. It is the latest GPT model and has vision capabilities as well. `o1` is the most advanced and expensive model from OpenAI. Use it when you need to do reasoning, planning, or get blocked.
 - Use `claude-3-5-sonnet-20241022` as the model name for Claude. It is the latest Claude model and has vision capabilities as well.
 - When running Python scripts that import from other local modules, use `PYTHONPATH=.` to ensure Python can find the modules. For example: `PYTHONPATH=. python tools/plan_exec_llm.py` instead of just `python tools/plan_exec_llm.py`. This is especially important when using relative imports.
+- API prefixes in FastAPI should be defined in one place only. In our application, the prefix should be added in the `main.py` file where routers are included (e.g., `app.include_router(responses.router, prefix="/api/responses", tags=["responses"])`), and not in the individual router definitions. When defining routes in router files, do not add the resource name as a prefix to avoid duplication (e.g., use `@router.get("/pending")` instead of `@router.get("/responses/pending")`). This prevents URL paths like `/api/responses/responses/pending`.
 
 # Multi-Agent Scratchpad
 
