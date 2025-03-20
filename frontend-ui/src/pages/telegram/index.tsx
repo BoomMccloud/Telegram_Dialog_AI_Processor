@@ -21,13 +21,29 @@ import GroupIcon from '@mui/icons-material/Group';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import ConversationView from '@components/ConversationView';
 import { useDialogs, DialogFilterMode } from '@hooks/useDialogs';
+import { useRecentMessages } from './hooks/useRecentMessages';
+import { DialogMessage } from '../../types/dialog';
+import { HistoricalMessage } from './types';
 
 // Constants
 const DRAWER_WIDTH = 320;
 
+const transformToDialogMessage = (message: HistoricalMessage, dialogId: string): DialogMessage => ({
+  id: message.id,
+  dialog_id: dialogId,
+  text: message.content,
+  timestamp: message.timestamp,
+  is_unread: false,
+  has_mention: false,
+  sender: {
+    id: message.sender.id,
+    name: message.sender.name,
+    is_self: message.isCurrentUser
+  }
+});
+
 const TelegramMessagesPage: React.FC = () => {
   const {
-    dialogs,
     filteredDialogs,
     loading,
     error,
@@ -39,8 +55,23 @@ const TelegramMessagesPage: React.FC = () => {
     initialized,
   } = useDialogs();
 
+  const {
+    messages,
+    isLoading: loadingMessages,
+    error: messagesError,
+    refetch: refetchMessages
+  } = useRecentMessages(selectedDialogId);
+
+  const dialogMessages = React.useMemo(() => {
+    if (!selectedDialogId || !messages) return [];
+    return messages.map(msg => transformToDialogMessage(msg, selectedDialogId));
+  }, [messages, selectedDialogId]);
+
   const handleRefresh = () => {
     fetchDialogs();
+    if (selectedDialogId) {
+      refetchMessages();
+    }
   };
 
   const handleTabChange = (newValue: DialogFilterMode) => {
@@ -51,6 +82,60 @@ const TelegramMessagesPage: React.FC = () => {
   const handleDialogSelect = (dialogId: string) => {
     setSelectedDialogId(dialogId);
   };
+
+  const renderDialogList = () => (
+    <List sx={{ 
+      width: '100%',
+      bgcolor: 'background.paper',
+      height: '100%',
+      overflow: 'auto',
+    }}>
+      {filteredDialogs.length === 0 ? (
+        <Box sx={{ p: 2, textAlign: 'center', color: 'text.secondary' }}>
+          No messages in this category
+        </Box>
+      ) : (
+        filteredDialogs.map((dialog) => (
+          <ListItem key={dialog.id} disablePadding>
+            <ListItemButton
+              selected={selectedDialogId === dialog.id.toString()}
+              onClick={() => handleDialogSelect(dialog.id.toString())}
+              sx={{
+                borderRadius: 1,
+                mx: 1,
+                '&.Mui-selected': {
+                  backgroundColor: 'action.selected',
+                }
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+                {dialog.is_group ? 
+                  <GroupIcon sx={{ mr: 1, color: 'text.secondary' }} /> : 
+                  <ChatIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                }
+                <ListItemText
+                  primary={
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <Typography variant="body1" noWrap sx={{ flex: 1 }}>
+                        {dialog.title}
+                      </Typography>
+                      {dialog.unread_count > 0 && (
+                        <Badge
+                          badgeContent={dialog.unread_count}
+                          color="primary"
+                          sx={{ ml: 1 }}
+                        />
+                      )}
+                    </Box>
+                  }
+                />
+              </Box>
+            </ListItemButton>
+          </ListItem>
+        ))
+      )}
+    </List>
+  );
 
   // Base layout that's consistent across all states
   const renderBaseLayout = (content: React.ReactNode) => (
@@ -147,11 +232,11 @@ const TelegramMessagesPage: React.FC = () => {
     );
   }
 
-  if (error) {
+  if (error || messagesError) {
     return renderBaseLayout(
       <Box sx={{ p: 3 }}>
         <Alert severity="error" sx={{ mb: 2 }}>
-          {error.message}
+          {(error || messagesError)?.message}
         </Alert>
       </Box>
     );
@@ -197,61 +282,7 @@ const TelegramMessagesPage: React.FC = () => {
     );
   }
 
-  const renderDialogList = () => (
-    <List sx={{ 
-      width: '100%',
-      bgcolor: 'background.paper',
-      height: '100%',
-      overflow: 'auto',
-    }}>
-      {filteredDialogs.length === 0 ? (
-        <Box sx={{ p: 2, textAlign: 'center', color: 'text.secondary' }}>
-          No messages in this category
-        </Box>
-      ) : (
-        filteredDialogs.map((dialog) => (
-          <ListItem key={dialog.id} disablePadding>
-            <ListItemButton
-              selected={selectedDialogId === dialog.id.toString()}
-              onClick={() => handleDialogSelect(dialog.id.toString())}
-              sx={{
-                borderRadius: 1,
-                mx: 1,
-                '&.Mui-selected': {
-                  backgroundColor: 'action.selected',
-                }
-              }}
-            >
-              <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
-                {dialog.is_group ? 
-                  <GroupIcon sx={{ mr: 1, color: 'text.secondary' }} /> : 
-                  <ChatIcon sx={{ mr: 1, color: 'text.secondary' }} />
-                }
-                <ListItemText
-                  primary={
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <Typography variant="body1" noWrap sx={{ flex: 1 }}>
-                        {dialog.title}
-                      </Typography>
-                      {dialog.unread_count > 0 && (
-                        <Badge
-                          badgeContent={dialog.unread_count}
-                          color="primary"
-                          sx={{ ml: 1 }}
-                        />
-                      )}
-                    </Box>
-                  }
-                />
-              </Box>
-            </ListItemButton>
-          </ListItem>
-        ))
-      )}
-    </List>
-  );
-
-  const selectedDialog = dialogs.find(d => d.id.toString() === selectedDialogId);
+  const selectedDialog = filteredDialogs.find(d => d.id.toString() === selectedDialogId);
 
   return renderBaseLayout(
     <ConversationView
@@ -260,15 +291,15 @@ const TelegramMessagesPage: React.FC = () => {
         dialog_id: selectedDialog.id.toString(),
         dialog_name: selectedDialog.title,
         suggested_response: "Loading...", // This will be replaced with actual response
-        edited_response: "",
+        edited_response: null,
         status: "PENDING_APPROVAL",
         processed_at: new Date().toISOString(),
         last_message_timestamp: new Date().toISOString(),
         last_message_id: "0",
         model_name: "gpt-4",
       } : null}
-      dialogMessages={[]} // This will be populated with actual messages
-      loadingMessages={false}
+      dialogMessages={dialogMessages}
+      loadingMessages={loadingMessages}
       onReject={() => {}}
       onEdit={() => {}}
       onApprove={() => {}}
