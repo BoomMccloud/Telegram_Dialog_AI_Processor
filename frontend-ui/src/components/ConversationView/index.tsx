@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -40,6 +40,18 @@ const ConversationView: React.FC<ConversationViewProps> = ({
   onApprove,
   onSend,
 }) => {
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    if (!loadingMessages && dialogMessages.length > 0) {
+      scrollToBottom();
+    }
+  }, [dialogMessages, loadingMessages]);
+
   if (!selectedResponse) {
     return (
       <Paper sx={{ 
@@ -141,7 +153,7 @@ const ConversationView: React.FC<ConversationViewProps> = ({
         overflow: 'auto',
         mb: 2,
         display: 'flex',
-        flexDirection: 'column',
+        flexDirection: 'column-reverse',
         minHeight: '200px'
       }}>
         {loadingMessages ? (
@@ -162,74 +174,123 @@ const ConversationView: React.FC<ConversationViewProps> = ({
       <Divider sx={{ mb: 2 }} />
       
       {/* AI suggested response */}
-      <Card variant="outlined" sx={{ mb: 2 }}>
-        <CardContent>
+      <Card variant="outlined" sx={{ mb: 2, minHeight: '200px' }}>
+        <CardContent sx={{ 
+          height: '150px',
+          display: 'flex',
+          flexDirection: 'column'
+        }}>
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
             <Avatar sx={{ bgcolor: 'info.main', mr: 1 }}>
               <SmartToyIcon />
             </Avatar>
             <Typography variant="subtitle1">AI Suggested Response</Typography>
           </Box>
-          <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
-            {selectedResponse.edited_response || selectedResponse.suggested_response}
-          </Typography>
+          <Box sx={{ 
+            overflow: 'auto',
+            flex: 1,
+            '&::-webkit-scrollbar': {
+              width: '8px',
+            },
+            '&::-webkit-scrollbar-track': {
+              background: '#f1f1f1',
+              borderRadius: '4px',
+            },
+            '&::-webkit-scrollbar-thumb': {
+              background: '#888',
+              borderRadius: '4px',
+            },
+            '&::-webkit-scrollbar-thumb:hover': {
+              background: '#555',
+            },
+          }}>
+            {!selectedResponse.suggested_response || selectedResponse.suggested_response === "Loading..." ? (
+              <Box sx={{ 
+                display: 'flex', 
+                justifyContent: 'center', 
+                alignItems: 'center',
+                height: '100%'
+              }}>
+                <CircularProgress size={24} />
+                <Typography variant="body1" sx={{ ml: 2 }}>
+                  Generating response...
+                </Typography>
+              </Box>
+            ) : (
+              <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
+                {selectedResponse.edited_response || selectedResponse.suggested_response}
+              </Typography>
+            )}
+          </Box>
         </CardContent>
-        <CardActions sx={{ justifyContent: 'flex-end' }}>
-          {selectedResponse.status === ResponseStatus.PENDING_APPROVAL && (
-            <>
-              <Button 
-                startIcon={<CancelIcon />} 
-                color="error" 
-                onClick={onReject}
-              >
-                Reject
-              </Button>
-              <Button 
-                startIcon={<EditIcon />} 
-                color="primary" 
-                onClick={onEdit}
-              >
-                Edit
-              </Button>
-              <Button 
-                startIcon={<CheckCircleIcon />} 
-                color="success" 
-                variant="contained"
-                onClick={onApprove}
-              >
-                Approve
-              </Button>
-            </>
-          )}
-          {selectedResponse.status === ResponseStatus.APPROVED && (
-            <>
-              <Button 
-                startIcon={<EditIcon />} 
-                color="primary" 
-                onClick={onEdit}
-              >
-                Edit
-              </Button>
-              <Button 
-                startIcon={<SendIcon />} 
-                color="primary" 
-                variant="contained"
-                onClick={onSend}
-              >
-                Send
-              </Button>
-            </>
-          )}
-          {(selectedResponse.status === ResponseStatus.REJECTED || 
-            selectedResponse.status === ResponseStatus.SENT || 
-            selectedResponse.status === ResponseStatus.FAILED) && (
+        <CardActions sx={{ justifyContent: 'flex-end', minHeight: '52px' }}>
+          {!selectedResponse.suggested_response || selectedResponse.suggested_response === "Loading..." ? (
             <Button 
-              startIcon={<EditIcon />} 
-              color="primary" 
-              onClick={onEdit}
+              disabled
+              startIcon={<SmartToyIcon />}
+              color="primary"
             >
-              View Details
+              Generating...
             </Button>
+          ) : (
+            <>
+              {selectedResponse.status === ResponseStatus.PENDING_APPROVAL && (
+                <>
+                  <Button 
+                    startIcon={<CancelIcon />} 
+                    color="error" 
+                    onClick={onReject}
+                  >
+                    Reject
+                  </Button>
+                  <Button 
+                    startIcon={<EditIcon />} 
+                    color="primary" 
+                    onClick={onEdit}
+                  >
+                    Edit
+                  </Button>
+                  <Button 
+                    startIcon={<CheckCircleIcon />} 
+                    color="success" 
+                    variant="contained"
+                    onClick={onApprove}
+                  >
+                    Approve
+                  </Button>
+                </>
+              )}
+              {selectedResponse.status === ResponseStatus.APPROVED && (
+                <>
+                  <Button 
+                    startIcon={<EditIcon />} 
+                    color="primary" 
+                    onClick={onEdit}
+                  >
+                    Edit
+                  </Button>
+                  <Button 
+                    startIcon={<SendIcon />} 
+                    color="primary" 
+                    variant="contained"
+                    onClick={onSend}
+                  >
+                    Send
+                  </Button>
+                </>
+              )}
+              {(selectedResponse.status === ResponseStatus.REJECTED || 
+                selectedResponse.status === ResponseStatus.SENT || 
+                selectedResponse.status === ResponseStatus.FAILED) && (
+                <Button 
+                  startIcon={<EditIcon />} 
+                  color="primary" 
+                  onClick={onEdit}
+                >
+                  View Details
+                </Button>
+              )}
+            </>
           )}
         </CardActions>
       </Card>
