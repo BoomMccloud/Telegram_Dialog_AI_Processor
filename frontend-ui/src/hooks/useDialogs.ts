@@ -42,14 +42,52 @@ export interface UseDialogsResult {
   initialized: boolean;
 }
 
+const STORAGE_KEYS = {
+  DIALOGS: 'telegram_dialogs',
+  FILTER_MODE: 'telegram_filter_mode',
+  SELECTED_DIALOG: 'telegram_selected_dialog',
+  INITIALIZED: 'telegram_initialized'
+};
+
 export const useDialogs = (): UseDialogsResult => {
-  const [dialogs, setDialogs] = useState<Dialog[]>([]);
+  const [dialogs, setDialogs] = useState<Dialog[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.DIALOGS);
+    return saved ? JSON.parse(saved) : [];
+  });
+  
   const [filteredDialogs, setFilteredDialogs] = useState<Dialog[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
-  const [selectedDialogId, setSelectedDialogId] = useState<string | null>(null);
-  const [filterMode, setFilterMode] = useState<DialogFilterMode>('all-unread');
-  const [initialized, setInitialized] = useState(false);
+  const [selectedDialogId, setSelectedDialogId] = useState<string | null>(() => {
+    return localStorage.getItem(STORAGE_KEYS.SELECTED_DIALOG);
+  });
+  const [filterMode, setFilterMode] = useState<DialogFilterMode>(() => {
+    return (localStorage.getItem(STORAGE_KEYS.FILTER_MODE) as DialogFilterMode) || 'all-unread';
+  });
+  const [initialized, setInitialized] = useState<boolean>(() => {
+    return localStorage.getItem(STORAGE_KEYS.INITIALIZED) === 'true';
+  });
+
+  // Persist state changes to localStorage
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.DIALOGS, JSON.stringify(dialogs));
+  }, [dialogs]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.FILTER_MODE, filterMode);
+  }, [filterMode]);
+
+  useEffect(() => {
+    if (selectedDialogId) {
+      localStorage.setItem(STORAGE_KEYS.SELECTED_DIALOG, selectedDialogId);
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.SELECTED_DIALOG);
+    }
+  }, [selectedDialogId]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.INITIALIZED, initialized.toString());
+  }, [initialized]);
 
   const filterDialogs = useCallback((dialogList: Dialog[], mode: DialogFilterMode) => {
     switch (mode) {
@@ -75,8 +113,6 @@ export const useDialogs = (): UseDialogsResult => {
         throw new Error('Invalid response format from server');
       }
       
-      console.log('Raw dialogs from API:', response.dialogs);
-      
       // Transform the response to match our Dialog interface
       const transformedDialogs = response.dialogs.map((dialog: ApiDialog) => ({
         id: dialog.id,
@@ -86,8 +122,6 @@ export const useDialogs = (): UseDialogsResult => {
         has_mention: false, // We'll need to get this from messages
         last_message: undefined // We'll need to get this from messages
       }));
-      
-      console.log('Transformed dialogs:', transformedDialogs);
       
       setDialogs(transformedDialogs);
       setFilteredDialogs(filterDialogs(transformedDialogs, filterMode));
@@ -100,10 +134,23 @@ export const useDialogs = (): UseDialogsResult => {
     }
   }, [filterMode, filterDialogs]);
 
+  // Auto-fetch dialogs on mount if we don't have any
+  useEffect(() => {
+    if (!initialized && dialogs.length === 0) {
+      fetchDialogs();
+    }
+  }, [initialized, dialogs.length, fetchDialogs]);
+
   // Update filtered dialogs when filter mode changes
   useEffect(() => {
     setFilteredDialogs(filterDialogs(dialogs, filterMode));
   }, [dialogs, filterMode, filterDialogs]);
+
+  // Set up periodic refresh (every 30 seconds)
+  useEffect(() => {
+    const intervalId = setInterval(fetchDialogs, 30000);
+    return () => clearInterval(intervalId);
+  }, [fetchDialogs]);
 
   return {
     dialogs,

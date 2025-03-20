@@ -38,7 +38,7 @@ const sortMessagesByDate = (messages: HistoricalMessage[]): HistoricalMessage[] 
   return [...messages].sort((a, b) => {
     const dateA = new Date(a.timestamp);
     const dateB = new Date(b.timestamp);
-    return dateA.getTime() - dateB.getTime(); // Ascending order (oldest first)
+    return dateB.getTime() - dateA.getTime(); // Descending order (newest first)
   });
 };
 
