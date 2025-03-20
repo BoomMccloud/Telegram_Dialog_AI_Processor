@@ -39,6 +39,7 @@ export interface UseDialogsResult {
   setSelectedDialogId: (id: string | null) => void;
   filterMode: DialogFilterMode;
   setFilterMode: (mode: DialogFilterMode) => void;
+  initialized: boolean;
 }
 
 export const useDialogs = (): UseDialogsResult => {
@@ -48,6 +49,7 @@ export const useDialogs = (): UseDialogsResult => {
   const [error, setError] = useState<Error | null>(null);
   const [selectedDialogId, setSelectedDialogId] = useState<string | null>(null);
   const [filterMode, setFilterMode] = useState<DialogFilterMode>('all-unread');
+  const [initialized, setInitialized] = useState(false);
 
   const filterDialogs = useCallback((dialogList: Dialog[], mode: DialogFilterMode) => {
     switch (mode) {
@@ -89,6 +91,7 @@ export const useDialogs = (): UseDialogsResult => {
       
       setDialogs(transformedDialogs);
       setFilteredDialogs(filterDialogs(transformedDialogs, filterMode));
+      setInitialized(true);
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Failed to fetch dialogs'));
       console.error('Error fetching dialogs:', err);
@@ -102,11 +105,6 @@ export const useDialogs = (): UseDialogsResult => {
     setFilteredDialogs(filterDialogs(dialogs, filterMode));
   }, [dialogs, filterMode, filterDialogs]);
 
-  // Fetch dialogs on mount
-  useEffect(() => {
-    fetchDialogs();
-  }, [fetchDialogs]);
-
   return {
     dialogs,
     filteredDialogs,
@@ -117,5 +115,6 @@ export const useDialogs = (): UseDialogsResult => {
     setSelectedDialogId,
     filterMode,
     setFilterMode,
+    initialized,
   };
 }; 

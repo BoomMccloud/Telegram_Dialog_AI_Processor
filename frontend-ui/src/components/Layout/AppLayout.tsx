@@ -21,6 +21,7 @@ import {
   Psychology as PsychologyIcon,
   Brightness4 as DarkModeIcon,
   Brightness7 as LightModeIcon,
+  Send as TelegramIcon,
 } from '@mui/icons-material';
 import { Link, useLocation } from 'react-router-dom';
 import { useThemeContext } from '../../theme/ThemeContext';
@@ -28,6 +29,7 @@ import { useThemeContext } from '../../theme/ThemeContext';
 // Navigation items
 const navItems = [
   { name: 'Dashboard', path: '/', icon: <DashboardIcon /> },
+  { name: 'Telegram', path: '/telegram', icon: <TelegramIcon /> },
   { name: 'Messages', path: '/messages', icon: <MessageIcon /> },
   { name: 'Models', path: '/models', icon: <PsychologyIcon /> },
 ];
@@ -54,6 +56,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, isAuthenticated = false
   const handleMobileMenuClose = () => {
     setMobileMenuAnchorEl(null);
   };
+
+  // Filter navigation items based on authentication
+  const visibleNavItems = isAuthenticated ? navItems : [navItems[0]]; // Only show Dashboard when not authenticated
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
@@ -91,7 +96,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, isAuthenticated = false
             display: { xs: 'none', md: 'flex' },
             ml: 2
           }}>
-            {navItems.map((item) => {
+            {visibleNavItems.map((item) => {
               const isActive = location.pathname === item.path || 
                 (item.path !== '/' && location.pathname.startsWith(item.path));
                 
@@ -162,7 +167,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, isAuthenticated = false
         open={isMobileMenuOpen}
         onClose={handleMobileMenuClose}
       >
-        {navItems.map((item) => {
+        {visibleNavItems.map((item) => {
           const isActive = location.pathname === item.path || 
             (item.path !== '/' && location.pathname.startsWith(item.path));
           

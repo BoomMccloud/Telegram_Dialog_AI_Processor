@@ -1,8 +1,4 @@
-import React, { useState } from 'react';
-import { MainLayout } from '@components/Layout/MainLayout';
-import { MessageThread } from '@components/Messages/MessageThread';
-import { MessageContextView } from '@components/Messages/MessageContextView';
-import { useDialogs, DialogFilterMode } from '@hooks/useDialogs';
+import React from 'react';
 import { 
   Alert, 
   CircularProgress, 
@@ -15,16 +11,19 @@ import {
   Badge,
   Box,
   Tooltip,
-  Tabs,
-  Tab,
   Paper,
-  Breadcrumbs,
-  Link,
+  Button,
+  Drawer,
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import ChatIcon from '@mui/icons-material/Chat';
 import GroupIcon from '@mui/icons-material/Group';
-import NavigateNextIcon from '@mui/icons-material/NavigateNext';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import ConversationView from '@components/ConversationView';
+import { useDialogs, DialogFilterMode } from '@hooks/useDialogs';
+
+// Constants
+const DRAWER_WIDTH = 320;
 
 const TelegramMessagesPage: React.FC = () => {
   const {
@@ -36,90 +35,174 @@ const TelegramMessagesPage: React.FC = () => {
     setSelectedDialogId,
     fetchDialogs,
     filterMode,
-    setFilterMode
+    setFilterMode,
+    initialized,
   } = useDialogs();
-
-  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
-  const [view, setView] = useState<'dialogs' | 'messages' | 'context'>('dialogs');
-
-  const handleMessageSelect = (messageId: string) => {
-    setSelectedMessageId(messageId);
-    setView('context');
-  };
 
   const handleRefresh = () => {
     fetchDialogs();
   };
 
-  const handleTabChange = (_event: React.SyntheticEvent, newValue: DialogFilterMode) => {
+  const handleTabChange = (newValue: DialogFilterMode) => {
     setFilterMode(newValue);
     setSelectedDialogId(null);
-    setSelectedMessageId(null);
-    setView('dialogs');
   };
 
   const handleDialogSelect = (dialogId: string) => {
     setSelectedDialogId(dialogId);
-    setView('messages');
   };
 
-  const handleBreadcrumbClick = (newView: 'dialogs' | 'messages' | 'context') => {
-    if (newView === 'dialogs') {
-      setSelectedDialogId(null);
-      setSelectedMessageId(null);
-    } else if (newView === 'messages') {
-      setSelectedMessageId(null);
-    }
-    setView(newView);
-  };
-
-  if (loading) {
-    return (
-      <MainLayout>
+  // Base layout that's consistent across all states
+  const renderBaseLayout = (content: React.ReactNode) => (
+    <Box sx={{ 
+      display: 'flex', 
+      height: 'calc(100vh - 64px)',
+      overflow: 'hidden'
+    }}>
+      {/* Left Drawer - Always present */}
+      <Drawer
+        variant="permanent"
+        sx={{
+          width: DRAWER_WIDTH,
+          flexShrink: 0,
+          '& .MuiDrawer-paper': {
+            width: DRAWER_WIDTH,
+            boxSizing: 'border-box',
+            position: 'relative',
+            height: '100%',
+            border: 'none',
+          },
+        }}
+      >
         <Box sx={{ 
+          p: 2, 
           display: 'flex', 
           alignItems: 'center', 
-          justifyContent: 'center',
-          height: 'calc(100vh - 64px)'
+          justifyContent: 'space-between',
+          borderBottom: 1,
+          borderColor: 'divider'
         }}>
-          <CircularProgress />
+          <Typography variant="h6">Dialogs</Typography>
+          <Tooltip title="Refresh messages">
+            <IconButton onClick={handleRefresh} disabled={loading} size="medium">
+              <RefreshIcon />
+            </IconButton>
+          </Tooltip>
         </Box>
-      </MainLayout>
+        
+        {initialized && (
+          <Box sx={{ 
+            p: 1,
+            display: 'flex',
+            gap: 1,
+            borderBottom: 1,
+            borderColor: 'divider'
+          }}>
+            <Button 
+              size="small"
+              variant={filterMode === 'all-unread' ? 'contained' : 'text'}
+              onClick={() => handleTabChange('all-unread')}
+            >
+              Unread
+            </Button>
+            <Button
+              size="small"
+              variant={filterMode === 'all' ? 'contained' : 'text'}
+              onClick={() => handleTabChange('all')}
+            >
+              All
+            </Button>
+          </Box>
+        )}
+
+        {initialized ? renderDialogList() : (
+          <Box sx={{ p: 2, textAlign: 'center', color: 'text.secondary' }}>
+            Click the button to load dialogs
+          </Box>
+        )}
+      </Drawer>
+
+      {/* Main Content Area - Always present */}
+      <Box sx={{ 
+        flexGrow: 1,
+        height: '100%',
+        overflow: 'hidden',
+        bgcolor: 'background.default'
+      }}>
+        {content}
+      </Box>
+    </Box>
+  );
+
+  if (loading) {
+    return renderBaseLayout(
+      <Box sx={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        height: '100%'
+      }}>
+        <CircularProgress />
+      </Box>
     );
   }
 
   if (error) {
-    return (
-      <MainLayout>
+    return renderBaseLayout(
+      <Box sx={{ p: 3 }}>
         <Alert severity="error" sx={{ mb: 2 }}>
           {error.message}
         </Alert>
-      </MainLayout>
+      </Box>
     );
   }
 
-  const getDialogCount = (mode: DialogFilterMode) => {
-    switch (mode) {
-      case 'all-unread':
-        return dialogs.filter(d => d.unread_count > 0).length;
-      case 'unread-dms':
-        return dialogs.filter(d => d.unread_count > 0 && !d.is_group).length;
-      case 'unread-groups':
-        return dialogs.filter(d => d.unread_count > 0 && d.is_group).length;
-      case 'all':
-        return dialogs.length;
-      default:
-        return 0;
-    }
-  };
+  if (!initialized) {
+    return renderBaseLayout(
+      <Box sx={{ 
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100%',
+        p: 3
+      }}>
+        <Paper 
+          elevation={2} 
+          sx={{ 
+            p: 4,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 2,
+            maxWidth: 400
+          }}
+        >
+          <Typography variant="h6" color="text.secondary" align="center">
+            Ready to fetch your Telegram messages
+          </Typography>
+          <Typography variant="body1" color="text.secondary" align="center">
+            Click the button below to start loading your messages
+          </Typography>
+          <Button
+            variant="contained"
+            size="large"
+            onClick={fetchDialogs}
+            startIcon={<PlayArrowIcon />}
+            disabled={loading}
+          >
+            Start Loading Messages
+          </Button>
+        </Paper>
+      </Box>
+    );
+  }
 
   const renderDialogList = () => (
     <List sx={{ 
-      overflowY: 'auto',
+      width: '100%',
+      bgcolor: 'background.paper',
       height: '100%',
-      '& .MuiListItem-root': {
-        px: 1,
-      }
+      overflow: 'auto',
     }}>
       {filteredDialogs.length === 0 ? (
         <Box sx={{ p: 2, textAlign: 'center', color: 'text.secondary' }}>
@@ -170,131 +253,27 @@ const TelegramMessagesPage: React.FC = () => {
 
   const selectedDialog = dialogs.find(d => d.id.toString() === selectedDialogId);
 
-  return (
-    <MainLayout>
-      <Box sx={{ p: 2, height: 'calc(100vh - 64px)', display: 'flex', flexDirection: 'column' }}>
-        {/* Top Navigation */}
-        <Box sx={{ mb: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-            <Breadcrumbs separator={<NavigateNextIcon fontSize="small" />}>
-              <Link
-                component="button"
-                variant="body1"
-                onClick={() => handleBreadcrumbClick('dialogs')}
-                color={view === 'dialogs' ? 'text.primary' : 'inherit'}
-                underline={view === 'dialogs' ? 'none' : 'hover'}
-              >
-                Dialogs
-              </Link>
-              {selectedDialog && (view === 'messages' || view === 'context') && (
-                <Link
-                  component="button"
-                  variant="body1"
-                  onClick={() => handleBreadcrumbClick('messages')}
-                  color={view === 'messages' ? 'text.primary' : 'inherit'}
-                  underline={view === 'messages' ? 'none' : 'hover'}
-                >
-                  {selectedDialog.title}
-                </Link>
-              )}
-              {view === 'context' && (
-                <Typography color="text.primary">
-                  Message Context
-                </Typography>
-              )}
-            </Breadcrumbs>
-            <Tooltip title="Refresh">
-              <IconButton onClick={handleRefresh} disabled={loading} size="small">
-                <RefreshIcon />
-              </IconButton>
-            </Tooltip>
-          </Box>
-          <Tabs
-            value={filterMode}
-            onChange={handleTabChange}
-            sx={{ borderBottom: 1, borderColor: 'divider' }}
-          >
-            <Tab 
-              label={`All Unread (${getDialogCount('all-unread')})`} 
-              value="all-unread"
-            />
-            <Tab 
-              label={`Unread DMs (${getDialogCount('unread-dms')})`} 
-              value="unread-dms"
-            />
-            <Tab 
-              label={`Unread Groups (${getDialogCount('unread-groups')})`} 
-              value="unread-groups"
-            />
-            <Tab 
-              label={`All (${getDialogCount('all')})`} 
-              value="all"
-            />
-          </Tabs>
-        </Box>
-
-        {/* Main Content */}
-        <Paper 
-          elevation={2} 
-          sx={{ 
-            flexGrow: 1,
-            overflow: 'hidden',
-            display: 'flex',
-            flexDirection: 'column',
-          }}
-        >
-          {view === 'dialogs' && renderDialogList()}
-          
-          {view === 'messages' && selectedDialogId && (
-            <MessageThread
-              dialogId={selectedDialogId}
-              onMessageSelect={handleMessageSelect}
-              onDialogSelect={setSelectedDialogId}
-            />
-          )}
-          
-          {view === 'context' && selectedMessageId && selectedDialogId && (
-            <MessageContextView
-              messageId={selectedMessageId}
-              dialogId={selectedDialogId}
-            />
-          )}
-
-          {/* Empty States */}
-          {view === 'messages' && !selectedDialogId && (
-            <Box sx={{ 
-              p: 3, 
-              textAlign: 'center', 
-              color: 'text.secondary',
-              height: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <Typography variant="body1">
-                Select a dialog to view messages
-              </Typography>
-            </Box>
-          )}
-          
-          {view === 'context' && !selectedMessageId && (
-            <Box sx={{ 
-              p: 3, 
-              textAlign: 'center', 
-              color: 'text.secondary',
-              height: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <Typography variant="body1">
-                Select a message to view its context
-              </Typography>
-            </Box>
-          )}
-        </Paper>
-      </Box>
-    </MainLayout>
+  return renderBaseLayout(
+    <ConversationView
+      selectedResponse={selectedDialog ? {
+        id: selectedDialog.id.toString(),
+        dialog_id: selectedDialog.id.toString(),
+        dialog_name: selectedDialog.title,
+        suggested_response: "Loading...", // This will be replaced with actual response
+        edited_response: "",
+        status: "PENDING_APPROVAL",
+        processed_at: new Date().toISOString(),
+        last_message_timestamp: new Date().toISOString(),
+        last_message_id: "0",
+        model_name: "gpt-4",
+      } : null}
+      dialogMessages={[]} // This will be populated with actual messages
+      loadingMessages={false}
+      onReject={() => {}}
+      onEdit={() => {}}
+      onApprove={() => {}}
+      onSend={() => {}}
+    />
   );
 };
 
