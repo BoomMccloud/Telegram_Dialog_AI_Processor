@@ -1,190 +1,121 @@
-import { useState } from 'react';
-import { api } from '../services/api';
-import { BaseDialog } from '../types';
-import { DialogMessage } from '../types/dialog';
+import { useState, useEffect, useCallback } from 'react';
+import { api } from '@services/api';
 
-interface UseDialogsResult {
-  dialogs: BaseDialog[];
-  selectedDialog: BaseDialog | null;
-  dialogMessages: DialogMessage[];
-  loading: boolean;
-  loadingMessages: boolean;
-  error: string | null;
-  fetchDialogs: () => Promise<void>;
-  fetchDialogMessages: (dialogId: string) => Promise<void>;
-  setSelectedDialog: (dialog: BaseDialog | null) => void;
-  refreshDialogs: () => Promise<void>;
-  isProcessing: boolean;
-  processingProgress: {
-    totalDialogs: number;
-    processedDialogs: number;
-    currentDialogName: string;
-    currentOperation: string;
-    error: string | null;
+interface ApiDialog {
+  id: number;
+  name: string;
+  unread_count: number;
+  is_group: boolean;
+  is_channel: boolean;
+  is_user: boolean;
+  type: string;
+}
+
+interface ApiDialogResponse {
+  dialogs: ApiDialog[];
+}
+
+export interface Dialog {
+  id: number;
+  title: string;
+  unread_count: number;
+  is_group: boolean;
+  has_mention: boolean;
+  last_message?: {
+    text: string;
+    date: string;
   };
-  startProcessing: () => Promise<void>;
-  cancelProcessing: () => void;
+}
+
+export type DialogFilterMode = 'all-unread' | 'unread-dms' | 'unread-groups' | 'all';
+
+export interface UseDialogsResult {
+  dialogs: Dialog[];
+  filteredDialogs: Dialog[];
+  loading: boolean;
+  error: Error | null;
+  fetchDialogs: () => Promise<void>;
+  selectedDialogId: string | null;
+  setSelectedDialogId: (id: string | null) => void;
+  filterMode: DialogFilterMode;
+  setFilterMode: (mode: DialogFilterMode) => void;
 }
 
 export const useDialogs = (): UseDialogsResult => {
-  const [dialogs, setDialogs] = useState<BaseDialog[]>([]);
-  const [selectedDialog, setSelectedDialog] = useState<BaseDialog | null>(null);
-  const [dialogMessages, setDialogMessages] = useState<DialogMessage[]>([]);
+  const [dialogs, setDialogs] = useState<Dialog[]>([]);
+  const [filteredDialogs, setFilteredDialogs] = useState<Dialog[]>([]);
   const [loading, setLoading] = useState(false);
-  const [loadingMessages, setLoadingMessages] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [processingProgress, setProcessingProgress] = useState({
-    totalDialogs: 0,
-    processedDialogs: 0,
-    currentDialogName: '',
-    currentOperation: '',
-    error: null as string | null
-  });
+  const [error, setError] = useState<Error | null>(null);
+  const [selectedDialogId, setSelectedDialogId] = useState<string | null>(null);
+  const [filterMode, setFilterMode] = useState<DialogFilterMode>('all-unread');
 
-  // Fetch all dialogs
-  const fetchDialogs = async (): Promise<void> => {
+  const filterDialogs = useCallback((dialogList: Dialog[], mode: DialogFilterMode) => {
+    switch (mode) {
+      case 'all-unread':
+        return dialogList.filter(dialog => dialog.unread_count > 0);
+      case 'unread-dms':
+        return dialogList.filter(dialog => dialog.unread_count > 0 && !dialog.is_group);
+      case 'unread-groups':
+        return dialogList.filter(dialog => dialog.unread_count > 0 && dialog.is_group);
+      case 'all':
+        return dialogList;
+      default:
+        return dialogList;
+    }
+  }, []);
+
+  const fetchDialogs = useCallback(async () => {
     setLoading(true);
     setError(null);
-    
     try {
-      const response = await api.telegram.getDialogs();
-      setDialogs(response.dialogs);
+      const response = await api.dialogs.getAll() as ApiDialogResponse;
+      if (!response || !response.dialogs) {
+        throw new Error('Invalid response format from server');
+      }
+      
+      console.log('Raw dialogs from API:', response.dialogs);
+      
+      // Transform the response to match our Dialog interface
+      const transformedDialogs = response.dialogs.map((dialog: ApiDialog) => ({
+        id: dialog.id,
+        title: dialog.name,
+        unread_count: dialog.unread_count,
+        is_group: dialog.is_group || dialog.is_channel,
+        has_mention: false, // We'll need to get this from messages
+        last_message: undefined // We'll need to get this from messages
+      }));
+      
+      console.log('Transformed dialogs:', transformedDialogs);
+      
+      setDialogs(transformedDialogs);
+      setFilteredDialogs(filterDialogs(transformedDialogs, filterMode));
     } catch (err) {
+      setError(err instanceof Error ? err : new Error('Failed to fetch dialogs'));
       console.error('Error fetching dialogs:', err);
-      setError('Failed to load dialogs. Please try again later.');
-      setDialogs([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, [filterMode, filterDialogs]);
 
-  // Fetch messages for a specific dialog
-  const fetchDialogMessages = async (dialogId: string): Promise<void> => {
-    setLoadingMessages(true);
-    
-    try {
-      // Implement when API is ready
-      // const response = await api.messages.getByDialogId(dialogId);
-      // setDialogMessages(response.messages);
-      
-      // Mock data for now
-      console.log(`Fetching messages for dialog: ${dialogId}`);
-      setDialogMessages([]);
-    } catch (err) {
-      console.error('Error fetching dialog messages:', err);
-      setError('Failed to load dialog messages. Please try again later.');
-      setDialogMessages([]);
-    } finally {
-      setLoadingMessages(false);
-    }
-  };
+  // Update filtered dialogs when filter mode changes
+  useEffect(() => {
+    setFilteredDialogs(filterDialogs(dialogs, filterMode));
+  }, [dialogs, filterMode, filterDialogs]);
 
-  // Refresh dialogs (for the manual refresh button)
-  const refreshDialogs = async (): Promise<void> => {
-    await fetchDialogs();
-  };
-
-  // Start processing dialogs
-  const startProcessing = async (): Promise<void> => {
-    console.log('Starting refresh process...');
-    setIsProcessing(true);
-    setProcessingProgress({
-      totalDialogs: 0,
-      processedDialogs: 0,
-      currentDialogName: '',
-      currentOperation: 'Fetching dialogs...',
-      error: null
-    });
-
-    try {
-      // Fetch all dialogs
-      const dialogsResponse = await api.telegram.getDialogs();
-      console.log('Received dialogs:', dialogsResponse);
-      
-      // Filter dialogs based on criteria
-      const filteredDialogs = dialogsResponse.dialogs.filter(dialog => {
-        return (dialog.is_user && dialog.unread_count > 0) || // Unread private messages
-               (!dialog.is_user && dialog.unread_count > 0 && dialog.type === 'group'); // Unread group messages
-      });
-
-      console.log('Filtered dialogs:', filteredDialogs);
-      
-      // Update state with filtered dialogs
-      setDialogs(filteredDialogs);
-      
-      // Update progress
-      setProcessingProgress(prev => ({
-        ...prev,
-        totalDialogs: filteredDialogs.length,
-        currentOperation: 'Processing dialogs...'
-      }));
-
-      // Process each dialog and generate responses
-      for (const dialog of filteredDialogs) {
-        try {
-          setProcessingProgress(prev => ({
-            ...prev,
-            currentDialogName: dialog.name,
-            currentOperation: `Generating responses for ${dialog.name}...`
-          }));
-
-          // Generate responses based on dialog type
-          if (dialog.is_user) {
-            await api.responses.generate.private(dialog.id.toString());
-          } else {
-            await api.responses.generate.group(dialog.id.toString());
-          }
-
-          setProcessingProgress(prev => ({
-            ...prev,
-            processedDialogs: prev.processedDialogs + 1
-          }));
-
-        } catch (dialogError) {
-          console.error(`Error processing dialog ${dialog.name}:`, dialogError);
-          setProcessingProgress(prev => ({
-            ...prev,
-            error: `Failed to process ${dialog.name}. Continuing with next dialog...`
-          }));
-        }
-      }
-
-      setProcessingProgress(prev => ({
-        ...prev,
-        currentOperation: 'All dialogs processed successfully'
-      }));
-
-    } catch (err) {
-      console.error('Error during refresh:', err);
-      setProcessingProgress(prev => ({
-        ...prev,
-        error: 'Failed to fetch or process dialogs. Please try again.'
-      }));
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  // Cancel processing
-  const cancelProcessing = () => {
-    setIsProcessing(false);
-  };
+  // Fetch dialogs on mount
+  useEffect(() => {
+    fetchDialogs();
+  }, [fetchDialogs]);
 
   return {
     dialogs,
-    selectedDialog,
-    dialogMessages,
+    filteredDialogs,
     loading,
-    loadingMessages,
     error,
     fetchDialogs,
-    fetchDialogMessages,
-    setSelectedDialog,
-    refreshDialogs,
-    isProcessing,
-    processingProgress,
-    startProcessing,
-    cancelProcessing
+    selectedDialogId,
+    setSelectedDialogId,
+    filterMode,
+    setFilterMode,
   };
 }; 

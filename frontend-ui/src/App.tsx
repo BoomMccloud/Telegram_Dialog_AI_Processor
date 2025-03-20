@@ -10,6 +10,7 @@ import Messages from './pages/Messages';
 import Data from './pages/Data';
 import Models from './pages/Models';
 import Login from './pages/Auth/Login';
+import TelegramMessagesPage from './pages/telegram';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
@@ -50,6 +51,12 @@ function App() {
           <Route path="/messages" element={
             <AppLayout isAuthenticated={isAuthenticated}>
               <Messages />
+            </AppLayout>
+          } />
+          
+          <Route path="/telegram" element={
+            <AppLayout isAuthenticated={isAuthenticated}>
+              <TelegramMessagesPage />
             </AppLayout>
           } />
           

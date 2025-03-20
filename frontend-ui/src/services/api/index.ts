@@ -1,5 +1,21 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
-import { QRAuthResponse, SessionVerifyResponse, DialogListResponse, SessionStatus, Response, ResponseListResponse, ResponseUpdateRequest, MessageListResponse, MessageFetchOptions, ResponseGenerateRequest, ResponseWithDialog, DialogSelectionResponse } from '../../types';
+import { QRAuthResponse, SessionVerifyResponse, DialogListResponse, SessionStatus, Response, ResponseListResponse, ResponseUpdateRequest, MessageListResponse, MessageFetchOptions, DialogSelectionResponse } from '../../types';
+
+// Add the DialogSelection type
+export interface DialogSelection {
+  dialog_id: string;
+  dialog_name: string;
+  is_processing_enabled?: boolean;
+  auto_send_enabled?: boolean;
+}
+
+// Add the ResponseWithDialog type
+export interface ResponseWithDialog extends Response {
+  dialog: {
+    id: string;
+    name: string;
+  };
+}
 
 // Create a base API instance
 const apiClient: AxiosInstance = axios.create({
@@ -244,47 +260,28 @@ export const api = {
     getAll: () => 
       apiRequest({
         method: 'GET',
-        url: '/dialogs',
+        url: '/messages/dialogs',
+      }),
+    getSelected: () => 
+      apiRequest({
+        method: 'GET',
+        url: '/dialogs/selected',
       }),
     getByTelegramId: (telegramId: string) =>
       apiRequest<DialogSelectionResponse>({
         method: 'GET',
         url: `/dialogs/by-telegram-id/${telegramId}`,
       }),
-    update: (id: number, data: { 
-      is_processing_enabled?: boolean; 
-      auto_send_enabled?: boolean;
-    }) => 
-      apiRequest({
-        method: 'PATCH',
-        url: `/dialogs/${String(id)}`,
-        data,
-      }),
-    delete: (id: number) => 
-      apiRequest({
-        method: 'DELETE',
-        url: `/dialogs/${String(id)}`,
-      }),
-    select: (dialogId: number, dialogName: string) => 
-      apiRequest({
+    select: (dialog: DialogSelection) =>
+      apiRequest<DialogSelectionResponse>({
         method: 'POST',
         url: '/dialogs/select',
-        data: {
-          dialog_id: String(dialogId),
-          dialog_name: dialogName,
-          is_processing_enabled: true,
-          auto_send_enabled: false
-        },
+        data: dialog,
       }),
-    unselect: (dialogId: number) => 
-      apiRequest({
+    deselect: (dialogId: string) =>
+      apiRequest<DialogSelectionResponse>({
         method: 'DELETE',
-        url: `/dialogs/selected/${String(dialogId)}`,
-      }),
-    getSelected: () => 
-      apiRequest({
-        method: 'GET',
-        url: '/dialogs/selected',
+        url: `/dialogs/selected/${dialogId}`,
       }),
   },
   
