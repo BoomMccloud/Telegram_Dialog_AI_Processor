@@ -92,8 +92,37 @@ The backend has comprehensive support for:
    - Each dialog will have at most one active response at any time
    - When new messages are processed, the existing response may be updated or preserved based on its status
 
-3. **User Privacy and Data Management**
+2. **User Privacy and Data Management**
    - Implement dialog-level and global cleanup functionality to allow users to delete message history and responses
+
+### ID Relationships and Management
+
+1. **Dual ID System**
+   - Each dialog maintains two types of IDs:
+     - Internal UUID (`id`): Used for database relationships and internal references
+     - Telegram ID (`telegram_dialog_id`): Used for Telegram API communication
+   - The `ProcessedResponse` table uses the internal UUID for its `dialog_id` foreign key
+
+2. **ID Formats**
+   - Internal UUID: Generated automatically for each new dialog
+   - Telegram ID formats (stored as strings):
+     - Private chats: Positive numbers (e.g., "123456789")
+     - Groups: Negative numbers (e.g., "-123456789")
+     - Supergroups/Channels: Special format (e.g., "-100123456789")
+
+3. **ID Usage**
+   - Frontend → Backend: Uses Telegram IDs for API requests
+   - Backend → Database: Uses UUIDs for relationships
+   - Backend → Telegram API: Uses Telegram IDs
+   - Database Constraints:
+     - Primary key: UUID
+     - Unique constraint on (user_id, telegram_dialog_id) pair
+
+4. **Benefits**
+   - Consistent internal referencing using UUIDs
+   - Compatibility with Telegram's various ID formats
+   - Clean separation between internal and external identifiers
+   - Data integrity through unique constraints
 
 ## Processing Logic
 
