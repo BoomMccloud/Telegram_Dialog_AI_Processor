@@ -1,283 +1,173 @@
-# Telegram Messages Page Development Plan
+# Telegram Dialog Message Processing - Development Plan
 
 ## Overview
-This document outlines the development plan for the new Telegram messages page, which will be implemented under `/frontend-ui/src/pages/telegram`. The page will handle Telegram authentication, display messages with historical context, and manage AI-generated responses. This plan focuses on maximizing the reuse of existing components while minimizing new code.
 
-## Project Structure
+This plan outlines the implementation of message processing and response generation for the Telegram Dialog AI Processor application. The feature allows users to refresh their Telegram dialogs and automatically generate AI responses for unread messages in private chats and mentions in group chats.
 
-### Path Aliases
-The project has proper path alias configuration in both `tsconfig.app.json` and `vite.config.ts`. Use these aliases for imports:
-- `@/*` -> `./src/*`
-- `@components/*` -> `./src/components/*`
-- `@services/*` -> `./src/services/*`
-- `@hooks/*` -> `./src/hooks/*`
-- `@types/*` -> `./src/types/*`
+## Current Implementation Status
 
-## Components
+### Frontend Components
 
-### Telegram Messages Page (`/telegram`)
-Current implementation status:
+1. **Dialog Management**
+   - ✅ `useDialogs` hook exists for fetching and filtering dialogs
+   - ✅ Dialog filtering implemented with modes: 'all-unread', 'unread-dms', 'unread-groups', 'all'
+   - ✅ Refresh functionality implemented in Telegram page (basic refresh of current dialogs)
+   - ❌ Missing filtering for unread messages and mentions specifically
 
-1. **Basic Structure**
-   - Layout with 12-column grid
-   - Three main sections: Message Thread (4 cols), Message Context (5 cols), Response Actions (3 cols)
-   - Components properly imported using path aliases
+2. **Message Fetching**
+   - ✅ `useRecentMessages` hook exists for fetching messages by dialog ID
+   - ✅ API endpoints for fetching messages are implemented
+   - ❌ Missing logic to fetch specific unread messages or messages with mentions
 
-2. **State Management**
-   ```typescript
-   const [selectedDialogId, setSelectedDialogId] = useState<string | null>(null);
-   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
-   const [isLoading, setIsLoading] = useState<boolean>(false);
-   const [error, setError] = useState<Error | null>(null);
-   ```
+3. **Response Generation**
+   - ✅ API endpoints for response generation exist (private and group)
+   - ✅ Response generation is callable from the API service
+   - ✅ API endpoints for managing responses (approve, reject, edit, send) are implemented
+   - ❌ Missing batch processing functionality for multiple dialogs
+   - ❌ Missing progress tracking during generation
 
-3. **Event Handlers**
-   - `handleDialogSelect`: Updates selected dialog and resets message selection
-   - `handleMessageSelect`: Updates selected message
+4. **UI Components**
+   - ✅ Basic refresh button exists in the Telegram page
+   - ✅ Dialog list view with selection functionality
+   - ✅ Conversation view for displaying messages
+   - ❌ Missing progress dialog for tracking batch operations
+   - ❌ Missing specific UI for unread message processing
 
-4. **TODO**
-   - Implement data fetching for dialogs
-   - Add loading state management using `setIsLoading`
-   - Add error handling using `setError`
-   - Connect components to real data sources
-   - Add initial state loading
-   - Implement dialog selection logic
+### Current Edge Case Handling
 
-5. **Component Dependencies**
-   All required components exist in correct locations:
-   - `MainLayout.tsx` in components/Layout
-   - `MessageThread.tsx` in components/Messages
-   - `ResponseActions.tsx` in components/Messages
-   - `MessageContextView` in components/Messages/MessageContextView
+1. **Dialog with Existing Response, No New Messages**
+   - ❌ No implementation for detecting if message_id matches last_processed_message_id
+   - ❌ Missing logic to skip processing for dialogs with no new messages
 
-## Next Steps
-1. Implement dialog fetching and filtering
-2. Add loading states and progress indicators
-3. Implement error handling and user feedback
-4. Connect to message processing pipeline
-5. Add response management functionality
+2. **Dialog with Existing Response, New Messages**
+   - ❌ No implementation for checking response status before updating
+   - ✅ Basic response status tracking exists in the `useResponses` hook
+   - ✅ Response generation API calls exist in `Messages/index.tsx` but without status-based conditionals
 
-## Existing Components to Reuse
+3. **Concurrent Operations**
+   - ❌ No implementation for preventing multiple refresh operations
+   - ❌ Missing progress dialog and processing state management
+   - ❌ No UI locks during processing
 
-### Core Components
-```typescript
-// From components/Messages/
-import { MessageThread } from 'components/Messages/MessageThread';
-import { MessageItem } from 'components/Messages/MessageItem';
-import { ResponseActions } from 'components/Messages/ResponseActions';
+4. **Error Handling**
+   - ✅ Basic error handling exists in API calls and hooks
+   - ❌ Missing retry logic with exponential backoff
+   - ❌ No detailed error feedback in the UI for processing operations
 
-// From components/Auth/
-import { ProtectedRoute } from 'components/Auth/ProtectedRoute';
-import { QRLogin } from 'components/Auth/QRLogin';
-import { SessionManager } from 'components/Auth/SessionManager';
+5. **UI Feedback**
+   - ❌ No implementation for showing processing progress
+   - ✅ Basic loading states exist but not specific to batch operations
+   - ❌ Missing cancellation functionality
 
-// From components/Layout/
-import { MainLayout } from 'components/Layout/MainLayout';
-```
+### Backend Support
 
-## Development Phases
+The backend has comprehensive support for:
+- ✅ Response generation for both private and group chats
+- ✅ Response management (approve, reject, edit, send)
+- ✅ Dialog and message fetching
 
-### Phase 1: Core Setup (Week 1)
-1. **Page Setup**
-   - Create telegram page using `MainLayout`
-   - Integrate existing `ProtectedRoute` for auth protection
-   - Set up routing in main App component
-   - Reuse existing auth flow (`QRLogin`, `SessionManager`)
+### What Needs to be Implemented
 
-2. **Message Context Integration**
-   - Create `MessageContextView` component
-   - Implement `useMessageContext` hook
-   - Add historical context endpoint to existing API
-   - Integrate with existing message services
+1. **Frontend Processing Logic**
+   - Implement the refresh workflow to process multiple dialogs
+   - Add filtering for unread messages and mentions
+   - Create progress tracking during batch operations
+   - Implement error handling with retries
 
-### Phase 2: Component Integration (Week 2)
-1. **Message Display**
-   - Integrate existing `MessageThread` component
-   - Add context display to `MessageItem`
-   - Connect existing response management
-   - Implement context loading states
+2. **UI Enhancements**
+   - Create a progress dialog component
+   - Add user feedback for processing status
+   - Implement dialog-level response management
 
-2. **Response Management**
-   - Integrate existing `ResponseActions`
-   - Connect to existing API endpoints
-   - Reuse existing response processing
-   - Add context-aware response generation
+3. **API Extensions**
+   - Consider creating a batch processing endpoint for efficiency
+   - Add endpoints for clearing message history and responses
 
-### Phase 3: Polish & Testing (Week 3)
-1. **Testing & Optimization**
-   - Test new components
-   - Integration testing with existing components
-   - Performance optimization
-   - Add context caching
+## Data Model Approach
 
-2. **Final Integration**
-   - Error handling
-   - Loading states
-   - Documentation
-   - Performance monitoring
+### Response Storage Strategy
 
-## Component Specifications
+1. **One Response Per Dialog**
+   - Maintain the existing unique constraint on `dialog_id` in the `ProcessedResponse` table
+   - Each dialog will have at most one active response at any time
+   - When new messages are processed, the existing response may be updated or preserved based on its status
 
-### New Components
+3. **User Privacy and Data Management**
+   - Implement dialog-level and global cleanup functionality to allow users to delete message history and responses
 
-#### MessageContextView
-```typescript
-interface MessageContextViewProps {
-  dialogId: string;
-  messageId: string;
-  onContextLoad: (context: MessageContext) => void;
-  className?: string;
-}
+## Processing Logic
 
-interface MessageContext {
-  messages: HistoricalMessage[];
-  hasMore: boolean;
-  isLoading: boolean;
-}
-```
+### Refresh Workflow
 
-#### useMessageContext Hook
-```typescript
-interface UseMessageContextResult {
-  context: MessageContext;
-  loadMore: () => Promise<void>;
-  hasMore: boolean;
-  isLoading: boolean;
-  error: Error | null;
-}
+1. User initiates refresh from the Telegram tab UI
+2. System fetches all dialogs and filters for:
+   - Unread private messages
+   - Group dialogs where the user is mentioned
+3. For each filtered dialog, fetch 50 messages starting from:
+   - The earliest unread message (for private chats)
+   - The earliest user mention (for group chats)
+4. Generate AI responses for these messages
+5. Store responses in the database
+6. Update UI to show processing status and results
 
-const useMessageContext = (
-  dialogId: string,
-  messageId: string
-): UseMessageContextResult;
-```
+### Edge Case Handling
 
-## API Integration
+1. **Dialog with Existing Response, No New Messages**
+   - Compare `last_message_id` from Telegram with `last_processed_message_id`
+   - If they match, skip processing for that dialog
+   - No changes to existing response
 
-### Existing Endpoints to Reuse
-```
-Authentication:
-- POST /api/auth/telegram/login
-- POST /api/auth/telegram/verify
-- POST /api/auth/refresh
+2. **Dialog with Existing Response, New Messages**
+   - Check status of existing response:
+     - If `PENDING_APPROVAL` or `FAILED`: Update with new response for latest message
+     - If `APPROVED`, `REJECTED`, or `SENT`: Preserve existing response, user must manually delete before regenerating
 
-Messages:
-- GET /api/messages/{dialogId}
-- POST /api/responses/generate
-- PUT /api/responses/{responseId}
-- POST /api/responses/{responseId}/approve
-- POST /api/responses/{responseId}/reject
-```
+3. **Concurrent Operations**
+   - Display processing state in UI
+   - Prevent multiple refresh operations with UI locks
+   - Show progress dialog during processing
 
-### New Endpoint Required
-```
-Messages:
-- GET /api/messages/{messageId}/historical-context
-  Parameters:
-    - limit: number
-    - before: number
-    - after: number
-  Response:
-    {
-      messages: HistoricalMessage[];
-      hasMore: boolean;
-    }
-```
+4. **Error Handling**
+   - Implement retry logic for network failures
+   - Log detailed errors for debugging
+   - Show user-friendly error messages in UI
 
-## Testing Strategy
+## UI Components
 
-1. **New Component Tests**
-   - MessageContextView rendering and interaction
-   - useMessageContext hook behavior
-   - API integration for historical context
+1. **Refresh Button**
+   - Add to Telegram tab navigation
+   - Trigger dialog refresh and message processing
 
-2. **Integration Tests**
-   - Interaction with existing components
-   - Authentication flow
-   - Response management
-   - Context loading and pagination
+2. **Progress Dialog**
+   - Show during processing with current status
+   - Display counts of dialogs processed and remaining
+   - Allow cancellation of operation
 
-3. **Performance Tests**
-   - Context loading speed
-   - Memory usage with large context
-   - Caching effectiveness
+3. **Response List**
+   - Display generated responses grouped by dialog
+   - Allow viewing, editing, approving, rejecting responses
 
-## Performance Considerations
+4. **Clear/Delete Options**
+   - Add dialog-level "Clear" button to remove response and message history
+   - Add global "Clear All" option for bulk cleanup
 
-1. **Context Loading**
-   - Implement pagination for historical messages
-   - Cache context data in memory
-   - Preload adjacent message contexts
-   - Implement virtual scrolling for large contexts
+## Implementation Phases
 
-2. **Integration Optimization**
-   - Reuse existing data fetching logic
-   - Share cached data between components
-   - Minimize redundant API calls
-   - Use existing state management
+1. **Backend Updates**
+   - ✅ Update ProcessingStatus enum with missing statuses
+   - Refine response generation endpoint to respect existing response states
 
-## Error Handling
+2. **Frontend Implementation**
+   - Add refresh button to Telegram tab
+   - Implement progress dialog component
+   - Add processing state management
+   - Create response list view
 
-1. **Context Loading Errors**
-   - Network failures
-   - Invalid message IDs
-   - Missing permissions
-   - Rate limiting
+3. **Testing**
+   - Test with various dialog states and message volumes
+   - Verify edge case handling
+   - Test error recovery
 
-2. **Integration Errors**
-   - Component communication
-   - State synchronization
-   - API response handling
-   - Authentication failures
-
-## Deployment Checklist
-
-1. **Pre-deployment**
-   - Test integration with existing components
-   - Verify API endpoint compatibility
-   - Check performance metrics
-   - Review error handling
-
-2. **Deployment**
-   - Update API documentation
-   - Deploy new endpoint
-   - Update frontend routes
-   - Monitor error rates
-
-3. **Post-deployment**
-   - Monitor context loading performance
-   - Track API usage
-   - Collect user feedback
-   - Optimize based on metrics
-
-## Future Considerations
-
-1. **Potential Enhancements**
-   - Advanced context filtering
-   - Smarter context preloading
-   - Enhanced caching strategies
-   - Performance optimizations
-
-2. **Maintenance**
-   - Regular dependency updates
-   - Performance monitoring
-   - Error tracking
-   - User feedback collection 
-
-
-Issues to Fix
-Missing pollResponseGeneration function for checking generation status
-
-Suggested Improvements
-Add proper loading states during transitions
-Implement proper response polling mechanism
-Add error messages for failed operations
-Add success notifications for sent messages
-Implement proper dialog message fetching
-Clean up unused code from the old state model
-Would you like me to help implement any of these improvements? I can start with:
-Creating the useDialogMessages hook
-Implementing the response polling mechanism
-Fixing the type issues and linter errors
-Or any other specific area you'd like to focus on first
-The core architecture for the simplified state model is already in place and working well, we just need to clean up some implementation details and add proper error handling.
+4. **Cleanup Features**
+   - Implement dialog clearing functionality
+   - Add global cleanup options
