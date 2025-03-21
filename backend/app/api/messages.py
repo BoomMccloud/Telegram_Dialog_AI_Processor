@@ -97,7 +97,7 @@ async def list_dialogs(
 )
 async def list_dialog_messages(
     dialog_id: int,
-    limit: int = Query(25, description="Number of messages to return", enum=[25, 50, 75]),
+    limit: int = Query(25, description="Number of messages to return", gt=0),
     session: SessionData = Depends(verify_session_dependency)
 ) -> List[TelegramMessage]:
     """
@@ -105,7 +105,7 @@ async def list_dialog_messages(
     
     Args:
         dialog_id: ID of the dialog to fetch messages from
-        limit: Maximum number of messages to return (default: 25, allowed values: 25, 50, 75)
+        limit: Maximum number of messages to return (default: 25, must be greater than 0)
         
     Returns:
         List of messages from the specified dialog

@@ -26,10 +26,14 @@ class DialogType(str, enum.Enum):
     CHANNEL = 'CHANNEL'
 
 class ProcessingStatus(str, enum.Enum):
-    PENDING_APPROVAL = 'pending_approval'
-    APPROVED = 'approved'
-    REJECTED = 'rejected'
-    SENT = 'sent'
+    """Status of a processed response
+    
+    PENDING_APPROVAL: Ready state - user can input their own reply or generate AI response
+    GENERATING: AI is currently generating a response
+    FAILED: Generation failed and can be retried
+    """
+    PENDING_APPROVAL = 'pending_approval'  # Used as our "ready" state
+    GENERATING = 'generating'
     FAILED = 'failed'
 
 class AuthMethod(str, enum.Enum):

@@ -1,23 +1,23 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Box,
-  Typography,
   Paper,
-  Divider,
+  Typography,
   Avatar,
-  Chip,
-  Card,
-  CardContent,
-  CardActions,
+  Divider,
   Button,
   CircularProgress,
+  TextField,
+  Card,
+  CardContent,
+  Chip,
 } from '@mui/material';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import CancelIcon from '@mui/icons-material/Cancel';
-import EditIcon from '@mui/icons-material/Edit';
-import SendIcon from '@mui/icons-material/Send';
-import PersonIcon from '@mui/icons-material/Person';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
+import SendIcon from '@mui/icons-material/Send';
+import CancelIcon from '@mui/icons-material/Cancel';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import ClearIcon from '@mui/icons-material/Clear';
+import PersonIcon from '@mui/icons-material/Person';
 import { Response, ResponseStatus } from '../../types';
 import { DialogMessage } from '../../types/dialog';
 
@@ -25,25 +25,28 @@ interface ConversationViewProps {
   selectedResponse: Response | null;
   dialogMessages: DialogMessage[];
   loadingMessages: boolean;
-  onReject: () => void;
-  onEdit: () => void;
-  onApprove: () => void;
-  onSend: () => void;
+  onGenerate: () => void;
+  onSend: (response: string) => void;
+  onClear: () => void;
+  onRetry: () => void;
 }
 
 const ConversationView: React.FC<ConversationViewProps> = ({
   selectedResponse,
   dialogMessages,
   loadingMessages,
-  onReject,
-  onEdit,
-  onApprove,
+  onGenerate,
   onSend,
+  onClear,
+  onRetry,
 }) => {
+  const [userInput, setUserInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'instant' });
+    }
   };
 
   useEffect(() => {
@@ -68,21 +71,135 @@ const ConversationView: React.FC<ConversationViewProps> = ({
     );
   }
 
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setUserInput(e.target.value);
+  };
+
+  const handleSend = () => {
+    if (userInput.trim() || selectedResponse.suggested_response) {
+      onSend(userInput.trim() || selectedResponse.suggested_response);
+      setUserInput('');
+    }
+  };
+
+  const renderResponseBox = () => {
+    switch (selectedResponse.status) {
+      case ResponseStatus.GENERATING:
+        return (
+          <Box sx={{ 
+            display: 'flex', 
+            justifyContent: 'center', 
+            alignItems: 'center',
+            height: '100%'
+          }}>
+            <CircularProgress size={24} />
+            <Typography variant="body1" sx={{ ml: 2 }}>
+              Generating response...
+            </Typography>
+            <Button 
+              startIcon={<CancelIcon />}
+              color="error"
+              onClick={onClear}
+              sx={{ ml: 2 }}
+            >
+              Cancel
+            </Button>
+          </Box>
+        );
+
+      case ResponseStatus.FAILED:
+        return (
+          <Box sx={{ 
+            display: 'flex', 
+            flexDirection: 'column',
+            alignItems: 'center',
+            height: '100%'
+          }}>
+            <Typography variant="body1" color="error" sx={{ mb: 2 }}>
+              Failed to generate response
+            </Typography>
+            <Box>
+              <Button 
+                startIcon={<RefreshIcon />}
+                color="primary"
+                onClick={onRetry}
+                sx={{ mr: 2 }}
+              >
+                Retry
+              </Button>
+              <Button 
+                startIcon={<ClearIcon />}
+                color="error"
+                onClick={onClear}
+              >
+                Clear
+              </Button>
+            </Box>
+          </Box>
+        );
+
+      case ResponseStatus.PENDING_APPROVAL:
+      default:
+        return (
+          <>
+            <TextField
+              multiline
+              fullWidth
+              rows={4}
+              value={userInput || selectedResponse.suggested_response || ''}
+              onChange={handleInputChange}
+              placeholder="Type your reply or generate an AI response..."
+              variant="outlined"
+              sx={{ mb: 2 }}
+            />
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+              {!userInput && !selectedResponse.suggested_response && (
+                <Button 
+                  startIcon={<SmartToyIcon />}
+                  color="primary"
+                  onClick={onGenerate}
+                >
+                  Generate AI Response
+                </Button>
+              )}
+              {(userInput || selectedResponse.suggested_response) && (
+                <>
+                  <Button 
+                    startIcon={<ClearIcon />}
+                    color="error"
+                    onClick={() => {
+                      setUserInput('');
+                      onClear();
+                    }}
+                  >
+                    Clear
+                  </Button>
+                  <Button 
+                    startIcon={<SendIcon />}
+                    color="primary"
+                    variant="contained"
+                    onClick={handleSend}
+                  >
+                    Send
+                  </Button>
+                </>
+              )}
+            </Box>
+          </>
+        );
+    }
+  };
+
   // Get status chip based on status
   const getStatusChip = (status: string) => {
     switch (status) {
-      case ResponseStatus.PENDING_APPROVAL:
-        return <Chip label="Pending" color="warning" size="small" />;
-      case ResponseStatus.APPROVED:
-        return <Chip label="Approved" color="info" size="small" />;
-      case ResponseStatus.REJECTED:
-        return <Chip label="Rejected" color="error" size="small" />;
-      case ResponseStatus.SENT:
-        return <Chip label="Sent" color="success" size="small" />;
+      case ResponseStatus.GENERATING:
+        return <Chip label="Generating..." color="warning" size="small" />;
       case ResponseStatus.FAILED:
         return <Chip label="Failed" color="error" size="small" />;
+      case ResponseStatus.PENDING_APPROVAL:
       default:
-        return <Chip label={status} size="small" />;
+        return <Chip label="Pending Approval" color="info" size="small" />;
     }
   };
 
@@ -165,134 +282,20 @@ const ConversationView: React.FC<ConversationViewProps> = ({
             No message history available
           </Typography>
         ) : (
-          <>
+          <Box sx={{ display: 'flex', flexDirection: 'column-reverse' }}>
+            <div ref={messagesEndRef} style={{ height: 1 }} />
             {dialogMessages.map(message => renderMessageBubble(message))}
-          </>
+          </Box>
         )}
       </Box>
       
       <Divider sx={{ mb: 2 }} />
       
-      {/* AI suggested response */}
+      {/* Response box */}
       <Card variant="outlined" sx={{ mb: 2, minHeight: '200px' }}>
-        <CardContent sx={{ 
-          height: '150px',
-          display: 'flex',
-          flexDirection: 'column'
-        }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-            <Avatar sx={{ bgcolor: 'info.main', mr: 1 }}>
-              <SmartToyIcon />
-            </Avatar>
-            <Typography variant="subtitle1">AI Suggested Response</Typography>
-          </Box>
-          <Box sx={{ 
-            overflow: 'auto',
-            flex: 1,
-            '&::-webkit-scrollbar': {
-              width: '8px',
-            },
-            '&::-webkit-scrollbar-track': {
-              background: '#f1f1f1',
-              borderRadius: '4px',
-            },
-            '&::-webkit-scrollbar-thumb': {
-              background: '#888',
-              borderRadius: '4px',
-            },
-            '&::-webkit-scrollbar-thumb:hover': {
-              background: '#555',
-            },
-          }}>
-            {!selectedResponse.suggested_response || selectedResponse.suggested_response === "Loading..." ? (
-              <Box sx={{ 
-                display: 'flex', 
-                justifyContent: 'center', 
-                alignItems: 'center',
-                height: '100%'
-              }}>
-                <CircularProgress size={24} />
-                <Typography variant="body1" sx={{ ml: 2 }}>
-                  Generating response...
-                </Typography>
-              </Box>
-            ) : (
-              <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
-                {selectedResponse.edited_response || selectedResponse.suggested_response}
-              </Typography>
-            )}
-          </Box>
+        <CardContent>
+          {renderResponseBox()}
         </CardContent>
-        <CardActions sx={{ justifyContent: 'flex-end', minHeight: '52px' }}>
-          {!selectedResponse.suggested_response || selectedResponse.suggested_response === "Loading..." ? (
-            <Button 
-              disabled
-              startIcon={<SmartToyIcon />}
-              color="primary"
-            >
-              Generating...
-            </Button>
-          ) : (
-            <>
-              {selectedResponse.status === ResponseStatus.PENDING_APPROVAL && (
-                <>
-                  <Button 
-                    startIcon={<CancelIcon />} 
-                    color="error" 
-                    onClick={onReject}
-                  >
-                    Reject
-                  </Button>
-                  <Button 
-                    startIcon={<EditIcon />} 
-                    color="primary" 
-                    onClick={onEdit}
-                  >
-                    Edit
-                  </Button>
-                  <Button 
-                    startIcon={<CheckCircleIcon />} 
-                    color="success" 
-                    variant="contained"
-                    onClick={onApprove}
-                  >
-                    Approve
-                  </Button>
-                </>
-              )}
-              {selectedResponse.status === ResponseStatus.APPROVED && (
-                <>
-                  <Button 
-                    startIcon={<EditIcon />} 
-                    color="primary" 
-                    onClick={onEdit}
-                  >
-                    Edit
-                  </Button>
-                  <Button 
-                    startIcon={<SendIcon />} 
-                    color="primary" 
-                    variant="contained"
-                    onClick={onSend}
-                  >
-                    Send
-                  </Button>
-                </>
-              )}
-              {(selectedResponse.status === ResponseStatus.REJECTED || 
-                selectedResponse.status === ResponseStatus.SENT || 
-                selectedResponse.status === ResponseStatus.FAILED) && (
-                <Button 
-                  startIcon={<EditIcon />} 
-                  color="primary" 
-                  onClick={onEdit}
-                >
-                  View Details
-                </Button>
-              )}
-            </>
-          )}
-        </CardActions>
       </Card>
     </Paper>
   );

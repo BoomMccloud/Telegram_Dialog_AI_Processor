@@ -263,3 +263,21 @@ Messages:
    - Performance monitoring
    - Error tracking
    - User feedback collection 
+
+
+Issues to Fix
+Missing pollResponseGeneration function for checking generation status
+
+Suggested Improvements
+Add proper loading states during transitions
+Implement proper response polling mechanism
+Add error messages for failed operations
+Add success notifications for sent messages
+Implement proper dialog message fetching
+Clean up unused code from the old state model
+Would you like me to help implement any of these improvements? I can start with:
+Creating the useDialogMessages hook
+Implementing the response polling mechanism
+Fixing the type issues and linter errors
+Or any other specific area you'd like to focus on first
+The core architecture for the simplified state model is already in place and working well, we just need to clean up some implementation details and add proper error handling.

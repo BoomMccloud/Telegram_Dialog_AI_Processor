@@ -62,10 +62,8 @@ export interface DialogListResponse {
 
 // Response types
 export enum ResponseStatus {
-  PENDING_APPROVAL = "pending_approval",
-  APPROVED = "approved",
-  REJECTED = "rejected",
-  SENT = "sent",
+  PENDING_APPROVAL = "pending_approval", // Used as our "ready" state
+  GENERATING = "generating",
   FAILED = "failed"
 }
 
