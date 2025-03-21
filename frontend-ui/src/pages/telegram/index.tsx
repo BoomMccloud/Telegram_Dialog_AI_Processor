@@ -22,8 +22,10 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import ConversationView from '@components/ConversationView';
 import { useDialogs, DialogFilterMode } from '@hooks/useDialogs';
 import { useRecentMessages } from './hooks/useRecentMessages';
+import { useDialogResponse } from '@hooks/useDialogResponse';
 import { DialogMessage } from '../../types/dialog';
 import { HistoricalMessage } from './types';
+import { api } from '@services/api';
 
 // Constants
 const DRAWER_WIDTH = 320;
@@ -62,6 +64,8 @@ const TelegramMessagesPage: React.FC = () => {
     refetch: refetchMessages
   } = useRecentMessages(selectedDialogId);
 
+  const { response, loading: loadingResponse, setSelectedResponse } = useDialogResponse(selectedDialogId);
+
   const dialogMessages = React.useMemo(() => {
     if (!selectedDialogId || !messages) return [];
     return messages.map(msg => transformToDialogMessage(msg, selectedDialogId));
@@ -81,6 +85,49 @@ const TelegramMessagesPage: React.FC = () => {
 
   const handleDialogSelect = (dialogId: string) => {
     setSelectedDialogId(dialogId);
+  };
+
+  const handleGenerate = async () => {
+    if (!selectedDialogId) return;
+    try {
+      await api.responses.generate.private(selectedDialogId);
+    } catch (error) {
+      console.error('Error generating response:', error);
+    }
+  };
+
+  const handleSend = async (responseText: string) => {
+    if (!selectedDialogId || !response) return;
+    try {
+      // First approve the response
+      await api.responses.approve(response.id);
+      
+      // Then update the response text if it was edited
+      if (responseText !== response.suggested_response) {
+        await api.responses.update(response.id, { edited_response: responseText });
+      }
+      
+      // Finally send it
+      await api.responses.send(response.id);
+    } catch (error) {
+      console.error('Error sending response:', error);
+      // Show error in UI
+      if (response) {
+        setSelectedResponse({
+          ...response,
+          status: "FAILED",
+          error: error instanceof Error ? error.message : 'Failed to send response'
+        });
+      }
+    }
+  };
+
+  const handleClear = () => {
+    // No-op for now
+  };
+
+  const handleRetry = () => {
+    handleGenerate();
   };
 
   const renderDialogList = () => (
@@ -286,24 +333,24 @@ const TelegramMessagesPage: React.FC = () => {
 
   return renderBaseLayout(
     <ConversationView
-      selectedResponse={selectedDialog ? {
-        id: selectedDialog.id.toString(),
-        dialog_id: selectedDialog.id.toString(),
-        dialog_name: selectedDialog.title,
-        suggested_response: "Loading...", // This will be replaced with actual response
+      selectedResponse={response || (selectedDialogId ? {
+        id: selectedDialogId,
+        dialog_id: selectedDialogId,
+        dialog_name: selectedDialog?.title || 'Unknown',
+        suggested_response: "No response found",
         edited_response: null,
         status: "PENDING_APPROVAL",
         processed_at: new Date().toISOString(),
         last_message_timestamp: new Date().toISOString(),
         last_message_id: "0",
         model_name: "gpt-4",
-      } : null}
+      } : null)}
       dialogMessages={dialogMessages}
-      loadingMessages={loadingMessages}
-      onReject={() => {}}
-      onEdit={() => {}}
-      onApprove={() => {}}
-      onSend={() => {}}
+      loadingMessages={loadingMessages || loadingResponse}
+      onGenerate={handleGenerate}
+      onSend={handleSend}
+      onClear={handleClear}
+      onRetry={handleRetry}
     />
   );
 };
